@@ -1,11 +1,15 @@
 package com.finderbots
 
-import io.prediction.controller.PDataSource
-import io.prediction.controller.EmptyEvaluationInfo
-import io.prediction.controller.EmptyActualResult
-import io.prediction.controller.Params
-import io.prediction.data.storage.Event
-import io.prediction.data.store.PEventStore
+import _root_.io.prediction.controller.PDataSource
+import _root_.io.prediction.controller.EmptyEvaluationInfo
+import _root_.io.prediction.controller.EmptyActualResult
+import _root_.io.prediction.controller.Params
+import _root_.io.prediction.data.storage.Event
+import _root_.io.prediction.data.store.PEventStore
+import org.apache.mahout.math.RandomAccessSparseVector
+import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
+import org.apache.mahout.sparkbindings._
+import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -13,7 +17,10 @@ import org.apache.spark.rdd.RDD
 
 import grizzled.slf4j.Logger
 
-case class DataSourceParams(appName: String) extends Params
+case class DataSourceParams(
+   appName: String,
+   eventNames: List[String])
+  extends Params
 
 class DataSource(val dsp: DataSourceParams)
   extends PDataSource[TrainingData,
@@ -24,47 +31,54 @@ class DataSource(val dsp: DataSourceParams)
   override
   def readTraining(sc: SparkContext): TrainingData = {
 
+    val eventNames = dsp.eventNames //todo: get from engine.json, the first is the primary
+
     val eventsRDD: RDD[Event] = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("user"),
-      eventNames = Some(List("rate", "buy")), // read "rate" and "buy" event
+      eventNames = Some(eventNames),
       // targetEntityType is optional field of an event.
       targetEntityType = Some(Some("item")))(sc)
 
-    val ratingsRDD: RDD[Rating] = eventsRDD.map { event =>
-      val rating = try {
-        val ratingValue: Double = event.event match {
-          case "rate" => event.properties.get[Double]("rating")
-          case "buy" => 4.0 // map buy event to rating value of 4
-          case _ => throw new Exception(s"Unexpected event ${event} is read.")
+    val actionRDDs = eventNames.map { eventName =>
+      val actionRDD = eventsRDD.map { event =>
+        val userAction = try {
+          if (!eventNames.contains(event.event))
+            throw new Exception(s"Unexpected event ${event} is read.")
+          // do we really want to throw and exception here? Maybe report and ignore the event
+          // entityId and targetEntityId is String and all we care about for input validation
+          (event.entityId, event.targetEntityId.get)
+        } catch {
+          case e: Exception => {
+            logger.error(s"Cannot convert ${event} to a user action. Exception: ${e}.")
+            throw e
+          }
         }
-        // entityId and targetEntityId is String
-        Rating(event.entityId,
-          event.targetEntityId.get,
-          ratingValue)
-      } catch {
-        case e: Exception => {
-          logger.error(s"Cannot convert ${event} to Rating. Exception: ${e}.")
-          throw e
-        }
-      }
-      rating
-    }.cache()
+        userAction
+      }.cache()
+      //todo: take out when not debugging
+      val debugActions = actionRDD.take(5)
+      //val indexedDataset = IndexedDatasetSpark(actionRDD)(sc)
+      (eventName, actionRDD)
+    }
 
-    new TrainingData(ratingsRDD)
+    // should have a list of RDDs, one per action
+
+    // for now all IndexedDatasets are considered to have users in rows so all must have the same
+    // row dimentionality
+    // todo: allows some data to be content, which will not have the same number of rows
+    new TrainingData(actionRDDs)
   }
 }
 
-case class Rating(
-  user: String,
-  item: String,
-  rating: Double
-)
-
 class TrainingData(
-  val ratings: RDD[Rating]
-) extends Serializable {
+    val actions: List[(String, RDD[(String, String)])])
+  extends Serializable {
+
   override def toString = {
-    s"ratings: [${ratings.count()}] (${ratings.take(2).toList}...)"
+    actions.map { t =>
+      s"${t._1} actions: [count:${t._2.count()}] + sample:${t._2.take(2).toList} "
+    }.toString()
   }
+
 }

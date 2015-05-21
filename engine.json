@@ -4,16 +4,24 @@
   "engineFactory": "com.finderbots.RecommendationEngine",
   "datasource": {
     "params" : {
-      "appName": "MyApp1"
+      "name": "sample-movielens",
+      "appName": "MMRApp1",
+      "eventNames": ["rate", "buy"]
     }
+  },
+  "sparkConf": {
+    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+    "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
+    "spark.kryo.referenceTracking": "false",
+    "spark.kryoserializer.buffer.mb": "200",
+    "spark.executor.memory": "4g"
   },
   "algorithms": [
     {
-      "name": "als",
+      "name": "mmr",
       "params": {
-        "rank": 10,
-        "numIterations": 20,
-        "lambda": 0.01,
+        "appName": "MMRApp1",
+        "eventNames": ["rate", "buy"],
         "seed": 3
       }
     }
