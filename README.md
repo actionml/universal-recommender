@@ -1,4 +1,4 @@
-# Multimodal Recommendation (MR) Template
+# Multimodal Recommendation (MMR) Template
 
 ## Documentation
 
@@ -9,18 +9,18 @@ recommend query with a Search Engine.
 
 ## Versions
 
-### develop
+### work in progress, by no means is this runnable
 
-### v0.0.1
-
-- initial rename for classes
-
-### v0.0.0
-
-- update for PredictionIO 0.9.2, including:
-
+  - Serving and query stubbed
+  - early debuggable version of a writer for indicators to ES, still working out how to identify the index, type, doc IDs, and fields
+  - MMRModel created but crash before code gets to save.
+  - upgraded to PredictionIO 0.9.3
+  - MMRAlgorithm.predict stubbed
+  - MMRAlgorithm.train working
+  - added Mahout's Spark requirements to engine.json sparkConf section, verified that Kryo serialization is working for Mahout objects
+  - Lots of work to make debuggable but this is in Intellij land, and only has an effect on build.sbt (as well as PIO on IntelliJ docs)
+  - Preparator working
+  - DataStore working
   - initial commit
-  - use new PEventStore API
-  - use appName in DataSource parameter
-  - clone of ALS as a base
+  - clone of ALS template as a base
 
