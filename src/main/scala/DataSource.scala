@@ -17,17 +17,28 @@ import org.apache.spark.rdd.RDD
 
 import grizzled.slf4j.Logger
 
+/** Taken from engine.json these are passed in to the DataSource constructor
+  *
+  * @param appName registered name for the app
+  * @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
+  *                   will be used to create the primary indicator and cross-cooccurrence secondary indicators.
+  */
 case class DataSourceParams(
    appName: String,
    eventNames: List[String])
   extends Params
 
+/** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
+  * are sent to the Preparator for further processing.
+  * @param dsp parameters taken from engine.json
+  */
 class DataSource(val dsp: DataSourceParams)
   extends PDataSource[TrainingData,
       EmptyEvaluationInfo, Query, EmptyActualResult] {
 
   @transient lazy val logger = Logger[this.type]
 
+  /** Reads events from PEventStore and creates and RDD for each */
   override
   def readTraining(sc: SparkContext): TrainingData = {
 
@@ -42,35 +53,28 @@ class DataSource(val dsp: DataSourceParams)
 
     val actionRDDs = eventNames.map { eventName =>
       val actionRDD = eventsRDD.map { event =>
-        val userAction = try {
-          if (!eventNames.contains(event.event))
-            throw new Exception(s"Unexpected event ${event} is read.")
-          // do we really want to throw and exception here? Maybe report and ignore the event
-          // entityId and targetEntityId is String and all we care about for input validation
-          (event.entityId, event.targetEntityId.get)
-        } catch {
-          case e: Exception => {
-            logger.error(s"Cannot convert ${event} to a user action. Exception: ${e}.")
-            throw e
-          }
-        }
-        userAction
+
+        require(eventNames.contains(event.event), s"Unexpected event ${event} is read.") // is this really needed?
+        require(event.entityId.nonEmpty && event.targetEntityId.get.nonEmpty, "Empty user or item ID")
+
+        (event.entityId, event.targetEntityId.get)
+
       }.cache()
       //todo: take out when not debugging
       val debugActions = actionRDD.take(5)
-      //val indexedDataset = IndexedDatasetSpark(actionRDD)(sc)
       (eventName, actionRDD)
     }
 
-    // should have a list of RDDs, one per action
-
-    // for now all IndexedDatasets are considered to have users in rows so all must have the same
-    // row dimentionality
-    // todo: allows some data to be content, which will not have the same number of rows
+    // Have a list of (actionName, RDD), for each action
+    // todo: should allow some data to be content indicators, which requires rethinking how to use PEventStore
     new TrainingData(actionRDDs)
   }
 }
 
+/** Low level RDD based representation of the data ready for the Preparator
+  *
+  * @param actions List of Tuples (actionName, actionRDD)
+  */
 class TrainingData(
     val actions: List[(String, RDD[(String, String)])])
   extends Serializable {

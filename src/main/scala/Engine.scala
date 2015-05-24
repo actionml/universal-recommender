@@ -1,7 +1,6 @@
 package com.finderbots
 
-import io.prediction.controller.IEngineFactory
-import io.prediction.controller.Engine
+import io.prediction.controller.{EngineFactory, IEngineFactory, Engine}
 
 /** todo: this needs to be a good deal more expressive to encompass things like context */
 case class Query(
@@ -18,7 +17,7 @@ case class ItemRank(
   score: Int // rank, original order returned
 ) extends Serializable
 
-object RecommendationEngine extends IEngineFactory {
+object RecommendationEngine extends EngineFactory {
   def apply() = {
     new Engine(
       classOf[DataSource],

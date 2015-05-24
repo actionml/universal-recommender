@@ -26,11 +26,11 @@ class MMRModel(
     logger.info("Saving mmr model")
     val esConfig = StorageClientConfig()
     val esStorageClient = new io.prediction.data.storage.elasticsearch.StorageClient(esConfig)
-    /*class ElasticsearchIndexedDatasetWriter(val writeSchema: Schema, val sort: Boolean = true)
-  (implicit val mc: DistributedContext)*/
+
     val esSchema = new Schema(
       "es" -> esStorageClient,
       "indexName" -> indexName)
+
     val esWriter = new ElasticsearchIndexedDatasetWriter(esSchema)(coocurrenceMatrices.head._2.matrix.context)
 
     // todo: how do we handle a previously trained indicator set, removing it after the new one is indexed?

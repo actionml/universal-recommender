@@ -14,6 +14,12 @@ import org.apache.spark.rdd.RDD
 class Preparator
   extends PPreparator[TrainingData, PreparedData] {
 
+  /** Create [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]] rdd backed
+    * "distributed row matrices" from the input string keyed rdds.
+    * @param sc Spark context for rdds
+    * @param trainingData list of (actionName, actionRDD)
+    * @return list of (indicatorName, indicatorindexedDataset)
+    */
   def prepare(sc: SparkContext, trainingData: TrainingData): PreparedData = {
     // now that we have all actions in separate RDDs we must merge any user dictionaries and
     // make sure the same user ids map to the correct events

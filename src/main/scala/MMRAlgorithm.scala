@@ -14,11 +14,20 @@ import org.apache.spark.rdd.RDD
 import grizzled.slf4j.Logger
 
 /**todo: probably need mappings here */
+
+
+
+/** Instantiated from engine.json */
 case class MMRAlgorithmParams(
   appName: String,// filled in from engine.json
   eventNames: List[String],// names used to ID all user actions
   seed: Option[Long]) extends Params //fixed default make it reproducable unless supplied
 
+/** Creates cooccurrence, cross-cooccurrence and eventually content indicators with
+  * [[org.apache.mahout.math.cf.SimilarityAnalysis]] The analysis part of the recommender is
+  * done here but the algorithm can predict only when the coocurrence data is indexed in a
+  * search engine like Elasticsearch. This is done in MMRModel.save.
+  */
 class MMRAlgorithm(val ap: MMRAlgorithmParams)
   extends P2LAlgorithm[PreparedData, MMRModel, Query, PredictedResult] {
 
@@ -30,7 +39,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
       s"Primary action in PreparedData cannot be empty." +
       " Please check if DataSource generates TrainingData" +
       " and Preprator generates PreparedData correctly.")
-    // todo: do the cooccurrence calc here but wait for MMRModel.save to store in ES?
+    // todo: remove when not debugging
     val debug = data.actions(0)._2.asInstanceOf[IndexedDatasetSpark].matrix.collect
     logger.info("Actions read now creating indicators")
     val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
@@ -40,9 +49,9 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
     val indexName = "mmrindex" //todo: where do we derive this, instance id?
 
+    // todo: remove when not debugging
     val debug2 = cooccurrenceIndicators(0)._2.matrix.collect
     logger.info("Indicators created now putting into MMRModel")
-    println("Indicators created now putting into MMRModel")
     new MMRModel(cooccurrenceIndicators, indexName)
   }
 
@@ -58,6 +67,8 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     }
   }
 
+  // boilerplate from inside PIO for getting the query, which will be user action history
+  // needs to be modified for use here
   /** Get recent events of the user on items for recommending similar items */
   def getRecentItems(query: Query): Set[String] = {
     // get latest 10 user view item events

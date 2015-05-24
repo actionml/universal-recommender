@@ -22,15 +22,15 @@ import org.json4s.native.JsonMethods._
 import org.json4s.native.Serialization.read
 import org.json4s.native.Serialization.write
 
-/** Extends the Writer trait to supply the type being written and supplies the writer function */
+/** Extends the Writer trait to supply the type being written and the writer function */
 trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
 
   /** Read in text delimited elements from all URIs in this comma delimited source String.
     * @param mc context for the Spark job
     * @param writeSchema describes the store and details for how to write the dataset.
-    * @param dest string the points to dest for [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]]
+    * @param dest string the points to the Elasticsearch field
     * @param indexedDataset what to write
-    * @param sort true if written sorted by element strength (default)
+    * @param sort true if written sorted by element strength (default = true)
     */
   protected def writer(
     mc: DistributedContext,
@@ -44,9 +44,7 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
       // val omitScore = writeSchema("omitScore").asInstanceOf[Boolean] // will throw cast error if wrong type
       val esStorageClient = writeSchema("es").asInstanceOf[StorageClient]
       val indexName = writeSchema("indexName").asInstanceOf[String]
-      //instance vars must be put into locally scoped vals when put into closures that are
-      //executed but Spark
-      val elementDelim = " "
+      val elementDelim = " " // todo: should be an array of strings eventually, not a space delimited string of IDs
 
       require (indexedDataset != null ,"No IndexedDataset to write")
       require (!dest.isEmpty,"No destination to write to")
@@ -86,38 +84,48 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
         } // "if" returns a line of text so this must be last in the block
 
         // create and update and write to ES here
-        //implicit val formats = DefaultFormats.lossless
-
-        // todo: use the upsert so indicator fields won't be deleted when the next indicator is written
-        // https://www.elastic.co/guide/en/elasticsearch/client/java-api/current/java-update-api.html#java-update-api-upsert
-        // todo: what should be used for the model MMRModelID
-        // todo: I think the doc._1, which is the doc ID is actually used as a URI fragment so better escape it
-        val indexRequest = new IndexRequest(indexName, "indicators", doc._1)
-          .source(XContentFactory.jsonBuilder()
-            .startObject()
-              .field(dest, doc._2 )
-            .endObject())
-        val updateRequest = new UpdateRequest(indexName, "indicators", doc._1)
-          .doc(XContentFactory.jsonBuilder()
-            .startObject()
-              .field(dest, doc._2 )
-            .endObject())
-          .upsert(indexRequest)
-        esStorageClient.client.update(updateRequest).get()
-      }
+        upsertRow(esStorageClient, indexName, doc._1, dest, doc._2)
+     }
 
     }catch{
       case cce: ClassCastException => {
         logger.error("Schema has illegal values"); throw cce}
     }
   }
+  
+  def upsertRow(
+    esStorageClient: StorageClient, 
+    indexName: String,
+    docID: String,
+    fieldName: String,
+    fieldData: String): Unit = {
+    // Use the upsert so indicator fields won't be deleted when the next indicator is written
+    // https://www.elastic.co/guide/en/elasticsearch/client/java-api/current/java-update-api.html#java-update-api-upsert
+    // todo: what should be used for the model MMRModelID
+    // todo: I think the doc._1, which is the doc ID is actually used as a URI fragment so better encode it
+    //implicit val formats = DefaultFormats.lossless
+    val indexRequest = new IndexRequest(indexName, "indicators", docID)
+      .source(XContentFactory.jsonBuilder() // todo: maybe use json4s here to make more reabable 
+        .startObject()
+          .field(fieldName, fieldData ) // todo: should be a list of String?
+        .endObject())
+    val updateRequest = new UpdateRequest(indexName, "indicators", docID)
+      .doc(XContentFactory.jsonBuilder()
+        .startObject()
+          .field(fieldName, fieldData )
+        .endObject())
+      .upsert(indexRequest)
+    esStorageClient.client.update(updateRequest).get()
+
+  }
+  
 }
 
 /**
- * Writes  text delimited files into an IndexedDataset. Classes can be used to supply trait params in their
+ * Writes IndexedDataset to Elasticsearch. Classes can be used to supply trait params in their
  * constructor.
  * @param writeSchema describes the parameters for writing to Elasticsearch.
- * @param mc Spark context for reading files
+ * @param mc [[org.apache.mahout.sparkbindings.SparkDistributedContext]] for distributed writing
  * @note the destination is supplied to Writer#writeTo
  */
 class ElasticsearchIndexedDatasetWriter(val writeSchema: Schema, val sort: Boolean = true)
