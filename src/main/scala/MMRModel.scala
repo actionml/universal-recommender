@@ -1,26 +1,43 @@
 package com.finderbots
-//package org.apache.spark.mllib.recommendation
-// This must be the same package as Spark's MatrixFactorizationModel because
-// MatrixFactorizationModel's constructor is private and we are using
-// its constructor in order to save and load the model
-// todo: THIS MUST BE REMOVED FROM SPARK
 
-import com.finderbots.MRAlgorithmParams
+import com.finderbots.MMRAlgorithmParams
+import grizzled.slf4j.Logger
 
 import io.prediction.controller.{PersistentModel, IPersistentModel, IPersistentModelLoader}
-import io.prediction.data.storage.BiMap
+import io.prediction.data.storage.{StorageClientConfig, Storage, BaseStorageClient, BiMap}
+import org.apache.mahout.math.RandomAccessSparseVector
+import org.apache.mahout.math.drm.DistributedContext
+import org.apache.mahout.math.indexeddataset.Schema
+import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 
-/** Cooccurrence models to save in ES */
-class MMRModel(/* something like cooccurrence and ES object? */) {
+/** Multimodal Cooccurrence models to save in ES */
+class MMRModel(
+  coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
+  indexName: String ) {
+  @transient lazy val logger = Logger[this.type]
 
-  def save(id: String, params: MRAlgorithmParams,
+  def save(id: String, params: MMRAlgorithmParams,
     sc: SparkContext): Boolean = {
 
-    //todo: create writer for IndexedDatasetSpark that can save in ES
+    logger.info("Saving mmr model")
+    val esConfig = StorageClientConfig()
+    val esStorageClient = new io.prediction.data.storage.elasticsearch.StorageClient(esConfig)
+    /*class ElasticsearchIndexedDatasetWriter(val writeSchema: Schema, val sort: Boolean = true)
+  (implicit val mc: DistributedContext)*/
+    val esSchema = new Schema(
+      "es" -> esStorageClient,
+      "indexName" -> indexName)
+    val esWriter = new ElasticsearchIndexedDatasetWriter(esSchema)(coocurrenceMatrices.head._2.matrix.context)
+
+    // todo: how do we handle a previously trained indicator set, removing it after the new one is indexed?
+    // todo: this just keeps overwriting the collection
+    coocurrenceMatrices.foreach { case (actionName, dataset) =>
+      esWriter.writeTo(dataset, actionName) // writing one field at a time, rather than joining all datasets on item ID
+    }
     true
   }
 
@@ -35,12 +52,5 @@ class MMRModel(/* something like cooccurrence and ES object? */) {
     s"(${itemStringIntMap.take(2)}...)" */
     s"describe stuff sent to ES"
   }
-}
 
-/** Not sure we need a companion object since we seem to need only one constructor AFAIK*/
-object MMRModel {
-  def apply(id: String, params: MRAlgorithmParams,
-    sc: Option[SparkContext]) = {
-    new MMRModel(/* something like cooccurrence and ES object? */)
-  }
 }

@@ -24,10 +24,12 @@ class Preparator
       d = Some(ids.rowIDs)
       (t._1, ids)
     }
+    // now make ssure all matrices have identical row space since this corresponds to all users
     val rowAdjustedIds = indexedDatasets.map { t =>
       val numUsers = d.get.size
       (t._1, t._2.create(t._2.matrix, d.get, t._2.columnIDs).newRowCardinality(numUsers))
     }
+
     new PreparedData(rowAdjustedIds)
   }
 

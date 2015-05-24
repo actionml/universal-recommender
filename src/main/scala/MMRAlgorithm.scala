@@ -1,6 +1,6 @@
 package com.finderbots
 
-import io.prediction.controller.PAlgorithm
+import io.prediction.controller.P2LAlgorithm
 import io.prediction.controller.Params
 import io.prediction.data.storage.{Event, BiMap}
 import io.prediction.data.store.LEventStore
@@ -14,13 +14,13 @@ import org.apache.spark.rdd.RDD
 import grizzled.slf4j.Logger
 
 /**todo: probably need mappings here */
-case class MRAlgorithmParams(
+case class MMRAlgorithmParams(
   appName: String,// filled in from engine.json
   eventNames: List[String],// names used to ID all user actions
   seed: Option[Long]) extends Params //fixed default make it reproducable unless supplied
 
-class MMRAlgorithm(val ap: MRAlgorithmParams)
-  extends PAlgorithm[PreparedData, MMRModel, Query, PredictedResult] {
+class MMRAlgorithm(val ap: MMRAlgorithmParams)
+  extends P2LAlgorithm[PreparedData, MMRModel, Query, PredictedResult] {
 
   @transient lazy val logger = Logger[this.type]
 
@@ -32,11 +32,18 @@ class MMRAlgorithm(val ap: MRAlgorithmParams)
       " and Preprator generates PreparedData correctly.")
     // todo: do the cooccurrence calc here but wait for MMRModel.save to store in ES?
     val debug = data.actions(0)._2.asInstanceOf[IndexedDatasetSpark].matrix.collect
-    val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(data.actions.map(_._2).toArray) //strip actionNamed
-    val cooccurrenceIndicators = cooccurrenceIDSs.zip(data.actions.map(_._1)) //add back the actionNames
-    // todo: need to save rdds for user history and cooccurrence
+    logger.info("Actions read now creating indicators")
+    val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
+      data.actions.map(_._2).toArray) // strip action names
+      .map(_.asInstanceOf[IndexedDatasetSpark]) // we know this is a Spark version of IndexedDataset
+    val cooccurrenceIndicators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
-    new MMRModel(/* something like cooccurrence and user history IndexedDataset and ES object? */)
+    val indexName = "mmrindex" //todo: where do we derive this, instance id?
+
+    val debug2 = cooccurrenceIndicators(0)._2.matrix.collect
+    logger.info("Indicators created now putting into MMRModel")
+    println("Indicators created now putting into MMRModel")
+    new MMRModel(cooccurrenceIndicators, indexName)
   }
 
   def predict(model: MMRModel, query: Query): PredictedResult = {
@@ -51,7 +58,6 @@ class MMRAlgorithm(val ap: MRAlgorithmParams)
     }
   }
 
-  /** Get recent events of the user on items for recommending similar items */
   /** Get recent events of the user on items for recommending similar items */
   def getRecentItems(query: Query): Set[String] = {
     // get latest 10 user view item events
