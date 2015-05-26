@@ -3,10 +3,9 @@ package com.finderbots
 import com.finderbots.MMRAlgorithmParams
 import grizzled.slf4j.Logger
 
-import io.prediction.controller.{PersistentModel, IPersistentModel, IPersistentModelLoader}
-import io.prediction.data.storage.{StorageClientConfig, Storage, BaseStorageClient, BiMap}
-import org.apache.mahout.math.RandomAccessSparseVector
-import org.apache.mahout.math.drm.DistributedContext
+import io.prediction.controller.PersistentModel
+import io.prediction.data.storage.{elasticsearch, StorageClientConfig}
+import io.prediction.data.storage.elasticsearch.StorageClient
 import org.apache.mahout.math.indexeddataset.Schema
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 
@@ -16,22 +15,24 @@ import org.apache.spark.rdd.RDD
 
 /** Multimodal Cooccurrence models to save in ES */
 class MMRModel(
-  coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
-  indexName: String ) {
+    coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
+    indexName: String )
+  extends PersistentModel[MMRAlgorithmParams] {
   @transient lazy val logger = Logger[this.type]
 
-  def save(id: String, params: MMRAlgorithmParams,
-    sc: SparkContext): Boolean = {
+  def save(id: String, params: MMRAlgorithmParams, sc: SparkContext): Boolean = {
 
     logger.info("Saving mmr model")
     val esConfig = StorageClientConfig()
-    val esStorageClient = new io.prediction.data.storage.elasticsearch.StorageClient(esConfig)
-
+    val esStorageClient = new elasticsearch.StorageClient(esConfig)
     val esSchema = new Schema(
-      "es" -> esStorageClient,
+      //"esClient" -> esStorageClient.client, // oddly enough this does serialize
+      "parallel" -> esConfig.parallel,
+      "test" -> esConfig.test,
+      "properties" -> esConfig.properties,
       "indexName" -> indexName)
 
-    val esWriter = new ElasticsearchIndexedDatasetWriter(esSchema)(coocurrenceMatrices.head._2.matrix.context)
+    val esWriter = new ElasticsearchIndexedDatasetWriter(esSchema)(sc)
 
     // todo: how do we handle a previously trained indicator set, removing it after the new one is indexed?
     // todo: this just keeps overwriting the collection

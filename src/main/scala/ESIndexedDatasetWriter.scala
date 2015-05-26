@@ -1,6 +1,6 @@
 package com.finderbots
 
-import _root_.io.prediction.data.storage.StorageClientConfig
+import _root_.io.prediction.data.storage.{elasticsearch, StorageClientConfig}
 import _root_.io.prediction.data.storage.elasticsearch.StorageClient
 import org.apache.log4j.Logger
 import org.apache.mahout.math.indexeddataset._
@@ -11,6 +11,7 @@ import org.apache.mahout.math.drm.{DrmLike, DrmLikeOps, DistributedContext, Chec
 import org.apache.mahout.sparkbindings._
 import org.elasticsearch.action.index.IndexRequest
 import org.elasticsearch.action.update.UpdateRequest
+import org.elasticsearch.client.transport.TransportClient
 import org.elasticsearch.common.xcontent.XContentFactory
 import scala.collection.JavaConversions._
 import org.elasticsearch.ElasticsearchException
@@ -41,8 +42,10 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
     @transient lazy val logger = Logger.getLogger(this.getClass.getCanonicalName)
     try {
       // pull out and validate schema params
-      // val omitScore = writeSchema("omitScore").asInstanceOf[Boolean] // will throw cast error if wrong type
-      val esStorageClient = writeSchema("es").asInstanceOf[StorageClient]
+      //val esClient = writeSchema("esClient").asInstanceOf[TransportClient]
+      val parallel = writeSchema("parallel").asInstanceOf[Boolean]
+      val test = writeSchema("test").asInstanceOf[Boolean]
+      val properties = writeSchema("properties").asInstanceOf[Map[String, String]]
       val indexName = writeSchema("indexName").asInstanceOf[String]
       val elementDelim = " " // todo: should be an array of strings eventually, not a space delimited string of IDs
 
@@ -57,6 +60,7 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
       val columnIDDictionary = indexedDataset.columnIDs
       val columnIDDictionary_bcast = mc.broadcast(columnIDDictionary)
 
+      // may want to mapBlock and create bulk updates as a slight optimization
       matrix.rdd.map { case (rowID, itemVector) =>
 
         // turn non-zeros into list for sorting
@@ -64,12 +68,12 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
         for (ve <- itemVector.nonZeroes) {
           itemList = itemList :+ (ve.index, ve.get)
         }
-        //sort by highest value descending(-)
+        //sort by highest strength value descending(-)
         val vector = if (sort) itemList.sortBy { elem => -elem._2 } else itemList
 
         // construct the data to be written as a doc to ES
         // first get the external docID token
-        val doc = if (!vector.isEmpty){
+        val doc = if (vector.nonEmpty){
           val docID = rowIDDictionary_bcast.value.inverse.getOrElse(rowID, "INVALID_DOC_ID")
           // for the rest of the row, construct the vector contents of elements (external column ID, strength value)
           var line = ""
@@ -84,7 +88,19 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
         } // "if" returns a line of text so this must be last in the block
 
         // create and update and write to ES here
-        upsertRow(esStorageClient, indexName, doc._1, dest, doc._2)
+        val esClient = new elasticsearch.StorageClient(StorageClientConfig(parallel, test, properties)).client
+        val indexRequest = new IndexRequest(indexName, "indicators", doc._1)
+          .source(XContentFactory.jsonBuilder() // todo: maybe use json4s here to make more reabable
+          .startObject()
+          .field(dest, doc._2 ) // todo: should be a list of String?
+          .endObject())
+        val updateRequest = new UpdateRequest(indexName, "indicators", doc._1)
+          .doc(XContentFactory.jsonBuilder()
+          .startObject()
+          .field(dest, doc._2 )
+          .endObject())
+          .upsert(indexRequest)
+        esClient.update(updateRequest).get()
      }
 
     }catch{
@@ -92,33 +108,7 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
         logger.error("Schema has illegal values"); throw cce}
     }
   }
-  
-  def upsertRow(
-    esStorageClient: StorageClient, 
-    indexName: String,
-    docID: String,
-    fieldName: String,
-    fieldData: String): Unit = {
-    // Use the upsert so indicator fields won't be deleted when the next indicator is written
-    // https://www.elastic.co/guide/en/elasticsearch/client/java-api/current/java-update-api.html#java-update-api-upsert
-    // todo: what should be used for the model MMRModelID
-    // todo: I think the doc._1, which is the doc ID is actually used as a URI fragment so better encode it
-    //implicit val formats = DefaultFormats.lossless
-    val indexRequest = new IndexRequest(indexName, "indicators", docID)
-      .source(XContentFactory.jsonBuilder() // todo: maybe use json4s here to make more reabable 
-        .startObject()
-          .field(fieldName, fieldData ) // todo: should be a list of String?
-        .endObject())
-    val updateRequest = new UpdateRequest(indexName, "indicators", docID)
-      .doc(XContentFactory.jsonBuilder()
-        .startObject()
-          .field(fieldName, fieldData )
-        .endObject())
-      .upsert(indexRequest)
-    esStorageClient.client.update(updateRequest).get()
 
-  }
-  
 }
 
 /**
@@ -129,6 +119,6 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
  * @note the destination is supplied to Writer#writeTo
  */
 class ElasticsearchIndexedDatasetWriter(val writeSchema: Schema, val sort: Boolean = true)
-  (implicit val mc: DistributedContext)
+  (implicit val mc: SparkDistributedContext)
   extends ESIndexedDatasetWriter
 
