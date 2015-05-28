@@ -90,7 +90,7 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
         // create and update and write to ES here
         val esClient = new elasticsearch.StorageClient(StorageClientConfig(parallel, test, properties)).client
         val indexRequest = new IndexRequest(indexName, "indicators", doc._1)
-          .source(XContentFactory.jsonBuilder() // todo: maybe use json4s here to make more reabable
+          .source(XContentFactory.jsonBuilder() // not using json4s here in case of executor overhead
           .startObject()
           .field(dest, doc._2 ) // todo: should be a list of String?
           .endObject())
@@ -111,12 +111,11 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
 
 }
 
-/**
- * Writes IndexedDataset to Elasticsearch. Classes can be used to supply trait params in their
- * constructor.
- * @param writeSchema describes the parameters for writing to Elasticsearch.
- * @param mc [[org.apache.mahout.sparkbindings.SparkDistributedContext]] for distributed writing
- * @note the destination is supplied to Writer#writeTo
+/** Writes IndexedDataset to Elasticsearch. Classes can be used to supply trait params in their
+  * constructor.
+  * @param writeSchema describes the parameters for writing to Elasticsearch.
+  * @param mc [[org.apache.mahout.sparkbindings.SparkDistributedContext]] for distributed writing
+  * @note the destination is supplied to Writer#writeTo
  */
 class ElasticsearchIndexedDatasetWriter(val writeSchema: Schema, val sort: Boolean = true)
   (implicit val mc: SparkDistributedContext)

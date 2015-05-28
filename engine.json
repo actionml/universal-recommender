@@ -22,6 +22,8 @@
       "params": {
         "appName": "MMRApp1",
         "eventNames": ["rate", "buy"],
+        "maxQueryActions": 20,
+        "maxRecs": 20,
         "seed": 3
       }
     }
