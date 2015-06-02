@@ -11,10 +11,16 @@ libraryDependencies ++= Seq(
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
   // Mahout's Spark code
   // used in 'pio build' with maven repos
-  "org.apache.mahout" % "mahout-math-scala_2.10" % mahoutVersion,
-  "org.apache.mahout" % "mahout-spark_2.10" % mahoutVersion,
-  "org.apache.mahout" % "mahout-math" % mahoutVersion,
-  "org.apache.mahout" % "mahout-hdfs" % mahoutVersion)
+  "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion
+    exclude("org.apache.mahout", "mahout-spark"),
+  "org.apache.mahout" %% "mahout-spark" % mahoutVersion
+    exclude("org.apache.spark", "spark-core_2.10"),
+  "org.apache.mahout"  % "mahout-math" % mahoutVersion,
+  "org.apache.mahout"  % "mahout-hdfs" % mahoutVersion
+    exclude("com.thoughtworks.xstream", "xstream")
+    exclude("org.apache.hadoop", "hadoop-client"),
+  "com.thoughtworks.xstream" % "xstream" % "1.4.4"
+    exclude("xmlpull", "xmlpull"))
 //
 /* used while debugging
   "org.apache.mahout" % "mahout-math-scala_2.10" % mahoutVersion % "provided"
@@ -41,3 +47,12 @@ libraryDependencies ++= Seq(
 //resolvers += "Apache staging" at " https://repository.apache.org/content/repositories/orgapachemahout-1009"
 
 //resolvers += Resolver.mavenLocal
+
+assemblyMergeStrategy in assembly := {
+  case "plugin.properties" => MergeStrategy.discard
+  case PathList(ps @ _*) if ps.last endsWith "package-info.class" =>
+    MergeStrategy.first
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
