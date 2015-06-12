@@ -17,10 +17,16 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 
 import grizzled.slf4j.Logger
-
-/**todo: probably need mappings here */
-
-
+/*
+“fields”: [
+   {
+     “name”: ”fieldname”
+     “values”: [“series”, ...],// values in the field query
+     “bias”: -maxFloat..maxFloat// negative means a filter, positive is a boost
+   }, ...
+ ]
+*/
+case class Field(name: String, values: Array[String], bias: Float)
 
 /** Instantiated from engine.json */
 case class MMRAlgorithmParams(
@@ -28,6 +34,7 @@ case class MMRAlgorithmParams(
   eventNames: List[String],// names used to ID all user actions
   maxQueryActions: Int,
   maxRecs: Int,
+  fieldNames: Array[Field],
   seed: Option[Long]) extends Params //fixed default make it reproducable unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content indicators with
@@ -59,7 +66,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     val cooccurrenceIndicators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     logger.info("Indicators created now putting into MMRModel")
-    new MMRModel(cooccurrenceIndicators, indexName)
+    new MMRModel(cooccurrenceIndicators, data.fieldsRDD, indexName)
   }
 
   /** Return a list of items recommended for a user identified in the query
@@ -95,13 +102,13 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     val recentItems = getRecentItems(query, ap.eventNames, ap.maxQueryActions)
 
     val json =
-    (
-      ("size" -> ap.maxRecs) ~
-      ("query"->
-        ("bool"->
-          ("should"->
-            recentItems.map { i =>
-              ("terms" -> (i.actionName -> i.itemIDs))}))))
+      (
+        ("size" -> ap.maxRecs) ~
+        ("query"->
+          ("bool"->
+            ("should"->
+              recentItems.map { i =>
+                ("terms" -> (i.actionName -> i.itemIDs))}))))
 
     val esConfig = StorageClientConfig()
     val esClient = new elasticsearch.StorageClient(esConfig).client
@@ -130,6 +137,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
           // entityType and entityId is specified for fast lookup
           entityType = "user",
           entityId = query.user,
+          // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
           eventNames = Some(Seq(action)),
           targetEntityType = Some(Some("item")),
           limit = Some(maxQueryActions), // todo: multiple queries is not ideal so revisit to find a better way

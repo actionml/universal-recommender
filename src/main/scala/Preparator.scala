@@ -1,6 +1,7 @@
 package com.finderbots
 
 import io.prediction.controller.PPreparator
+import io.prediction.data.storage.PropertyMap
 import org.apache.mahout.math.indexeddataset.{IndexedDataset, BiDictionary}
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.mahout.sparkbindings
@@ -20,23 +21,24 @@ class Preparator
     // now that we have all actions in separate RDDs we must merge any user dictionaries and
     // make sure the same user ids map to the correct events
     var userDictionary: Option[BiDictionary] = None
-    val indexedDatasets = trainingData.actions.map{ descriptor =>
-      val ids = IndexedDatasetSpark(descriptor._2, userDictionary)(sc) // passing in previous row dictionary will use the values if they exist
+    val indexedDatasets = trainingData.actions.map{ case(eventName, eventIDS) =>
+      val ids = IndexedDatasetSpark(eventIDS, userDictionary)(sc) // passing in previous row dictionary will use the values if they exist
       // and append any new ids, so after all are constructed we have all user ids in the last dictionary
       userDictionary = Some(ids.rowIDs)
-      (descriptor._1, ids)
+      (eventName, ids)
     }
     // now make sure all matrices have identical row space since this corresponds to all users
-    val rowAdjustedIds = indexedDatasets.map { descriptor =>
+    val rowAdjustedIds = indexedDatasets.map { case(eventName, eventIDS) =>
       val numUsers = userDictionary.get.size
-      (descriptor._1, descriptor._2.create(descriptor._2.matrix, userDictionary.get, descriptor._2.columnIDs).newRowCardinality(numUsers))
+      (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs).newRowCardinality(numUsers))
     }
 
-    new PreparedData(rowAdjustedIds)
+    new PreparedData(rowAdjustedIds, trainingData.fieldsRDD)
   }
 
 }
 
 class PreparedData(
-  val actions: List[(String, IndexedDataset)]
+  val actions: List[(String, IndexedDataset)],
+  val fieldsRDD: RDD[(String, PropertyMap)]
 ) extends Serializable

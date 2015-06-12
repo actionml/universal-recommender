@@ -24,6 +24,9 @@
         "eventNames": ["rate", "buy"],
         "maxQueryActions": 20,
         "maxRecs": 20,
+        "fields": [
+          {"name": "category", "values": ["series", "action"], "bias": 10 }
+        ],
         "seed": 3
       }
     }

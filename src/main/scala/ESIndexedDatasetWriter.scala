@@ -2,7 +2,7 @@ package com.finderbots
 
 import _root_.io.prediction.data.storage.{elasticsearch, StorageClientConfig}
 import _root_.io.prediction.data.storage.elasticsearch.StorageClient
-import org.apache.log4j.Logger
+import grizzled.slf4j.Logger
 import org.apache.mahout.math.indexeddataset._
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext._
@@ -39,7 +39,7 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
     dest: String,
     indexedDataset: IndexedDatasetSpark,
     sort: Boolean = true): Unit = {
-    @transient lazy val logger = Logger.getLogger(this.getClass.getCanonicalName)
+    @transient lazy val logger = Logger[this.type]
     try {
       // pull out and validate schema params
       //val esClient = writeSchema("esClient").asInstanceOf[TransportClient]
@@ -101,7 +101,7 @@ trait ESIndexedDatasetWriter extends Writer[IndexedDatasetSpark]{
           .endObject())
           .upsert(indexRequest)
         esClient.update(updateRequest).get()
-     }
+      }
 
     }catch{
       case cce: ClassCastException => {

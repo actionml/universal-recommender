@@ -4,7 +4,7 @@ import _root_.io.prediction.controller.PDataSource
 import _root_.io.prediction.controller.EmptyEvaluationInfo
 import _root_.io.prediction.controller.EmptyActualResult
 import _root_.io.prediction.controller.Params
-import _root_.io.prediction.data.storage.Event
+import _root_.io.prediction.data.storage.{PropertyMap, Event}
 import _root_.io.prediction.data.store.PEventStore
 import org.apache.mahout.math.RandomAccessSparseVector
 import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
@@ -16,6 +16,7 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 
 import grizzled.slf4j.Logger
+import org.joda.time.DateTime
 
 /** Taken from engine.json these are passed in to the DataSource constructor
   *
@@ -42,14 +43,18 @@ class DataSource(val dsp: DataSourceParams)
   override
   def readTraining(sc: SparkContext): TrainingData = {
 
-    val eventNames = dsp.eventNames //todo: get from engine.json, the first is the primary
+    val eventNames = dsp.eventNames
 
-    val eventsRDD: RDD[Event] = PEventStore.find(
+    val eventsRDD = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("user"),
       eventNames = Some(eventNames),
       // targetEntityType is optional field of an event.
       targetEntityType = Some(Some("item")))(sc)
+
+    val fieldsRDD = PEventStore.aggregateProperties(
+      appName= "MMRApp1", //dsp.appName,
+      entityType=  "item")(sc)
 
     val actionRDDs = eventNames.map { eventName =>
       val actionRDD = eventsRDD.map { event =>
@@ -67,22 +72,26 @@ class DataSource(val dsp: DataSourceParams)
 
     // Have a list of (actionName, RDD), for each action
     // todo: should allow some data to be content indicators, which requires rethinking how to use PEventStore
-    new TrainingData(actionRDDs)
+    new TrainingData(actionRDDs, fieldsRDD)
   }
 }
 
 /** Low level RDD based representation of the data ready for the Preparator
   *
-  * @param actions List of Tuples (actionName, actionRDD)
+  * @param actions List of Tuples (actionName, actionRDD)qw
+  * @param fieldsRDD RDD of item keyed PropertyMap for item metadata
   */
 class TrainingData(
-    val actions: List[(String, RDD[(String, String)])])
+    val actions: List[(String, RDD[(String, String)])],
+    val fieldsRDD: RDD[(String, PropertyMap)])
   extends Serializable {
 
   override def toString = {
-    actions.map { t =>
+    val a = actions.map { t =>
       s"${t._1} actions: [count:${t._2.count()}] + sample:${t._2.take(2).toList} "
     }.toString()
+    val f = s"Item metadata: [count:${fieldsRDD.count}] + sample:${fieldsRDD.take(2).toList} "
+    a + f
   }
 
 }
