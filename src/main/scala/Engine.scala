@@ -1,4 +1,4 @@
-package com.finderbots
+package org.template
 
 import io.prediction.controller.{EngineFactory, Engine}
 
@@ -6,6 +6,7 @@ import io.prediction.controller.{EngineFactory, Engine}
 case class Query(
   // todo: this needs to be a good deal more expressive to encompass things like context
   user: String,
+  item: String,
   num: Int
 ) extends Serializable
 

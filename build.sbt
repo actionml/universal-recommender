@@ -19,7 +19,11 @@ libraryDependencies ++= Seq(
     exclude("org.apache.hadoop", "hadoop-client"),
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
-  "org.elasticsearch" % "elasticsearch-hadoop" % "2.1.0.Beta4")
+  "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.0.Beta4"
+    exclude("org.apache.spark", "spark-catalyst_2.10")
+    exclude("org.apache.spark", "spark-sql_2.10"),
+  "org.json4s" %% "json4s-native" % "3.2.11"
+)
 
 
 resolvers += Resolver.mavenLocal

@@ -1,4 +1,4 @@
-package com.finderbots
+package org.template
 
 import io.prediction.controller.LServing
 

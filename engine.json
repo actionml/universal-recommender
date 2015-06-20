@@ -1,7 +1,7 @@
 {
   "id": "default",
   "description": "Default settings",
-  "engineFactory": "com.finderbots.RecommendationEngine",
+  "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
       "name": "sample-movielens",
@@ -14,13 +14,16 @@
     "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
     "spark.kryo.referenceTracking": "false",
     "spark.kryoserializer.buffer.mb": "200",
-    "spark.executor.memory": "4g"
+    "spark.executor.memory": "4g",
+    "es.index.auto.create": "true"
   },
   "algorithms": [
     {
       "name": "mmr",
       "params": {
         "appName": "MMRApp1",
+        "indexName": "mmrindex",
+        "typeName": "items",
         "eventNames": ["rate", "buy"],
         "maxQueryActions": 20,
         "maxRecs": 20,

@@ -1,42 +1,15 @@
-package com.finderbots
+package org.template
 
-import com.finderbots.MMRAlgorithmParams
 import grizzled.slf4j.Logger
 
 import io.prediction.controller.{PersistentModelLoader, PersistentModel}
-import io.prediction.data.storage.{PropertyMap, elasticsearch, StorageClientConfig}
-import io.prediction.data.storage.elasticsearch.StorageClient
-import io.prediction.data.store.PEventStore
-import org.apache.mahout.math.indexeddataset.Schema
-import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
-
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
+import io.prediction.data.storage.PropertyMap
 import org.apache.spark.rdd.RDD
-import org.elasticsearch.action.index.IndexRequest
-import org.elasticsearch.action.update.UpdateRequest
-import org.elasticsearch.common.xcontent.XContentFactory
 import _root_.io.prediction.data.storage.{elasticsearch, StorageClientConfig}
-import _root_.io.prediction.data.storage.elasticsearch.StorageClient
-import org.apache.mahout.math.indexeddataset._
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
-import org.apache.spark.SparkContext._
-import org.apache.mahout.math.RandomAccessSparseVector
-import org.apache.mahout.math.drm.{DrmLike, DrmLikeOps, DistributedContext, CheckpointedDrm}
-import org.apache.mahout.sparkbindings._
-import org.elasticsearch.action.index.IndexRequest
-import org.elasticsearch.action.update.UpdateRequest
-import org.elasticsearch.client.transport.TransportClient
-import org.elasticsearch.common.xcontent.XContentFactory
-import scala.collection.JavaConversions._
-import org.elasticsearch.ElasticsearchException
-import org.elasticsearch.client.Client
-import org.elasticsearch.index.query.FilterBuilders.termFilter
-import org.json4s.DefaultFormats
-import org.json4s.JsonDSL._
-import org.json4s.native.JsonMethods._
-import org.json4s.native.Serialization.read
-import org.json4s.native.Serialization.write
+import org.template.conversions.IndexedDatasetConversions
+import org.elasticsearch.spark._
+import org.apache.spark.SparkContext
 
 
 /** Multimodal Cooccurrence models to save in ES */
@@ -50,72 +23,87 @@ class MMRModel(
   extends PersistentModel[MMRAlgorithmParams] {
   @transient lazy val logger = Logger[this.type]
 
+  /** Save all fields to be indexed by Elasticsearch and queried for recs
+    * This will is something like a table with row IDs = item IDs and separate fields for all
+    * cooccurrence and cross-cooccurrence indicators and metadata for each item. Metadata fields are
+    * limited to text term collections so vector types. Scalar values can be used but depend on
+    * Elasticsearch's support. One exception is the Data scalar, which is also supported
+    * @param id
+    * @param params from engine.json, slgorithm control params
+    * @param sc The spark constext already created for execution
+    * @return always returns true since most other reasons to not save cause exceptions
+    */
   def save(id: String, params: MMRAlgorithmParams, sc: SparkContext): Boolean = {
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
     logger.info("Saving mmr model")
-    val esConfig = StorageClientConfig()
-    val esStorageClient = new elasticsearch.StorageClient(esConfig)
-    val esSchema = new Schema(
-      //"esClient" -> esStorageClient.client, // oddly enough this does serialize
-      "parallel" -> esConfig.parallel,
-      "test" -> esConfig.test,
-      "properties" -> esConfig.properties,
-      "indexName" -> indexName)
 
-    val esWriter = new ElasticsearchIndexedDatasetWriter(esSchema)(sc)
-
-    // todo: how do we handle a previously trained indicator set, removing it after the new one is indexed?
-    // todo: this just keeps overwriting the collection, which has some benefits
-    coocurrenceMatrices.foreach { case (actionName, dataset) =>
-      esWriter.writeTo(dataset, actionName) // writing one field at a time, rather than joining all datasets on item ID
+    // convert cooccurrence matrices into indicators as RDD[(itemID, (actionName, Seq[itemID])]
+    // do they need to be in Elasticsearch format
+    val indicators = coocurrenceMatrices.map { case (actionName, dataset) =>
+      dataset.toStringMapRDD(actionName)
     }
 
-    // add metadata to items after they have been updated in the index
+    // convert the PropertyMap into Map[String, Seq[String]] for ES
+    val fields = fieldsRDD.map { case (item, pm ) =>
+      var m: Map[String, Seq[String]] = Map()
+      for (key <- pm.keySet){
+        m = m  + (key -> pm.get[List[String]](key))
+      }
+      (item, m)
+    }
 
-    writeFields(fieldsRDD, esConfig)
+    // Elasticsearch takes a Map with all fields, not a tuple
+    val esFields = joinAll(fields, indicators(0), indicators.drop(1)).map { case (item, map) =>
+        val esMap = map + ("id" -> item)
+        esMap
+    }
+
+    val debug = esFields.take(1)(0)
+
+    // May specifiy a remapping parameter to put certain fields in different places in the ES document
+    // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
+    // recreate it, no swapping yet
+    esClient.deleteIndex(params.indexName)
+
+    // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
+    esFields.saveToEs(s"/${params.indexName}/${params.typeName}", Map("es.mapping.id" -> "id"))
+    // todo: check to see if a Flush is needed after writing all new data to the index
+    // esClient.admin().indices().flush(new FlushRequest("mmrindex")).actionGet()
     true
   }
 
-  def writeFields(fieldsRDD: RDD[(String, PropertyMap)], esConfig: StorageClientConfig = StorageClientConfig()): Boolean = {
-    val esParallel = esConfig.parallel
-    val esTest = esConfig.test
-    val esProperties = esConfig.properties
-    val esIndexName = indexName
-
-    /*val num = fieldsRDD.count()
-    val one = fieldsRDD.take(1)
-    val key = one(0)._1
-    val value = one(0)._2
-    val props = one(0)._2.get[Seq[String]]("category")
-    val propsKeys = one(0)._2.keySet
+  /** Joins any number of PairRDDs of tuples with leading id but flattens the result nested tuple after each join
+    * since the nesting will have an arbitrary depth and will therefore be cumbersome to deal with. The second
+    * item in the input RDD will always be a Map so the maps are merged after each join to reutrn an
+    * RDD[(String, Map[String, Seq[String]], which is an item id and a map of (fieldname -> list-of-values).
+    * Private only because it's specific to pair RDDs that have maps as the second pair element.
+    * @param indicators RDD of (item-id, map-of-filednames -> lists-of-value)
+    * @return RDD of (item-id, map-of-all-fieldnames -> lists-of-values)
     */
+  private def joinAll(
+    indicators: Seq[RDD[(String, Map[String, Seq[String]])]]): RDD[(String, (Map[String, Seq[String]]))] = {
+    if (indicators.size == 1) indicators(0)
+    else if (indicators.size == 2) indicators(0).join(indicators(1)).map { case (item, (m1, m2)) => (item, m1 ++ m2) }
+    else joinAll(indicators(0), indicators(1), indicators.drop(2))
+  }
 
-    val f = fieldsRDD.collect()
-    val esClient = new elasticsearch.StorageClient(StorageClientConfig(esParallel, esTest, esProperties)).client
+  /** Private, since it is specific to this RDD data, helper for three or more RDDs */
+  private def joinAll(
+    firstIndicator: RDD[(String, Map[String, Seq[String]])] ,
+    secondIndicator: RDD[(String, Map[String, Seq[String]])] ,
+    restIndicators: Seq[RDD[(String, Map[String, Seq[String]])]]): RDD[(String, Map[String, Seq[String]])] = {
+    var joinedIndicators = firstIndicator.join(secondIndicator).map { case (item, (m1, m2)) => (item, m1 ++ m2) }
 
-    fieldsRDD.foreach { case (item, properties) =>
-      val d = 0
-      for ( fieldName <- properties.keySet){
-        val props = properties.get[Seq[String]](fieldName)
-        val debug = 0
-        val indexRequest = new IndexRequest(esIndexName, "indicators", item)
-          .source(XContentFactory.jsonBuilder() // not using json4s here in case of executor overhead
-          .startObject()
-          .field(fieldName, props) // todo: should be a list of String?
-          .endObject())
-        val updateRequest = new UpdateRequest(esIndexName, "indicators", item)
-          .doc(XContentFactory.jsonBuilder()
-          .startObject()
-          .field(fieldName, props)
-          .endObject())
-          .upsert(indexRequest)
-        esClient.update(updateRequest).get() //todo: should build upsert for all properties before performing
+    restIndicators.foreach { indicator =>
+      joinedIndicators = joinedIndicators.join(indicator).map { case (item, (m1, m2)) =>
+        (item, m1 ++ m2) // to avoid nested tuples, an extas pass over the joined rdd merges their maps
       }
     }
-    true
+    joinedIndicators
   }
-    override def toString = {
+
+  override def toString = {
   /*s"userFeatures: [${userFeatures.count()}]" +
     s"(${userFeatures.take(2).toList}...)" +
     s" productFeatures: [${productFeatures.count()}]" +
@@ -133,6 +121,15 @@ class MMRModel(
 object MMRModel
   extends PersistentModelLoader[MMRAlgorithmParams, MMRModel] {
   @transient lazy val logger = Logger[this.type]
+
+  /** This is actually only used to read saved values and since they are in Elasticsearch we don't need to read
+    * this means we create a null model since it will not be used.
+    * todo: we should rejigger the template framework so this is not required.
+    * @param id ignored
+    * @param params ignored
+    * @param sc ignored
+    * @return dummy null model
+    */
   def apply(id: String, params: MMRAlgorithmParams, sc: Option[SparkContext]): MMRModel = {
     // todo: need changes in PIO to remove the need for this
     val mmrm = new MMRModel(null, null, null, true)

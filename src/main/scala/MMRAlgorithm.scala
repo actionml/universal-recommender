@@ -1,4 +1,6 @@
-package com.finderbots
+package org.template
+
+import java.util
 
 import io.prediction.controller.P2LAlgorithm
 import io.prediction.controller.Params
@@ -15,7 +17,8 @@ import org.apache.spark.rdd.RDD
 import org.json4s._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
-
+import scala.collection.convert.wrapAsScala._
+import scala.collection.convert.decorateAll._
 import grizzled.slf4j.Logger
 /*
 “fields”: [
@@ -31,6 +34,8 @@ case class Field(name: String, values: Array[String], bias: Float)
 /** Instantiated from engine.json */
 case class MMRAlgorithmParams(
   appName: String,// filled in from engine.json
+  indexName: String = "mmrindex", // can optionally be used to specify the elasticsearch index name
+  typeName: String = "items", // can optionally be used to specify the elasticsearch type name
   eventNames: List[String],// names used to ID all user actions
   maxQueryActions: Int,
   maxRecs: Int,
@@ -47,8 +52,8 @@ case class MMRAlgorithmParams(
 class MMRAlgorithm(val ap: MMRAlgorithmParams)
   extends P2LAlgorithm[PreparedData, MMRModel, Query, PredictedResult] {
 
-  case class ActionHistory(actionName: String, itemIDs: Set[String])
-  val indexName = "mmrindex" //todo: where do we derive this, instance id?
+  case class Indicators(actionName: String, itemIDs: Seq[String])
+  val indexName = ap.indexName // taken from engine.json
 
   @transient lazy val logger = Logger[this.type]
 
@@ -70,7 +75,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
   }
 
   /** Return a list of items recommended for a user identified in the query
-    * todo: abstract out dealing with ES
+    * todo: move to the esClient object
     * The ES json query looks like this:
     *  {
     *    "size": 20
@@ -97,77 +102,106 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     * @return
     */
   def predict(model: MMRModel, query: Query): PredictedResult = {
-    logger.info(s"Query received, user id: ${query.user}")
+    logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
 
-    val recentItems = getRecentItems(query, ap.eventNames, ap.maxQueryActions)
+    esClient.search(buildQuery(ap, query), indexName)
+  }
+
+  def buildQuery(ap: MMRAlgorithmParams, query: Query): String = {
+
+    val user = query.user
+    val item = query.item
+
+    val recentUserHistory = getRecentItems(query, ap.eventNames, ap.maxQueryActions)
+    val similarItems = getSimilarItemsWithMetadata(item, ap.eventNames)
+    val allIndicators = recentUserHistory ++ similarItems
+
+    //val indicatorArray = allIndicators.toArray
+
+    // since users have action history and items have indicators and both correspond to the same "actions" like
+    // purchase or view, we'll pass both to the query if the user history or items indicators are empty
+    // then metadata must be relied on to return results.
 
     val json =
       (
         ("size" -> ap.maxRecs) ~
-        ("query"->
-          ("bool"->
-            ("should"->
-              recentItems.map { i =>
-                ("terms" -> (i.actionName -> i.itemIDs))}))))
+          ("query"->
+            ("bool"->
+              ("should"->
+                allIndicators.map { i =>
+                  ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> 1))}
 
-    val esConfig = StorageClientConfig()
-    val esClient = new elasticsearch.StorageClient(esConfig).client
-    // todo: check for ES exceptions that need to be caught or explained!
-    val sr = esClient.prepareSearch(indexName).setSource(compact(render(json))).get()
+            ))))
+    val j = compact(render(json))
+    compact(render(json))
+  }
+/*
 
-    if (!sr.isTimedOut) {
-      val recs = sr.getHits.getHits.map( hit => new ItemScore(hit.getId, hit.getScore.toDouble) )
-      logger.info(s"Recommendations for user id: ${query.user}, ${sr.getHits.getHits.size} retrieved of " +
-        s"a possible ${sr.getHits.totalHits()}")
-      new PredictedResult(recs)
-    } else {
-      logger.info(s"No prediction for unknown user ${query.user}.")
-      new PredictedResult(Array.empty)
+                similarItems.get.map { i =>
+                  ("terms" -> (i.indicatorName -> i.itemIDs)) ~
+                  ("boost" -> 1)
+
+ */
+  /** Get similar items for an item, these are already in the item and the action indicators in ES */
+  def getSimilarItemsWithMetadata(item: String, actions: List[String]): Seq[Indicators] = {
+    val m = esClient.getSource(ap.indexName, ap.typeName, item)
+
+    actions.map { action =>
+      val items = try {
+        m.get(action).asInstanceOf[util.ArrayList[String]]
+      } catch {
+        case cce: ClassCastException =>
+          logger.warn(s"Bad value in item ${item} corresponding to key: ${action} that was not a List[String]" +
+          " ignored.")
+          new util.ArrayList[String]
+      }
+      val rItems = if (items.size() <= ap.maxQueryActions) items else items.subList(0, ap.maxQueryActions - 1)
+      Indicators(action, rItems)
     }
+
   }
 
   /** Get recent events of the user on items to create the recommendations query from */
-  def getRecentItems(query: Query, actions: List[String], maxQueryActions: Int): List[ActionHistory] = {
+  // todo: split up into lsit per action
+  def getRecentItems(query: Query, actions: List[String], maxQueryActions: Int): Seq[Indicators] = {
+
+
+    val recentEvents = try {
+      LEventStore.findByEntity(
+        appName = ap.appName,
+        // entityType and entityId is specified for fast lookup
+        entityType = "user",
+        entityId = query.user,
+        // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
+        //eventNames = Some(Seq(action)),// get all and separate later
+        targetEntityType = Some(Some("item")),
+        // limit = Some(maxQueryActions), // this will get all history then each action can be limited before using in
+        // the query
+        latest = true,
+        // set time limit to avoid super long DB access
+        timeout = Duration(200, "millis")
+      ).toList
+    } catch {
+      case e: scala.concurrent.TimeoutException =>
+        logger.error(s"Timeout when read recent events." +
+          s" Empty list is used. ${e}")
+        Iterator[Event]()
+      case e: Exception => // fatal because of error, an empty query
+        logger.error(s"Error when read recent events: ${e}")
+        throw e
+    }
 
     actions.map { action =>
+      var items = List[String]()
 
-      val recentEvents = try {
-        LEventStore.findByEntity(
-          appName = ap.appName,
-          // entityType and entityId is specified for fast lookup
-          entityType = "user",
-          entityId = query.user,
-          // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
-          eventNames = Some(Seq(action)),
-          targetEntityType = Some(Some("item")),
-          limit = Some(maxQueryActions), // todo: multiple queries is not ideal so revisit to find a better way
-          latest = true,
-          // set time limit to avoid super long DB access
-          timeout = Duration(200, "millis")
-        )
-      } catch {
-        case e: scala.concurrent.TimeoutException =>
-          logger.error(s"Timeout when read recent events." +
-            s" Empty list is used. ${e}")
-          Iterator[Event]()
-        case e: Exception =>
-          logger.error(s"Error when read recent events: ${e}")
-          throw e
-      }
-
-      val recentItems: Set[String] = recentEvents.map { event =>
-        try {
-          event.targetEntityId.get
-        } catch {
-          case e => {
-            logger.error("Can't get targetEntityId of event ${event}.")
-            throw e
-          }
+      for ( event <- recentEvents )
+        if (event.event == action && items.size < ap.maxQueryActions) {
+          items = event.targetEntityId.get :: items
+          // todo: may throw exception and we should ignore the event instead of crashing
         }
-      }.toSet
-
-      ActionHistory(action, recentItems)
+      Indicators(action, items)
     }
+
   }
 
 }

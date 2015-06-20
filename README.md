@@ -23,7 +23,7 @@ This file allows the user to describe and set parameters that control the engine
     {
       "id": "default",
       "description": "Default settings",
-      "engineFactory": "com.finderbots.RecommendationEngine",
+      "engineFactory": "org.template.RecommendationEngine",
       "datasource": {
         "params" : {
           "name": "sample-movielens",
@@ -45,6 +45,8 @@ This file allows the user to describe and set parameters that control the engine
           "name": "mmr",
           "params": {
             "appName": "MMRApp1",
+            "indexName": "mmrindex",
+            "typeName": "items",
             "blacklist": ["buy"],
             “comment”: “these must be ‘hot’,‘trending’, or ‘popular’”
             "backfill": ["trending", "popular"],
@@ -68,6 +70,8 @@ This file allows the user to describe and set parameters that control the engine
 The “params” section controls most of the features of the MMR. Possible values are:
 
 * **appName**: string describing the app using the engine.
+* **indexName**: string describing the index for all indicators, something like "mmrindex".
+* **typeName**: string describing the type in Elasticsearch terminology, something like "items".
 * **eventNames**: and array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
 * **maxQueryActions**: an integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
 * **maxRecs**: an integer telling the engine the maximum number of recs to return per query.

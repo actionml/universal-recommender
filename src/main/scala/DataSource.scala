@@ -1,4 +1,4 @@
-package com.finderbots
+package org.template
 
 import _root_.io.prediction.controller.PDataSource
 import _root_.io.prediction.controller.EmptyEvaluationInfo
