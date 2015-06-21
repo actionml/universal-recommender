@@ -146,9 +146,13 @@ This returns items based on user #1 history filtered by category and boosted to 
 
 ### Work in progress, runs on sample data, use at your own risk
 
+  - can be used to recommend for users or items (similar items)
+  - boilerpate for bias (boost and filter) based on any indicator for user or item-based.
+  - boilerplate for metadata boost and filter
+  - integrated with Elasticsearch native (and therefore fast?) Spark based parallel indexing.
   - Runnable on example data for ALS
-  - Serving working
-  - MMRAlgorithm.predict working with ES multi-indicator query
+  - Serving working, query work with item and user, no bias or metadata implemented
+  - MMRAlgorithm.predict working with ES multi-indicator query for cooccurrence and cross-cooccurrence
   - writer for indicators to ES working, still thinking about how to identify the index, type, doc IDs, and fields
   - MMRModel created
   - upgraded to PredictionIO 0.9.3
@@ -163,11 +167,7 @@ This returns items based on user #1 history filtered by category and boosted to 
   
 ### Known issues
 
-  - Moving from upsert modify in place to bulk create index then swap in when ready--so current code that uses upser will be removed
-  - Need to save item ids to ES as an array of strings, not as a space delimited single string as it is done now - fixed
-  - Find a better way to id the index, it's hard coded to "mmrindex" now so multiple engines would conflict - add new name to MMRAlgorithmParams
-  - Do we need to manage indexes for performance. For now each field is written to the index and the index is updated every write. For blasting a new model into the index this may affect performance. - moving to bult create and swap method
-  - Not sure how to handle the case where the user is allowed to alter metadata. If we modify in place the model is immortal but refreshed. But if it's immortal how do items get removed permanently since they are derived from items that get interactions.
+  - index droped then written, need to create, then swap for 0 down-time.
   - Only doing usage events now, content similarity is not implemented
   - Context is not allowed in queries yet (location, time of day, device, etc) - bias is speced in engin.json
   - No popularity based fallback yet. - use the EventStore plugin to modify a field in ES docs
