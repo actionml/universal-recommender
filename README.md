@@ -31,13 +31,14 @@ This file allows the user to describe and set parameters that control the engine
           "eventNames": ["rate", "buy"]
         }
       },
-      {“comment”: “This is for Mahout, the values are minimums and should not be removed”},
+      {“comment”: “This is for Mahout and Elasticsearch, the values are minimums and should not be removed”},
       "sparkConf": {
         "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
         "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
         "spark.kryo.referenceTracking": "false",
         "spark.kryoserializer.buffer.mb": "200",
-        "spark.executor.memory": "4g"
+        "spark.executor.memory": "4g",
+        "es.index.auto.create": "true"
       },
       "algorithms": [
         {
@@ -84,69 +85,90 @@ The “params” section controls most of the features of the MMR. Possible valu
 Query fields determine what data is used to match when returning recs. Some fields have default values in engine.json and so may never be needed in individual queries. On the other hand all values from engine.json may be overridden or added to in an individual query.
 
     {
-      “userId”: “1”,
-      “entityId”: “Bra-series-53454543513”,    
+      “user”: {"id": “xyz”, “bias”: -maxFloat..maxFloat }
+      “item”: {"id": “53454543513”, “bias”: -maxFloat..maxFloat }  
+      “num”: 4,// this number is optional overrides the default in engine.json maxRecs
       “fields”: [
         {
-          “name”: ”fieldname”
+          “name”: ”fieldname” // may have several fields in query
           “values”: [“fieldValue1”, ...],// values in the field query
           “bias”: -maxFloat..maxFloat }// negative means a filter, positive is a boost 
         },...
       ]
-      “num”: 4,// this number is optional overrides the default in engine.json maxRecs
       “blacklist”: [“itemId1”, “itemId2”, ...]// overrides the blacklist in engine.json and is optional
       “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
 
-* **userId** is the unique id for the user, it may be an anonymous user as long as the id is unique from any authenticated use. This tells the recommender to return recs based on the user’s event history. Used for personalized recommendations.
-* **entityId** is the unique item identifier. This tells the recommender to return items similar to this entity. Use for “people who liked this also liked these”.
+* **user** is the unique id for the user, it may be an anonymous user as long as the id is unique from any authenticated use. This tells the recommender to return recs based on the user’s event history. Used for personalized recommendations.
+* **item** is the unique item identifier. This tells the recommender to return items similar to this entity. Use for “people who liked this also liked these”.
 * **fields**: array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 num max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
 * **blacklist** Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
  
-The query returns personalized recommendations, similar items, or a mix including backfill. The query itself determines this by supplying itemId, userId or both. The boosts and filters are determined by the sign and magnitude of the various metadata “bias” values. Some examples are:
+The query returns personalized recommendations, similar items, or a mix including backfill. The query itself determines this by supplying itemId, user or both. The boosts and filters are determined by the sign and magnitude of the various metadata “bias” values. Some examples are:
 
 ###Simple Non-contextual Personalized
 
-{
-  “userId”: “1”,
-}
-
+	{
+	  “user”: {"id": “xyz”}
+	}
+	
 This gets all default values from the engine.json and uses only action indicators for the types specified there.
 
 ###Simple Non-contextual Similar Items
 
-{
-  “entityId”: “Bra-series-53454543513”,    
-}
-
+	{
+	  “item”: {"id": “53454543513”}   
+	}
+	
 This returns items that are similar to the query item, and blacklist and backfill are defaulted to what is in the engine.json
 
 ###Contextual Personalized
 
-{
-  “userId”: “1”,
-  “fields”: [
-    {
-      “name”: “category”
-      “values”: [“series”, “mini-series”],
-      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
-    },{
-      “name”: “genre”,
-      “values”: [“sci-fi”, “detective”]
-      “bias”: 10 // boost recs with the `genre’ = `sci-fi` or ‘detective’ by 10
-    }
-  ]
-}
+	{
+	  “user”: {"id": “xyz”}
+	  “fields”: [
+	    {
+	      “name”: “category”
+	      “values”: [“series”, “mini-series”],
+	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
+	    },{
+	      “name”: “genre”,
+	      “values”: [“sci-fi”, “detective”]
+	      “bias”: 10 // boost recs with the `genre’ = `sci-fi` or ‘detective’ by 10
+	    }
+	  ]
+	}
 
-This returns items based on user #1 history filtered by category and boosted to favor more genre specific items. The values for fields have been attached to items with $set events where the “name” corresponds to a doc field and the “values” correspond to the contents of the field. The “bias” is used to indicate a filter or a boost. For Solr or Elasticsearch the boost is sent as-is to the engine and it’s meaning is determined by the engine (Lucene in either case). As always the blacklist and backfill use the defaults in engine.json.
+This returns items based on user "xyz" history filtered by category and boosted to favor more genre specific items. The values for fields have been attached to items with $set events where the “name” corresponds to a doc field and the “values” correspond to the contents of the field. The “bias” is used to indicate a filter or a boost. For Solr or Elasticsearch the boost is sent as-is to the engine and it’s meaning is determined by the engine (Lucene in either case). As always the blacklist and backfill use the defaults in engine.json.
 
+###Contextual Personalized with Similar Items
+
+	{
+	  “user”: {"id": “xyz”, "bias": 2} // favor personal recs
+	  “item”: {"id": “53454543513”} // fallback to contexturl recs
+	  “fields”: [
+	    {
+	      “name”: “category”
+	      “values”: [“series”, “mini-series”],
+	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
+	    },{
+	      “name”: “genre”,
+	      “values”: [“sci-fi”, “detective”]
+	      “bias”: 10 // favor recs with the `genre’ = `sci-fi` or ‘detective’
+	    }
+	  ]
+	}
+
+This returns items based on user xyz history or similar to item 53454543513 but favoring user hostory recs. These are filtered by category and boosted to favor more genre specific items. 
+
+**Note**:This query should be condsidered **experimental**. mixing user history with item similairty is possible but may have unexpected results.
 
 ## Versions WIP
 
 ### Work in progress, runs on sample data, use at your own risk
 
-  - can be used to recommend for users or items (similar items)
+  - can be used to recommend for users and/or items (similar items)
   - boilerpate for bias (boost and filter) based on any indicator for user or item-based.
   - boilerplate for metadata boost and filter
   - integrated with Elasticsearch native (and therefore fast?) Spark based parallel indexing.
@@ -167,6 +189,7 @@ This returns items based on user #1 history filtered by category and boosted to 
   
 ### Known issues
 
+  - bias, fields, dates not implemented
   - index droped then written, need to create, then swap for 0 down-time.
   - Only doing usage events now, content similarity is not implemented
   - Context is not allowed in queries yet (location, time of day, device, etc) - bias is speced in engin.json
