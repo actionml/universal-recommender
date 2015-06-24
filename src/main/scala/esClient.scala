@@ -35,7 +35,7 @@ object esClient {
       new PredictedResult(recs)
     } else {
       logger.info(s"No results for query ${parse(query)}")
-      new PredictedResult(Array.empty)
+      new PredictedResult(Array.empty[ItemScore])
     }
 
   }

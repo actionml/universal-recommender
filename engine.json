@@ -25,10 +25,11 @@
         "indexName": "mmrindex",
         "typeName": "items",
         "eventNames": ["rate", "buy"],
+        "userBias": 2,
         "maxQueryActions": 20,
         "maxRecs": 20,
         "fields": [
-          {"name": "category", "values": ["series", "action"], "bias": 10 }
+          {"name": "categories", "values": ["cat5"], "bias": 2 }
         ],
         "seed": 3
       }

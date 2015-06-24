@@ -19,6 +19,11 @@ The Multimodal Recommender (MMR) will accept a range of data, auto correlate it,
 * It includes a fallback to some form of item popularity when there is not other information known about the user.
 * All of the above can be mixed into a single query for blended results and so the query can be tuned to a great many applicaitons.
 
+###Biases
+
+These take the form of boosts and filters where a neutral bias is 1.0. The importance of some part of the query may be boosted by a positive non-zero float. If the bias is <= 0 it is considered a filter&mdash;meaning no recommendation is made that lacks the filter value(s). Although filters may be applied to any biasable data they make the most sense with metadata. For instance it may make sense to show only "electronics" recommendations when the user is viewing an electroncs product. Biases are often applied to a list of data, for instance the user is looking at a video page with a cast of actors. The "cast" list is metadata attached to items and a query can show "people who liked this, also liked these" type recs with the current cast boosted by 0.5. This cousl be said to show similar item recs but use the cast in the query in a way that is not to over power the similar items (since by default they have a neutral 1.0 bias).
+
+
 ###Engine.json
 
 This file allows the user to describe and set parameters that control the engine operations. Some of the parameters work as defaults values for every query and can be overriden in an individual query or added to in the query.
@@ -53,7 +58,7 @@ This file allows the user to describe and set parameters that control the engine
             "typeName": "items",
             "blacklist": ["buy"],
             “comment”: “these must be ‘hot’,‘trending’, or ‘popular’”
-            "backfill": ["trending", "popular"],
+            "backfill": "trending" or "popular",
             "maxQueryActions": 20,
             "maxRecs": 20,
             "seed": 3,
@@ -83,16 +88,18 @@ The “params” section controls most of the features of the MMR. Possible valu
 * **blacklist**: array of strings corresponding to the actions taken on items, which would cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is little need to recommend something the user has already bought. If this is not specified then no blacklist is assumed but one may be passed in with the query.
 * **backfill**: array of string corresponding to the types of backfill available. These values are calculated from hot, popular, or trending items and are mixed into the query so they don’t occur unless the other query data produces no results. For example if there is no user history or similar items, only backfill will be returned. 
 * **fields**: array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array on one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
-* **userbias**: amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
-* **itembias**: same as userbias but applied to similar items to the item supplied in the query.
+* **userBias**: amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
+* **itemBias**: same as userbias but applied to similar items to the item supplied in the query.
 
 ###Queries
 
 Query fields determine what data is used to match when returning recs. Some fields have default values in engine.json and so may never be needed in individual queries. On the other hand all values from engine.json may be overridden or added to in an individual query.
 
     {
-      “user”: {"id": “xyz”, “bias”: -maxFloat..maxFloat }
-      “item”: {"id": “53454543513”, “bias”: -maxFloat..maxFloat }  
+      “user”: “xyz”, 
+      “userBias”: -maxFloat..maxFloat,
+      “item”: “53454543513”, 
+      “itemBias”: -maxFloat..maxFloat,  
       “num”: 4,// this number is optional overrides the default in engine.json maxRecs
       “fields”: [
         {
@@ -105,8 +112,10 @@ Query fields determine what data is used to match when returning recs. Some fiel
       “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
 
-* **user** contains a unique id for the user and the amount to favor the user's history in making recs. The user may be anonymous as long as the id is unique from any authenticated user. This tells the recommender to return recs based on the user’s event history. Used for personalized recommendations.
-* **item** contains the unique item identifier and the amount to favor similar items in making recs. This tells the recommender to return items similar to this the item specified. Use for “people who liked this also liked these”.
+* **user** contains a unique id for the user
+* **userBias** the amount to favor the user's history in making recs. The user may be anonymous as long as the id is unique from any authenticated user. This tells the recommender to return recs based on the user’s event history. Used for personalized recommendations. Overrides and bias in engine.json
+* **item** contains the unique item identifier
+* **itemBias** the amount to favor similar items in making recs. This tells the recommender to return items similar to this the item specified. Use for “people who liked this also liked these”. Overrides any bias in engine.json
 * **fields**: array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 num max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
 * **blacklist** Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
@@ -135,7 +144,7 @@ This returns items that are similar to the query item, and blacklist and backfil
 	  “user”: {"id": “xyz”}
 	  “fields”: [
 	    {
-	      “name”: “category”
+	      “name”: “categories”
 	      “values”: [“series”, “mini-series”],
 	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
 	    },{
@@ -146,7 +155,7 @@ This returns items that are similar to the query item, and blacklist and backfil
 	  ]
 	}
 
-This returns items based on user "xyz" history filtered by category and boosted to favor more genre specific items. The values for fields have been attached to items with $set events where the “name” corresponds to a doc field and the “values” correspond to the contents of the field. The “bias” is used to indicate a filter or a boost. For Solr or Elasticsearch the boost is sent as-is to the engine and it’s meaning is determined by the engine (Lucene in either case). As always the blacklist and backfill use the defaults in engine.json.
+This returns items based on user "xyz" history filtered by categories and boosted to favor more genre specific items. The values for fields have been attached to items with $set events where the “name” corresponds to a doc field and the “values” correspond to the contents of the field. The “bias” is used to indicate a filter or a boost. For Solr or Elasticsearch the boost is sent as-is to the engine and it’s meaning is determined by the engine (Lucene in either case). As always the blacklist and backfill use the defaults in engine.json.
 
 ###Contextual Personalized with Similar Items
 
@@ -155,7 +164,7 @@ This returns items based on user "xyz" history filtered by category and boosted 
 	  “item”: {"id": “53454543513”} // fallback to contexturl recs
 	  “fields”: [
 	    {
-	      “name”: “category”
+	      “name”: “categories”
 	      “values”: [“series”, “mini-series”],
 	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
 	    },{
@@ -166,7 +175,7 @@ This returns items based on user "xyz" history filtered by category and boosted 
 	  ]
 	}
 
-This returns items based on user xyz history or similar to item 53454543513 but favoring user hostory recs. These are filtered by category and boosted to favor more genre specific items. 
+This returns items based on user xyz history or similar to item 53454543513 but favoring user hostory recs. These are filtered by categories and boosted to favor more genre specific items. 
 
 **Note**:This query should be condsidered **experimental**. mixing user history with item similairty is possible but may have unexpected results.
 

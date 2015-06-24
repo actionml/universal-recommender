@@ -10,6 +10,7 @@ import org.apache.mahout.math.cf.SimilarityAnalysis
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.elasticsearch.action.search.{SearchRequestBuilder, SearchRequest}
 import org.elasticsearch.index.query.QueryBuilder
+import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
@@ -19,6 +20,7 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import scala.collection.convert.wrapAsScala._
 import scala.collection.convert.decorateAll._
+import scala.collection.convert.Wrappers
 import grizzled.slf4j.Logger
 /*
 “fields”: [
@@ -29,18 +31,22 @@ import grizzled.slf4j.Logger
    }, ...
  ]
 */
-case class Field(name: String, values: Array[String], bias: Float)
 
 /** Instantiated from engine.json */
 case class MMRAlgorithmParams(
-  appName: String,// filled in from engine.json
-  indexName: String = "mmrindex", // can optionally be used to specify the elasticsearch index name
-  typeName: String = "items", // can optionally be used to specify the elasticsearch type name
-  eventNames: List[String],// names used to ID all user actions
-  maxQueryActions: Int,
-  maxRecs: Int,
-  fieldNames: Array[Field],
-  seed: Option[Long]) extends Params //fixed default make it reproducable unless supplied
+    appName: String,// filled in from engine.json
+    indexName: String = "mmrindex", // can optionally be used to specify the elasticsearch index name
+    typeName: String = "items", // can optionally be used to specify the elasticsearch type name
+    eventNames: List[String],// names used to ID all user actions
+    blacklist: Option[List[String]],
+    backfill: Option[String],// popular or trending
+    maxQueryActions: Option[Int] = Some(20),//default = DefaultMaxQueryItems
+    maxRecs: Option[Int] = Some(20),
+    userBias: Option[Float] = Some(1.0f),
+    itemBias: Option[Float] = Some(1.0f),
+    fields: Option[Array[Field]] = Some(Array.empty[Field]),
+    seed: Option[Long] = Some(System.currentTimeMillis()))
+  extends Params //fixed default make it reproducable unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content indicators with
   * [[org.apache.mahout.math.cf.SimilarityAnalysis]] The analysis part of the recommender is
@@ -52,8 +58,8 @@ case class MMRAlgorithmParams(
 class MMRAlgorithm(val ap: MMRAlgorithmParams)
   extends P2LAlgorithm[PreparedData, MMRModel, Query, PredictedResult] {
 
-  case class Indicators(actionName: String, itemIDs: Seq[String])
-  val indexName = ap.indexName // taken from engine.json
+  case class BoostableIndicators(actionName: String, itemIDs: Seq[String], boost: Float)
+  case class FilterIndicators(actionName: String, itemIDs: Seq[String])
 
   @transient lazy val logger = Logger[this.type]
 
@@ -71,11 +77,10 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     val cooccurrenceIndicators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     logger.info("Indicators created now putting into MMRModel")
-    new MMRModel(cooccurrenceIndicators, data.fieldsRDD, indexName)
+    new MMRModel(cooccurrenceIndicators, data.fieldsRDD, ap.indexName)
   }
 
   /** Return a list of items recommended for a user identified in the query
-    * todo: move to the esClient object
     * The ES json query looks like this:
     *  {
     *    "size": 20
@@ -89,7 +94,15 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     *          },
     *          {
     *            "terms": {
-    *              "buy": ["0", "32"]
+    *              "buy": ["0", "32"],
+    *              "boost": 2
+    *            }
+    *          }
+    *        ],
+    *        "must": [
+    *          {
+    *            "terms": {
+    *              "category": ["cat1"]
     *            }
     *          }
     *        ]
@@ -104,17 +117,62 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
   def predict(model: MMRModel, query: Query): PredictedResult = {
     logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
 
-    esClient.search(buildQuery(ap, query), indexName)
+    val queryAndBlacklist = buildQuery(ap, query)
+    val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
+    removeBlacklisted(recs, query, queryAndBlacklist._2)
   }
 
-  def buildQuery(ap: MMRAlgorithmParams, query: Query): String = {
+  def removeBlacklisted(recs: PredictedResult, query: Query, queryBlacklist: List[Event] ): PredictedResult = {
+    val eventFilteredItemScores = recs.itemScores.filterNot { itemScore =>
+      queryBlacklist.filter { event => //if some rec id == something blacklisted
+        event.entityId == itemScore.item
+      }.nonEmpty //if some rec id == something blacklisted then don't return the itemScore
+    }
 
-    val user = query.user
-    val item = query.item
+    val queryFilteredItemScores = eventFilteredItemScores.filterNot { itemScore =>
+      query.blacklist.contains(itemScore.item)
+    } //if some rec id == something blacklisted in query then don't return the itemScore
+    PredictedResult(queryFilteredItemScores)
+  }
 
-    val recentUserHistory = getRecentItems(query, ap.eventNames, ap.maxQueryActions)
-    val similarItems = getSimilarItemsWithMetadata(item, ap.eventNames)
-    val allIndicators = recentUserHistory ++ similarItems
+  def buildQuery(ap: MMRAlgorithmParams, query: Query): (String, List[Event]) = {
+
+    // there may be default query values in the engine.json so build the qurey from there
+    // then overwrite with data in the specific query if needed.
+    // In order to match the form of the Elasticsearch query, indicators are broken into
+    // one with possible boosts and ones that filter results
+
+    // create a List[BoostableIndicators] of all query indicators that can have a boost attached
+    val alluserEvents = getBiasedRecentUserActions(query, ap.eventNames, ap.maxQueryActions)
+
+    val recentUserHistory = if (ap.userBias.get >= 0f)
+      alluserEvents._1
+    else List.empty[BoostableIndicators]
+    
+    val similarItems = if (ap.itemBias.get >= 0f) getBiasedSimilarItems(query.item, ap.eventNames)
+    else List.empty[BoostableIndicators]
+    
+    val boostedMetadata = getBoostedMetadata(query)
+    
+    val allBoostedIndicators = recentUserHistory ++ similarItems ++ boostedMetadata
+
+    // create a List[FilteredIndicators] of all query indicators that are to be used to filter results
+    val recentUserHistoryFilter = if (ap.userBias.get < 0f) {
+      // strip any boosts
+      alluserEvents._1.map { i =>
+        FilterIndicators(i.actionName, i.itemIDs)
+      }
+    } else List.empty[FilterIndicators]
+
+    val similarItemsFilter = if (ap.itemBias.get < 0f ) {
+      getBiasedSimilarItems(query.item.id, ap.eventNames).map { i =>
+        FilterIndicators(i.actionName, i.itemIDs)
+      }.toList
+    } else List.empty[FilterIndicators]
+
+    val filteringMetadata = getFilteringMetadata(query)
+
+    val allFilteringIndicators = recentUserHistoryFilter ++ similarItemsFilter ++ filteringMetadata
 
     //val indicatorArray = allIndicators.toArray
 
@@ -125,53 +183,55 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     val json =
       (
         ("size" -> ap.maxRecs) ~
-          ("query"->
-            ("bool"->
-              ("should"->
-                allIndicators.map { i =>
-                  ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> 1))}
+        ("query"->
+          ("bool"->
+            ("should"->
+              allBoostedIndicators.map { i =>
+                ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}
 
-            ))))
+            ) ~
+            ("must"->
+              allFilteringIndicators.map { i =>
+                ("terms" -> (i.actionName -> i.itemIDs))})
+          )
+        )
+      )
     val j = compact(render(json))
-    compact(render(json))
+    (compact(render(json)), alluserEvents._2)
   }
-/*
 
-                similarItems.get.map { i =>
-                  ("terms" -> (i.indicatorName -> i.itemIDs)) ~
-                  ("boost" -> 1)
+  /** Get similar items for an item, these are already in the action indicators in ES */
+  def getBiasedSimilarItems(item: Option[String] = None, actions: List[String]): Seq[BoostableIndicators] = {
+    if (item.nonEmpty) {
+      val m = esClient.getSource(ap.indexName, ap.typeName, item.get)
 
- */
-  /** Get similar items for an item, these are already in the item and the action indicators in ES */
-  def getSimilarItemsWithMetadata(item: String, actions: List[String]): Seq[Indicators] = {
-    val m = esClient.getSource(ap.indexName, ap.typeName, item)
-
-    actions.map { action =>
-      val items = try {
-        m.get(action).asInstanceOf[util.ArrayList[String]]
-      } catch {
-        case cce: ClassCastException =>
-          logger.warn(s"Bad value in item ${item} corresponding to key: ${action} that was not a List[String]" +
-          " ignored.")
-          new util.ArrayList[String]
+      actions.map { action =>
+        val items = try {
+          m.get(action).asInstanceOf[List[String]]
+        } catch {
+          case cce: ClassCastException =>
+            logger.warn(s"Bad value in item ${item} corresponding to key: ${action} that was not a List[String]" +
+              " ignored.")
+            List.empty[String]
+        }
+        val rItems = if (items.size <= ap.maxQueryActions.get) items else items.slice(0, ap.maxQueryActions.get - 1)
+        BoostableIndicators(action, rItems, ap.itemBias.get)
       }
-      val rItems = if (items.size() <= ap.maxQueryActions) items else items.subList(0, ap.maxQueryActions - 1)
-      Indicators(action, rItems)
-    }
-
+    } else List.empty[BoostableIndicators]
   }
 
   /** Get recent events of the user on items to create the recommendations query from */
-  // todo: split up into lsit per action
-  def getRecentItems(query: Query, actions: List[String], maxQueryActions: Int): Seq[Indicators] = {
-
+  def getBiasedRecentUserActions(
+    query: Query,
+    actions: List[String],
+    maxQueryActions: Option[Int]): (Seq[BoostableIndicators], List[Event]) = {
 
     val recentEvents = try {
       LEventStore.findByEntity(
         appName = ap.appName,
         // entityType and entityId is specified for fast lookup
         entityType = "user",
-        entityId = query.user,
+        entityId = query.user.id.get,
         // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
         //eventNames = Some(Seq(action)),// get all and separate later
         targetEntityType = Some(Some("item")),
@@ -185,23 +245,53 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
       case e: scala.concurrent.TimeoutException =>
         logger.error(s"Timeout when read recent events." +
           s" Empty list is used. ${e}")
-        Iterator[Event]()
+        List[Event]()
       case e: Exception => // fatal because of error, an empty query
         logger.error(s"Error when read recent events: ${e}")
         throw e
     }
 
-    actions.map { action =>
+      val rActions = actions.map { action =>
       var items = List[String]()
 
       for ( event <- recentEvents )
-        if (event.event == action && items.size < ap.maxQueryActions) {
+        if (event.event == action && items.size < ap.maxQueryActions.get) {
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
-      Indicators(action, items)
+      BoostableIndicators(action, items, ap.userBias.get)
+    }
+    (rActions, recentEvents)
+  }
+
+  def getBoostedMetadata( query: Query ): List[BoostableIndicators] = {
+    val paramsBoostedFields = ap.fields.getOrElse(Array.empty[Field])
+    .filter( field => field.bias <= 0 ).map { field =>
+      BoostableIndicators(field.name, field.values, field.bias)
+    }.toList
+    
+    val queryBoostedFields = query.fields.filter { field =>
+      field.bias >=  0f
+    }.map { field =>
+      BoostableIndicators(field.name, field.values, field.bias)
     }
 
+    paramsBoostedFields ++ queryBoostedFields
+  }
+
+  def getFilteringMetadata( query: Query ): List[FilterIndicators] = {
+    val paramsFilterFields = ap.fields.getOrElse(Array.empty[Field])
+      .filter( field => field.bias > 0 ).map { field =>
+      FilterIndicators(field.name, field.values)
+    }.toList
+
+    val queryFilterFields = query.fields.filter { field =>
+      field.bias <  0f
+    }.map { field =>
+      FilterIndicators(field.name, field.values)
+    }
+    
+    paramsFilterFields ++ queryFilterFields
   }
 
 }
