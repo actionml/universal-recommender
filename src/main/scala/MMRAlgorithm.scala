@@ -22,15 +22,6 @@ import scala.collection.convert.wrapAsScala._
 import scala.collection.convert.decorateAll._
 import scala.collection.convert.Wrappers
 import grizzled.slf4j.Logger
-/*
-“fields”: [
-   {
-     “name”: ”fieldname”
-     “values”: [“series”, ...],// values in the field query
-     “bias”: -maxFloat..maxFloat// negative means a filter, positive is a boost
-   }, ...
- ]
-*/
 
 /** Instantiated from engine.json */
 case class MMRAlgorithmParams(
@@ -44,6 +35,7 @@ case class MMRAlgorithmParams(
     num: Option[Int] = Some(20),
     userBias: Option[Float] = None,// will cause the default search engine boost of 1.0
     itemBias: Option[Float] = None,// will cause the default search engine boost of 1.0
+    returnSelf: Option[Boolean] = None,// query building logic defaults this to false
     fields: Option[List[Field]] = None,
     seed: Option[Long] = Some(System.currentTimeMillis()))
   extends Params //fixed default make it reproducable unless supplied
@@ -58,7 +50,7 @@ case class MMRAlgorithmParams(
 class MMRAlgorithm(val ap: MMRAlgorithmParams)
   extends P2LAlgorithm[PreparedData, MMRModel, Query, PredictedResult] {
 
-  case class BoostableIndicators(actionName: String, itemIDs: Seq[String], boost: Float)
+  case class BoostableIndicators(actionName: String, itemIDs: Seq[String], boost: Option[Float])
   case class FilterIndicators(actionName: String, itemIDs: Seq[String])
 
   @transient lazy val logger = Logger[this.type]
@@ -135,7 +127,13 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     val queryFilteredItemScores = eventFilteredItemScores.filterNot { itemScore =>
       query.blacklist.getOrElse(List.empty[String]).contains(itemScore.item)
     } //if some rec id == something blacklisted in query then don't return the itemScore
-    PredictedResult(queryFilteredItemScores)
+
+    // conditionally filter the query item
+    val includeSelf = query.returnSelf.getOrElse(ap.returnSelf.getOrElse(false))
+    val finalFilteredQueryScores = if ( !includeSelf ) queryFilteredItemScores.filterNot { itemScore =>
+      query.item.getOrElse("").equals(itemScore.item)
+    } else { queryFilteredItemScores }//don't filter out the query item
+    PredictedResult(finalFilteredQueryScores)
   }
 
   def buildQuery(ap: MMRAlgorithmParams, query: Query): (String, List[Event]) = {
@@ -189,7 +187,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
       val numRecs = if ( query.num.nonEmpty ) query.num.get
       else ap.num.get
-      
+
       val json =
         (
           ("size" -> numRecs) ~
@@ -199,11 +197,11 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
                 allBoostedIndicators.map { i =>
                   ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}
 
-              ) ~
-              ("must"->
-                allFilteringIndicators.map { i =>
-                  ("terms" -> (i.actionName -> i.itemIDs))}
-              )
+                ) ~
+                ("must"->
+                  allFilteringIndicators.map { i =>
+                    ("terms" -> (i.actionName -> i.itemIDs))}
+                )
             )
           )
         )
@@ -221,8 +219,8 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     if (query.item.nonEmpty) {
       val m = esClient.getSource(ap.indexName, ap.typeName, query.item.get)
 
-      val itemEventBias = query.userBias.getOrElse(ap.userBias.getOrElse(1f))
-      val userEventsBoost = if (itemEventBias > 0) itemEventBias else 1
+      val itemEventBias = query.itemBias.getOrElse(ap.itemBias.getOrElse(1f))
+      val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
       ap.eventNames.map { action =>
         val items = try {
           m.get(action).asInstanceOf[util.ArrayList[String]].toList
@@ -233,7 +231,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
             List.empty[String]
         }
         val rItems = if (items.size <= ap.maxQueryActions.get) items else items.slice(0, ap.maxQueryActions.get - 1)
-        BoostableIndicators(action, rItems, userEventsBoost)
+        BoostableIndicators(action, rItems, itemEventsBoost)
       }
     } else List.empty[BoostableIndicators]
   }
@@ -271,7 +269,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     }
 
     val userEventBias = query.userBias.getOrElse(ap.userBias.getOrElse(1f))
-    val userEventsBoost = if (userEventBias > 0) userEventBias else 1
+    val userEventsBoost = if (userEventBias > 0 && userEventBias != 1) Some(userEventBias) else None
     val rActions = ap.eventNames.map { action =>
       var items = List[String]()
 
@@ -287,13 +285,13 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
   def getBoostedMetadata( query: Query ): List[BoostableIndicators] = {
     val paramsBoostedFields = ap.fields.getOrElse(List.empty[Field]).filter( field => field.bias <= 0 ).map { field =>
-      BoostableIndicators(field.name, field.values, field.bias)
+      BoostableIndicators(field.name, field.values, Some(field.bias))
     }
     
     val queryBoostedFields = query.fields.getOrElse(List.empty[Field]).filter { field =>
       field.bias >=  0f
     }.map { field =>
-      BoostableIndicators(field.name, field.values, field.bias)
+      BoostableIndicators(field.name, field.values, Some(field.bias))
     }
 
     paramsBoostedFields ++ queryBoostedFields

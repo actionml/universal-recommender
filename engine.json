@@ -27,6 +27,7 @@
         "eventNames": ["rate", "buy"],
         "maxQueryActions": 20,
         "maxRecs": 20,
+        "returnSelf": true,
         "seed": 3
       }
     }

@@ -64,6 +64,7 @@ This file allows the user to describe and set parameters that control the engine
             "seed": 3,
             "userbias": -maxFloat..maxFloat, // favor user history in recs by this amount
             "itembias": -maxFloat..maxFloat, //favor similar items in recs by this amount
+            "returnSelf": true | false //default = false, will not return item or user as recommendation
             “fields”: [ // an array of fields to be used as biasing factors in all queries
               {
                 “name”: ”fieldname”
@@ -90,6 +91,7 @@ The “params” section controls most of the features of the MMR. Possible valu
 * **fields**: array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array on one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **userBias**: amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
 * **itemBias**: same as userbias but applied to similar items to the item supplied in the query.
+* **returnSelf**: boolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
 
 ###Queries
 
@@ -109,6 +111,7 @@ Query fields determine what data is used to match when returning recs. Some fiel
         },...
       ]
       “blacklist”: [“itemId1”, “itemId2”, ...]// overrides the blacklist in engine.json and is optional
+      "returnSelf": true | false //default = false, will not return query item as recommendation
       “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
 
@@ -119,6 +122,7 @@ Query fields determine what data is used to match when returning recs. Some fiel
 * **fields**: array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 num max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
 * **blacklist** Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
+* **returnSelf**: boolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
  
 The query returns personalized recommendations, similar items, or a mix including backfill. The query itself determines this by supplying itemId, user or both. The boosts and filters are determined by the sign and magnitude of the various metadata “bias” values. Some examples are:
 

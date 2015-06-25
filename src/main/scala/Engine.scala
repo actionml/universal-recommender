@@ -11,6 +11,7 @@ case class Query(
     itemBias: Option[Float] = None,
     fields: Option[List[Field]] = None,
     blacklist: Option[List[String]] = None,
+    returnSelf: Option[Boolean] = None,// means use the query default
     num: Option[Int] = None)
   extends Serializable
 
