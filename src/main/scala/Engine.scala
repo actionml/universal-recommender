@@ -5,14 +5,15 @@ import io.prediction.controller.{EngineFactory, Engine}
 
 /** Constructed by PredictionIO and passed to MMRAlgoritm.predict */
 case class Query(
-    user: Entity,
-    item: Entity,
-    fields: List[Field],
-    blacklist: List[String],
-    num: Int)
+    user: Option[String] = None,
+    userBias: Option[Float] = None,
+    item: Option[String] = None,
+    itemBias: Option[Float] = None,
+    fields: Option[List[Field]] = None,
+    blacklist: Option[List[String]] = None,
+    num: Option[Int] = None)
   extends Serializable
 
-case class Entity(id: Option[String] = None, bias: Option[Float] = None)
 
 case class Field(
     name: String,

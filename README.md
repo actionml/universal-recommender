@@ -183,6 +183,7 @@ This returns items based on user xyz history or similar to item 53454543513 but 
 
 ### Work in progress, runs on sample data, use at your own risk
 
+  - working for item, user, both with boost but filter not working yet.
   - can be used to recommend for users and/or items (similar items)
   - boilerpate for bias (boost and filter) based on any indicator for user or item-based.
   - boilerplate for metadata boost and filter

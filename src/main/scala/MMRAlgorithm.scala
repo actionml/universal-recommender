@@ -41,10 +41,10 @@ case class MMRAlgorithmParams(
     blacklist: Option[List[String]],
     backfill: Option[String],// popular or trending
     maxQueryActions: Option[Int] = Some(20),//default = DefaultMaxQueryItems
-    maxRecs: Option[Int] = Some(20),
-    userBias: Option[Float] = Some(1.0f),
-    itemBias: Option[Float] = Some(1.0f),
-    fields: Option[Array[Field]] = Some(Array.empty[Field]),
+    num: Option[Int] = Some(20),
+    userBias: Option[Float] = None,// will cause the default search engine boost of 1.0
+    itemBias: Option[Float] = None,// will cause the default search engine boost of 1.0
+    fields: Option[List[Field]] = None,
     seed: Option[Long] = Some(System.currentTimeMillis()))
   extends Params //fixed default make it reproducable unless supplied
 
@@ -125,12 +125,15 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
   def removeBlacklisted(recs: PredictedResult, query: Query, queryBlacklist: List[Event] ): PredictedResult = {
     val eventFilteredItemScores = recs.itemScores.filterNot { itemScore =>
       queryBlacklist.filter { event => //if some rec id == something blacklisted
-        event.entityId == itemScore.item
+        if (event.entityId == itemScore.item) {
+          val breakpoint = 0
+          true
+        } else false
       }.nonEmpty //if some rec id == something blacklisted then don't return the itemScore
     }
 
     val queryFilteredItemScores = eventFilteredItemScores.filterNot { itemScore =>
-      query.blacklist.contains(itemScore.item)
+      query.blacklist.getOrElse(List.empty[String]).contains(itemScore.item)
     } //if some rec id == something blacklisted in query then don't return the itemScore
     PredictedResult(queryFilteredItemScores)
   }
@@ -142,96 +145,109 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     // In order to match the form of the Elasticsearch query, indicators are broken into
     // one with possible boosts and ones that filter results
 
-    // create a List[BoostableIndicators] of all query indicators that can have a boost attached
-    val alluserEvents = getBiasedRecentUserActions(query, ap.eventNames, ap.maxQueryActions)
+    try{ // require the minimum of a user or item, if not then return nothing
+      require( query.item.nonEmpty || query.user.nonEmpty, "Warning: a query must include either a user or item id")
 
-    val recentUserHistory = if (ap.userBias.get >= 0f)
-      alluserEvents._1
-    else List.empty[BoostableIndicators]
-    
-    val similarItems = if (ap.itemBias.get >= 0f) getBiasedSimilarItems(query.item, ap.eventNames)
-    else List.empty[BoostableIndicators]
-    
-    val boostedMetadata = getBoostedMetadata(query)
-    
-    val allBoostedIndicators = recentUserHistory ++ similarItems ++ boostedMetadata
+      // create a List[BoostableIndicators] of all query indicators that can have a boost attached
+      val alluserEvents = getBiasedRecentUserActions(query)
 
-    // create a List[FilteredIndicators] of all query indicators that are to be used to filter results
-    val recentUserHistoryFilter = if (ap.userBias.get < 0f) {
-      // strip any boosts
-      alluserEvents._1.map { i =>
-        FilterIndicators(i.actionName, i.itemIDs)
-      }
-    } else List.empty[FilterIndicators]
+      val recentUserHistory = if ( ap.userBias.getOrElse(1f) >= 0f )
+        alluserEvents._1.slice(0, ap.maxQueryActions.get - 1)
+      else List.empty[BoostableIndicators]
 
-    val similarItemsFilter = if (ap.itemBias.get < 0f ) {
-      getBiasedSimilarItems(query.item.id, ap.eventNames).map { i =>
-        FilterIndicators(i.actionName, i.itemIDs)
-      }.toList
-    } else List.empty[FilterIndicators]
+      val similarItems = if ( ap.itemBias.getOrElse(1f) >= 0f )
+        getBiasedSimilarItems(query)
+      else List.empty[BoostableIndicators]
 
-    val filteringMetadata = getFilteringMetadata(query)
+      val boostedMetadata = getBoostedMetadata(query)
 
-    val allFilteringIndicators = recentUserHistoryFilter ++ similarItemsFilter ++ filteringMetadata
+      val allBoostedIndicators = recentUserHistory ++ similarItems ++ boostedMetadata
 
-    //val indicatorArray = allIndicators.toArray
+      // create a List[FilteredIndicators] of all query indicators that are to be used to filter results
+      val recentUserHistoryFilter = if ( ap.userBias.getOrElse(1f) < 0f ) {
+        // strip any boosts
+        alluserEvents._1.map { i =>
+          FilterIndicators(i.actionName, i.itemIDs)
+        }.slice(0, ap.maxQueryActions.get - 1)
+      } else List.empty[FilterIndicators]
 
-    // since users have action history and items have indicators and both correspond to the same "actions" like
-    // purchase or view, we'll pass both to the query if the user history or items indicators are empty
-    // then metadata must be relied on to return results.
+      val similarItemsFilter = if ( ap.itemBias.getOrElse(1f) < 0f ) {
+        getBiasedSimilarItems(query).map { i =>
+          FilterIndicators(i.actionName, i.itemIDs)
+        }.toList
+      } else List.empty[FilterIndicators]
 
-    val json =
-      (
-        ("size" -> ap.maxRecs) ~
-        ("query"->
-          ("bool"->
-            ("should"->
-              allBoostedIndicators.map { i =>
-                ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}
+      val filteringMetadata = getFilteringMetadata(query)
 
-            ) ~
-            ("must"->
-              allFilteringIndicators.map { i =>
-                ("terms" -> (i.actionName -> i.itemIDs))})
+      val allFilteringIndicators = recentUserHistoryFilter ++ similarItemsFilter ++ filteringMetadata
+
+      //val indicatorArray = allIndicators.toArray
+
+      // since users have action history and items have indicators and both correspond to the same "actions" like
+      // purchase or view, we'll pass both to the query if the user history or items indicators are empty
+      // then metadata must be relied on to return results.
+
+      val numRecs = if ( query.num.nonEmpty ) query.num.get
+      else ap.num.get
+      
+      val json =
+        (
+          ("size" -> numRecs) ~
+          ("query"->
+            ("bool"->
+              ("should"->
+                allBoostedIndicators.map { i =>
+                  ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}
+
+              ) ~
+              ("must"->
+                allFilteringIndicators.map { i =>
+                  ("terms" -> (i.actionName -> i.itemIDs))}
+              )
+            )
           )
         )
-      )
-    val j = compact(render(json))
-    (compact(render(json)), alluserEvents._2)
+      val j = compact(render(json))
+      logger.info(s"Query: \n${j}\n")
+      (compact(render(json)), alluserEvents._2)
+    } catch {
+      case e: IllegalArgumentException =>
+        ("", List.empty[Event])
+    }
   }
 
   /** Get similar items for an item, these are already in the action indicators in ES */
-  def getBiasedSimilarItems(item: Option[String] = None, actions: List[String]): Seq[BoostableIndicators] = {
-    if (item.nonEmpty) {
-      val m = esClient.getSource(ap.indexName, ap.typeName, item.get)
+  def getBiasedSimilarItems(query: Query): Seq[BoostableIndicators] = {
+    if (query.item.nonEmpty) {
+      val m = esClient.getSource(ap.indexName, ap.typeName, query.item.get)
 
-      actions.map { action =>
+      val itemEventBias = query.userBias.getOrElse(ap.userBias.getOrElse(1f))
+      val userEventsBoost = if (itemEventBias > 0) itemEventBias else 1
+      ap.eventNames.map { action =>
         val items = try {
-          m.get(action).asInstanceOf[List[String]]
+          m.get(action).asInstanceOf[util.ArrayList[String]].toList
         } catch {
           case cce: ClassCastException =>
-            logger.warn(s"Bad value in item ${item} corresponding to key: ${action} that was not a List[String]" +
+            logger.warn(s"Bad value in item ${query.item} corresponding to key: ${action} that was not a List[String]" +
               " ignored.")
             List.empty[String]
         }
         val rItems = if (items.size <= ap.maxQueryActions.get) items else items.slice(0, ap.maxQueryActions.get - 1)
-        BoostableIndicators(action, rItems, ap.itemBias.get)
+        BoostableIndicators(action, rItems, userEventsBoost)
       }
     } else List.empty[BoostableIndicators]
   }
 
   /** Get recent events of the user on items to create the recommendations query from */
   def getBiasedRecentUserActions(
-    query: Query,
-    actions: List[String],
-    maxQueryActions: Option[Int]): (Seq[BoostableIndicators], List[Event]) = {
+    query: Query): (Seq[BoostableIndicators], List[Event]) = {
 
     val recentEvents = try {
       LEventStore.findByEntity(
         appName = ap.appName,
         // entityType and entityId is specified for fast lookup
         entityType = "user",
-        entityId = query.user.id.get,
+        entityId = query.user.get,
         // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
         //eventNames = Some(Seq(action)),// get all and separate later
         targetEntityType = Some(Some("item")),
@@ -245,13 +261,18 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
       case e: scala.concurrent.TimeoutException =>
         logger.error(s"Timeout when read recent events." +
           s" Empty list is used. ${e}")
-        List[Event]()
+        List.empty[Event]
+      case e: NoSuchElementException => // todo: bad form to use an exception to check if there is a user id
+        logger.info("No user id for recs, returning similar items for the item specified")
+        List.empty[Event]
       case e: Exception => // fatal because of error, an empty query
         logger.error(s"Error when read recent events: ${e}")
         throw e
     }
 
-      val rActions = actions.map { action =>
+    val userEventBias = query.userBias.getOrElse(ap.userBias.getOrElse(1f))
+    val userEventsBoost = if (userEventBias > 0) userEventBias else 1
+    val rActions = ap.eventNames.map { action =>
       var items = List[String]()
 
       for ( event <- recentEvents )
@@ -259,18 +280,17 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
-      BoostableIndicators(action, items, ap.userBias.get)
+      BoostableIndicators(action, items, userEventsBoost)// todo: userBias may be None!
     }
     (rActions, recentEvents)
   }
 
   def getBoostedMetadata( query: Query ): List[BoostableIndicators] = {
-    val paramsBoostedFields = ap.fields.getOrElse(Array.empty[Field])
-    .filter( field => field.bias <= 0 ).map { field =>
+    val paramsBoostedFields = ap.fields.getOrElse(List.empty[Field]).filter( field => field.bias <= 0 ).map { field =>
       BoostableIndicators(field.name, field.values, field.bias)
-    }.toList
+    }
     
-    val queryBoostedFields = query.fields.filter { field =>
+    val queryBoostedFields = query.fields.getOrElse(List.empty[Field]).filter { field =>
       field.bias >=  0f
     }.map { field =>
       BoostableIndicators(field.name, field.values, field.bias)
@@ -280,12 +300,11 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
   }
 
   def getFilteringMetadata( query: Query ): List[FilterIndicators] = {
-    val paramsFilterFields = ap.fields.getOrElse(Array.empty[Field])
-      .filter( field => field.bias > 0 ).map { field =>
+    val paramsFilterFields = ap.fields.getOrElse(List.empty[Field]).filter( field => field.bias > 0 ).map { field =>
       FilterIndicators(field.name, field.values)
-    }.toList
+    }
 
-    val queryFilterFields = query.fields.filter { field =>
+    val queryFilterFields = query.fields.getOrElse(List.empty[Field]).filter { field =>
       field.bias <  0f
     }.map { field =>
       FilterIndicators(field.name, field.values)
