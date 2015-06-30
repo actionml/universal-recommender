@@ -11,16 +11,16 @@ libraryDependencies ++= Seq(
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
   // Mahout's Spark code
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion
-    from "file:///home/pat/mmr/lib/mahout-math-scala_2.10-0.10.1-SNAPSHOT.jar",
+    from "file://./lib/mahout-math-scala_2.10-0.10.1-SNAPSHOT.jar",
   "org.apache.mahout" %% "mahout-spark" % mahoutVersion
     exclude("org.apache.spark", "spark-core_2.10")
-    from "file:///home/pat/mmr/lib/mahout-spark-scala_2.10-0.10.1-SNAPSHOT.jar",
+    from "file://./lib/mahout-spark-scala_2.10-0.10.1-SNAPSHOT.jar",
   "org.apache.mahout"  % "mahout-math" % mahoutVersion
-    from "file:///home/pat/mmr/lib/mahout-math-0.10.1-SNAPSHOT.jar",
+    from "file://./lib/mahout-math-0.10.1-SNAPSHOT.jar",
   "org.apache.mahout"  % "mahout-hdfs" % mahoutVersion
     exclude("com.thoughtworks.xstream", "xstream")
     exclude("org.apache.hadoop", "hadoop-client")
-    from "file:///home/pat/mmr/lib/mahout-hdfs-0.10.1-SNAPSHOT.jar",
+    from "file://./lib/mahout-hdfs-0.10.1-SNAPSHOT.jar",
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
   "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.0.Beta4"
