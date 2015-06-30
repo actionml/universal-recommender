@@ -5,7 +5,7 @@
   "datasource": {
     "params" : {
       "name": "sample-movielens",
-      "appName": "MMRApp1",
+      "appName": "MMRPhonesFake",
       "eventNames": ["rate", "buy"]
     }
   },
@@ -21,13 +21,12 @@
     {
       "name": "mmr",
       "params": {
-        "appName": "MMRApp1",
+        "appName": "MMRPhonesFake",
         "indexName": "mmrindex",
         "typeName": "items",
-        "eventNames": ["rate", "buy"],
+        "eventNames": ["purchase", "view"],
         "maxQueryActions": 20,
-        "maxRecs": 20,
-        "returnSelf": true,
+        "maxRecs": 1,
         "seed": 3
       }
     }

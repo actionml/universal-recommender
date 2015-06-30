@@ -248,7 +248,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
         entityId = query.user.get,
         // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
         //eventNames = Some(Seq(action)),// get all and separate later
-        targetEntityType = Some(Some("item")),
+        targetEntityType = None,
         // limit = Some(maxQueryActions), // this will get all history then each action can be limited before using in
         // the query
         latest = true,

@@ -70,6 +70,7 @@ class MMRModel(
     esFields.saveToEs(s"/${params.indexName}/${params.typeName}", Map("es.mapping.id" -> "id"))
     // todo: check to see if a Flush is needed after writing all new data to the index
     // esClient.admin().indices().flush(new FlushRequest("mmrindex")).actionGet()
+    val dbFields = esFields.collect()
     true
   }
 
