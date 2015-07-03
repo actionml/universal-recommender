@@ -4,9 +4,9 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "name": "sample-movielens",
+      "name": "sample-handmade-data.txt",
       "appName": "MMRPhonesFake",
-      "eventNames": ["rate", "buy"]
+      "eventNames": ["purchase", "view"]
     }
   },
   "sparkConf": {
@@ -27,7 +27,7 @@
         "eventNames": ["purchase", "view"],
         "maxQueryActions": 20,
         "maxRecs": 1,
-        "seed": 3
+        "blacklist": ["purchase"]
       }
     }
   ]

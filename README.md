@@ -83,7 +83,7 @@ The “params” section controls most of the features of the MMR. Possible valu
 * **eventNames**: and array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
 * **maxQueryActions**: an integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
 * **maxRecs**: an integer telling the engine the maximum number of recs to return per query but less may be returned if the query produces less results.
-* **blacklist**: array of strings corresponding to the actions taken on items, which would cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is little need to recommend something the user has already bought. If this is not specified then no blacklist is assumed but one may be passed in with the query. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a categpory page this could be recorded as a category preference so if this event is used in a blacklist it should have no effect, the catagory and item ids should never match. 
+* **blacklist**: array of strings corresponding to the actions taken on items, which would cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is little need to recommend something the user has already bought. If this is not specified then no blacklist is assumed but one may be passed in with the query. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a categpory page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the catagory and item ids should never match. If you want to filter certain categories, use a filter.
 * **backfill**: array of strings corresponding to the types of backfill available. These values are calculated from hot, popular, or trending items and are mixed into the query so they don’t occur unless the other query data produces no results. For example if there is no user history or similar items, only backfill will be returned. Backfil bias is always 1 so increasing the bias for user or item data is usual when including backfill so their results will dominate. **Note**: not sure if this is best, may want to boost lower than one and allow an override backfillBias since users will seldom want to mix personal and popular recommendations equally.
 * **fields**: array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **userBias**: amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
@@ -181,36 +181,31 @@ This returns items based on user xyz history or similar to item 53454543513 but 
 
 **Note**:This query should be condsidered **experimental**. mixing user history with item similairty is possible but may have unexpected results.
 
+##Creating New Model with New Event Types
+
+To begin using on new data with an engine that has been used with sample data or using different events follow these steps:
+
+1. Create a new app name, change `appName` in `engine.json`
+2. Run `pio app new **your-new-app-name**`
+3. Make any changes to `engine.json` to specify new event names and config values. Make sure `"eventNames": ["**your-primary-event**", "**a-secondary-event**", "**another-secondary-event**", ...]` contains the exact string used for your events and that the primary one is first in the list.
+4. Import new events or allow enough to accumulate into the EventStore. If you are using sample events from a file run `python data/**your-python-import-script**.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
+5. Perform `pio build`, `pio train`, and `pio deploy`
+6. Copy and edit the sample query script to match your new data. For new user ids pick a user that exists in the events, same for metadata `fields`, and items.
+7. Run your edited query script and check the recs.
+
 ## Versions WIP
 
 ### Work in progress, runs on sample data, use at your own risk
 
-  - all except backfill working in the happy path lots of testing still needed
-  - working for item, user, both with boost but filter not working yet
-  - can be used to recommend for users and/or items (similar items)
-  - boilerpate for bias (boost and filter) based on any indicator for user or item-based.
-  - boilerplate for metadata boost and filter
-  - integrated with Elasticsearch native (and therefore fast?) Spark based parallel indexing.
-  - Runnable on example data for ALS
-  - Serving working, query works with item and user, no bias or metadata implemented
-  - MMRAlgorithm.predict working with ES multi-indicator query for cooccurrence and cross-cooccurrence
-  - writer for indicators to ES working, still thinking about how to identify the index, type, doc IDs, and fields
-  - MMRModel created
-  - upgraded to PredictionIO 0.9.3
-  - MMRAlgorithm.predict stubbed
-  - MMRAlgorithm.train working
-  - added Mahout's Spark requirements to engine.json sparkConf section, verified that Kryo serialization is working for Mahout objects
-  - Lots of work to make debuggable but this is in Intellij land, and only has an effect on build.sbt (as well as PIO on IntelliJ docs)
-  - Preparator working
-  - DataStore working
-  - initial commit
-  - clone of ALS template as a base
+  - all except backfill and dates implmented and working
+  - blacklisting based on events (user purchase for instance) are not working but specific item blacklists are.
   
 ### Known issues
 
+  - event-based blacklists not working (user purchased items for instance)
   - dates not implemented
   - index droped then written, need to create, then swap for 0 down-time? Not sure 
   - Only doing usage events now, content similarity is not implemented
-  - Context is not allowed in queries yet (location, time of day, device, etc) - bias is speced in engin.json
+  - Context is not allowed in queries yet (location, time of day, device, etc)
   - No popularity based fallback yet. - use the EventStore plugin to modify a field in ES docs
 

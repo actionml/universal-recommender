@@ -27,14 +27,16 @@ def import_events(client, file):
         target_entity_type="item",
         target_entity_id=data[2],
       )
+      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2]
     elif (data[1] == "view"): # assumes other event type is 'view'
       client.create_event(
         event=data[1],
         entity_type="user",
         entity_id=data[0],
-        target_entity_type="category", # type of item in this action
+        target_entity_type="item", # type of item in this action
         target_entity_id=data[2],
       )
+      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2]
     elif (data[1] == "$set"): # must be a set event
       client.create_event(
         event=data[1],
@@ -42,7 +44,8 @@ def import_events(client, file):
         entity_id=data[0],
         properties= { "category": [data[2]] }
       )
-    count += 1
+      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2]
+  count += 1
   f.close()
   print "%s events are imported." % count
 

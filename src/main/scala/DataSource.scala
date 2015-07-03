@@ -6,17 +6,15 @@ import _root_.io.prediction.controller.EmptyActualResult
 import _root_.io.prediction.controller.Params
 import _root_.io.prediction.data.storage.{PropertyMap, Event}
 import _root_.io.prediction.data.store.PEventStore
-import org.apache.mahout.math.RandomAccessSparseVector
+//import org.apache.mahout.math.RandomAccessSparseVector
 import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
-import org.apache.mahout.sparkbindings._
-import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
-
+//import org.apache.mahout.sparkbindings._
+//import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
+//import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
-
 import grizzled.slf4j.Logger
-import org.joda.time.DateTime
+//import org.joda.time.DateTime
 
 /** Taken from engine.json these are passed in to the DataSource constructor
   *
@@ -26,7 +24,7 @@ import org.joda.time.DateTime
   */
 case class DataSourceParams(
    appName: String,
-   eventNames: List[String])
+   eventNames: List[String]) // IMPORTANT: eventNames must be exactly the same as MMRAlgorithmParams eventNames
   extends Params
 
 /** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
@@ -39,7 +37,7 @@ class DataSource(val dsp: DataSourceParams)
 
   @transient lazy val logger = Logger[this.type]
 
-  /** Reads events from PEventStore and creates and RDD for each */
+  /** Reads events from PEventStore and create and RDD for each */
   override
   def readTraining(sc: SparkContext): TrainingData = {
 
@@ -48,30 +46,36 @@ class DataSource(val dsp: DataSourceParams)
     val eventsRDD = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("user"),
-      eventNames = Some(eventNames),
+      eventNames = Some(eventNames)
       // targetEntityType is optional field of an event.
-      targetEntityType = Some(Some("item")))(sc)
+      // strictly speaking items are not the target type for all actions so use event name to differentiate
+      //targetEntityType = Some(Some("item"))
+      )(sc)
 
-    val fieldsRDD = PEventStore.aggregateProperties(
-      appName= "MMRApp1", //dsp.appName,
-      entityType=  "item")(sc)
-
+     // now separate the events by event name
     val actionRDDs = eventNames.map { eventName =>
-      val actionRDD = eventsRDD.map { event =>
+      val actionRDD = eventsRDD.filter { event =>
 
         require(eventNames.contains(event.event), s"Unexpected event ${event} is read.") // is this really needed?
         require(event.entityId.nonEmpty && event.targetEntityId.get.nonEmpty, "Empty user or item ID")
 
-        (event.entityId, event.targetEntityId.get)
+        eventName.equals(event.event)
 
+      }.map { event =>
+        (event.entityId, event.targetEntityId.get)
       }.cache()
       //todo: take out when not debugging
       val debugActions = actionRDD.take(5)
       (eventName, actionRDD)
     }
 
+    // aggregating all $set/$unsets for metadata fields, which are attached to items
+    val fieldsRDD = PEventStore.aggregateProperties(
+      appName= dsp.appName,
+      entityType=  "item")(sc)
+
     // Have a list of (actionName, RDD), for each action
-    // todo: should allow some data to be content indicators, which requires rethinking how to use PEventStore
+    // todo: some day allow data to be content, which requires rethinking how to use EventStore
     new TrainingData(actionRDDs, fieldsRDD)
   }
 }

@@ -5,7 +5,6 @@ import grizzled.slf4j.Logger
 import io.prediction.controller.{PersistentModelLoader, PersistentModel}
 import io.prediction.data.storage.PropertyMap
 import org.apache.spark.rdd.RDD
-import _root_.io.prediction.data.storage.{elasticsearch, StorageClientConfig}
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.template.conversions.IndexedDatasetConversions
 import org.elasticsearch.spark._
@@ -65,6 +64,7 @@ class MMRModel(
     // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
     // recreate it, no swapping yet
     esClient.deleteIndex(params.indexName)
+    esClient.createIndex(params.indexName)
 
     // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
     esFields.saveToEs(s"/${params.indexName}/${params.typeName}", Map("es.mapping.id" -> "id"))
@@ -113,7 +113,7 @@ class MMRModel(
     s"(${userStringIntMap.take(2)}...)" +
     s" itemStringIntMap: [${itemStringIntMap.size}]" +
     s"(${itemStringIntMap.take(2)}...)" */
-      "Todo: describe MMRModel"
+    s"MMRModel in Elasticsearch at index: ${indexName}"
   }
 
 
