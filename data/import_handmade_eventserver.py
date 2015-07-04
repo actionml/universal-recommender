@@ -45,7 +45,7 @@ def import_events(client, file):
         properties= { "category": [data[2]] }
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2]
-  count += 1
+    count += 1
   f.close()
   print "%s events are imported." % count
 

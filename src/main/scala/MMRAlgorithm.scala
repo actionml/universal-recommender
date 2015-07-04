@@ -21,7 +21,10 @@ case class MMRAlgorithmParams(
     indexName: String = "mmrindex", // can optionally be used to specify the elasticsearch index name
     typeName: String = "items", // can optionally be used to specify the elasticsearch type name
     eventNames: List[String], // names used to ID all user actions
-    blacklist: Option[List[String]],
+    blacklistEvents: Option[List[String]], // list of events used to determine which recs to filter out, used for
+                                           // things like not showing items a user has purchased. Default is anything
+                                           // the user took the primary action on, to not filter anything specify an
+                                           // empty array
     backfill: Option[String], // popular or trending
     maxQueryActions: Option[Int] = Some(500),//default = DefaultMaxQueryItems
     num: Option[Int] = Some(20), // default max # of recs returned
@@ -109,32 +112,35 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     * because they are already shown on an app screen/page.
     * @param recs recs to be filtered
     * @param query query for
-    * @param queryBlacklist
+    * @param userActions
     * @return
     */
-  def removeBlacklisted(recs: PredictedResult, query: Query, queryBlacklist: List[Event] ): PredictedResult = {
+  def removeBlacklisted(recs: PredictedResult, query: Query, userActions: List[Event] ): PredictedResult = {
 
-    // First remove any items specifically not allowed
-    val eventFilteredItemScores = recs.itemScores.filterNot { itemScore =>
-      queryBlacklist.filter { event => //if some rec id == something blacklisted
-        if (event.entityId == itemScore.item) {
-          val breakpoint = 0
-          true
-        } else false
-      }.nonEmpty //if some rec id == something blacklisted then don't return the itemScore
+    // First remove any events that have targets not allowed
+    val disallowedEvents = userActions.filter { event =>
+      if (ap.blacklistEvents.nonEmpty) {
+        // either a list or an empty list of filtering events so honor them
+        if (ap.blacklistEvents.get == List.empty[String]) false // no filtering events so all are allowed
+        else if (ap.blacklistEvents.get.contains(event.event)) true else false // if its filtered remove it, else allow
+      } else if (ap.eventNames(0).equals(event.event)) true else false // remove the primary event if nothing specified
     }
 
-    // Now remove any items that the user has interacted with
-    val queryFilteredItemScores = eventFilteredItemScores.filterNot { itemScore =>
-      query.blacklist.getOrElse(List.empty[String]).contains(itemScore.item)
+    val allowedItemScores = recs.itemScores.filter { itemScore =>
+      !disallowedEvents.exists ( event => itemScore.item.equals(event.targetEntityId.getOrElse("")))
+    }
+
+   // Now remove any items disallowed in query
+    val queryFilteredItemScores = allowedItemScores.filterNot { itemScore =>
+      query.blacklistItems.getOrElse(List.empty[String]).contains(itemScore.item)
     } //if some rec id == something blacklisted in query then don't return the itemScore
 
     // Now conditionally filter the query item itself
     val includeSelf = query.returnSelf.getOrElse(ap.returnSelf.getOrElse(false))
-    val finalFilteredQueryScores = if ( !includeSelf ) queryFilteredItemScores.filterNot { itemScore =>
+    val selfFilteredItemScores = if ( !includeSelf ) queryFilteredItemScores.filterNot { itemScore =>
       query.item.getOrElse("").equals(itemScore.item)
-    } else { queryFilteredItemScores }//don't filter out the query item
-    PredictedResult(finalFilteredQueryScores)
+    } else queryFilteredItemScores //don't filter out the query item
+    PredictedResult(selfFilteredItemScores)
   }
 
   /** Build a query from default algorithms params and the query itself taking into account defaults */
@@ -179,7 +185,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
       // since users have action history and items have indicators and both correspond to the same "actions" like
       // purchase or view, we'll pass both to the query if the user history or items indicators are empty
-      // then metadata must be relied on to return results.
+      // then metadata or backfill must be relied on to return results.
 
       val numRecs = if ( query.num.nonEmpty ) query.num.get
       else ap.num.get

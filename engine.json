@@ -26,8 +26,7 @@
         "typeName": "items",
         "eventNames": ["purchase", "view"],
         "maxQueryActions": 20,
-        "maxRecs": 1,
-        "blacklist": ["purchase"]
+        "maxRecs": 4
       }
     }
   ]

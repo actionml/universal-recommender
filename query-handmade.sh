@@ -61,10 +61,11 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u1, one rec requested"
+echo "Recommendations for user: u1, max of one rec requested but due to blacklisting, may see none"
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1"
+    "user": "u1",
+    "num": 1
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
@@ -158,7 +159,7 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u1, one rec requested, blacklist 'ipad'"
+echo "Recommendations for user: u1, blacklist 'ipad'"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -192,6 +193,34 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 #sleep 2
 
+
+echo ""
+echo "Recommendations for item: galaxy"
+curl -H "Content-Type: application/json" -d '
+{
+    "item": "galaxy"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
+echo "Recommendations for user: u1"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
+echo "Recommendations for user: u1, 'galaxy' blacklisted"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "blacklistItems": ["galaxy"]
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
 
 
 

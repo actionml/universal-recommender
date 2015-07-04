@@ -55,15 +55,15 @@ This file allows the user to describe and set parameters that control the engine
             "appName": "MMRApp1",
             "indexName": "mmrindex",
             "typeName": "items",
-            "blacklist": ["buy"],
+            "blacklistEvents": ["buy", "view"],
             "backfill": "trending" or "popular" or "trending",
             "maxQueryActions": 20,
             "maxRecs": 20,
             "seed": 3,
-            "userbias": -maxFloat..maxFloat, // favor user history in recs by this amount
-            "itembias": -maxFloat..maxFloat, //favor similar items in recs by this amount
-            "returnSelf": true | false //default = false, will not return item or user as recommendation
-            “fields”: [ // an array of fields to be used as biasing factors in all queries
+            "userbias": -maxFloat..maxFloat,
+            "itembias": -maxFloat..maxFloat,
+            "returnSelf": true | false,
+            “fields”: [
               {
                 “name”: ”fieldname”
                 “values”: [“fieldValue1”, ...],
@@ -77,13 +77,13 @@ This file allows the user to describe and set parameters that control the engine
 
 The “params” section controls most of the features of the MMR. Possible values are:
 
-* **appName**: string describing the app using the engine.
-* **indexName**: string describing the index for all indicators, something like "mmrindex".
-* **typeName**: string describing the type in Elasticsearch terminology, something like "items".
+* **appName**: string describing the app using the engine. Must be the same as is seen with `pio app list`
+* **indexName**: string describing the index for all indicators, something like "mmrindex". The Elasticsearch URI for its REST interface is `http:/**your-master-machine**/indexName/typeName/...` You can access ES through its REST interface here.
+* **typeName**: string describing the type in Elasticsearch terminology, something like "items". This has no important meaning but must be part of the Elastic search URI for queries.
 * **eventNames**: and array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
 * **maxQueryActions**: an integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
 * **maxRecs**: an integer telling the engine the maximum number of recs to return per query but less may be returned if the query produces less results.
-* **blacklist**: array of strings corresponding to the actions taken on items, which would cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is little need to recommend something the user has already bought. If this is not specified then no blacklist is assumed but one may be passed in with the query. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a categpory page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the catagory and item ids should never match. If you want to filter certain categories, use a filter.
+* **blacklistEvents**: array of strings corresponding to the actions taken on items, which will cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is often little need to recommend something the user has already bought. If this is not specified then the primary event is assumed. To blacklist no event, specify an enpty array. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a categpory page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the catagory and item ids should never match. If you want to filter certain categories, use a field filter and specify all categories allowed.
 * **backfill**: array of strings corresponding to the types of backfill available. These values are calculated from hot, popular, or trending items and are mixed into the query so they don’t occur unless the other query data produces no results. For example if there is no user history or similar items, only backfill will be returned. Backfil bias is always 1 so increasing the bias for user or item data is usual when including backfill so their results will dominate. **Note**: not sure if this is best, may want to boost lower than one and allow an override backfillBias since users will seldom want to mix personal and popular recommendations equally.
 * **fields**: array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **userBias**: amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
@@ -107,7 +107,7 @@ Query fields determine what data is used to match when returning recs. Some fiel
           “bias”: -maxFloat..maxFloat }// negative means a filter, positive is a boost 
         },...
       ]
-      “blacklist”: [“itemId1”, “itemId2”, ...]// overrides the blacklist in engine.json and is optional
+      “blacklistItems”: [“itemId1”, “itemId2”, ...]// overrides the blacklist in engine.json and is optional
       "returnSelf": true | false //default = false, will not return query item as recommendation
       “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
@@ -197,15 +197,14 @@ To begin using on new data with an engine that has been used with sample data or
 
 ### Work in progress, runs on sample data, use at your own risk
 
-  - all except backfill and dates implmented and working
-  - blacklisting based on events (user purchase for instance) are not working but specific item blacklists are.
+  - all implmented and working except date and backfill
   
 ### Known issues
 
-  - event-based blacklists not working (user purchased items for instance)
   - dates not implemented
-  - index droped then written, need to create, then swap for 0 down-time? Not sure 
-  - Only doing usage events now, content similarity is not implemented
-  - Context is not allowed in queries yet (location, time of day, device, etc)
+  - synchronous query, should we do async?
+  - index droped then written, with correct management of index refresh this could mean 0 downtime for Elasticsearch, delete in train, refresh during deploy 
+  - Only doing usage events, content similarity is not implemented and non-trivial
+  - Context is not allowed in queries yet (location, time of day, device, etc) allowed if they are sent as user events to the event store
   - No popularity based fallback yet. - use the EventStore plugin to modify a field in ES docs
 

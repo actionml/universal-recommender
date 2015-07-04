@@ -15,7 +15,7 @@ case class Query(
     item: Option[String] = None, // must be a user or item id
     itemBias: Option[Float] = None, // default: whatever is in algorithm params or 1
     fields: Option[List[Field]] = None, // default: whatever is in algorithm params or None
-    blacklist: Option[List[String]] = None, // default: whatever is in algorithm params or None
+    blacklistItems: Option[List[String]] = None, // default: whatever is in algorithm params or None
     returnSelf: Option[Boolean] = None,// means for an item query should the item itself be returned, defaults
                                        // to what is in the algorithm params or false
     num: Option[Int] = None) // default: whatever is in algorithm params, which itself has a default--probably 20
