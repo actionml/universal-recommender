@@ -15,6 +15,14 @@ import org.json4s.jackson.JsonMethods._
 import scala.collection.convert.wrapAsScala._
 import grizzled.slf4j.Logger
 
+/** Setting the option in the params case class doesn't work as expected when the param is missing from
+  * engine.json so set these for use in the algorithm when they are not present in the engine.json
+  */
+object defaultMMRAlgorithmParams {
+  val DefaultMaxQueryActions = 500
+  val DefaultNum = 20
+}
+
 /** Instantiated from engine.json */
 case class MMRAlgorithmParams(
     appName: String, // filled in from engine.json
@@ -26,8 +34,8 @@ case class MMRAlgorithmParams(
                                            // the user took the primary action on, to not filter anything specify an
                                            // empty array
     backfill: Option[String], // popular or trending
-    maxQueryActions: Option[Int] = Some(500),//default = DefaultMaxQueryItems
-    num: Option[Int] = Some(20), // default max # of recs returned
+    maxQueryActions: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxQueryActions),//default = DefaultMaxQueryItems
+    num: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultNum), // default max # of recs requested
     userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
     itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
     returnSelf: Option[Boolean] = None, // query building logic defaults this to false
@@ -154,7 +162,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
       // create a list of all boosted query indicators
       val recentUserHistory = if ( ap.userBias.getOrElse(1f) >= 0f )
-        alluserEvents._1.slice(0, ap.maxQueryActions.get - 1)
+        alluserEvents._1.slice(0, ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions) - 1)
       else List.empty[BoostableIndicators]
 
       val similarItems = if ( ap.itemBias.getOrElse(1f) >= 0f )
@@ -170,7 +178,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
         // strip any boosts
         alluserEvents._1.map { i =>
           FilterIndicators(i.actionName, i.itemIDs)
-        }.slice(0, ap.maxQueryActions.get - 1)
+        }.slice(0, ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions) - 1)
       } else List.empty[FilterIndicators]
 
       val similarItemsFilter = if ( ap.itemBias.getOrElse(1f) < 0f ) {
@@ -187,8 +195,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
       // purchase or view, we'll pass both to the query if the user history or items indicators are empty
       // then metadata or backfill must be relied on to return results.
 
-      val numRecs = if ( query.num.nonEmpty ) query.num.get
-      else ap.num.get
+      val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultMMRAlgorithmParams.DefaultNum))
 
       val json =
         (
@@ -233,7 +240,8 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
                 " ignored.")
               List.empty[String]
           }
-          val rItems = if (items.size <= ap.maxQueryActions.get) items else items.slice(0, ap.maxQueryActions.get - 1)
+          val rItems = if (items.size <= ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions))
+            items else items.slice(0, ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions) - 1)
           BoostableIndicators(action, rItems, itemEventsBoost)
         }
       } else List.empty[BoostableIndicators] // no similar items
@@ -278,7 +286,8 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
       var items = List[String]()
 
       for ( event <- recentEvents )
-        if (event.event == action && items.size < ap.maxQueryActions.get) {
+        if (event.event == action && items.size <
+          ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions)) {
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }

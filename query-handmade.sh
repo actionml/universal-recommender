@@ -101,7 +101,7 @@ curl -H "Content-Type: application/json" -d '
         "values": ["tablets"],
         "bias": 2
     }],
-    "blacklist": ["ipad"]
+    "blacklistItems": ["ipad"]
 
 }' http://localhost:8000/queries.json
 echo ""
@@ -118,7 +118,7 @@ curl -H "Content-Type: application/json" -d '
         "values": ["phones"],
         "bias": 2
     }],
-    "blacklist": ["ipad"]
+    "blacklistItems": ["ipad"]
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
@@ -134,7 +134,7 @@ curl -H "Content-Type: application/json" -d '
         "values": ["tablets"],
         "bias": -2
     }],
-    "blacklist": ["ipad"]
+    "blacklistItems": ["ipad"]
 
 }' http://localhost:8000/queries.json
 echo ""
@@ -151,7 +151,7 @@ curl -H "Content-Type: application/json" -d '
         "values": ["phones"],
         "bias": -2
     }],
-    "blacklist": ["ipad"]
+    "blacklistItems": ["ipad"]
 
 
 }' http://localhost:8000/queries.json
@@ -163,7 +163,7 @@ echo "Recommendations for user: u1, blacklist 'ipad'"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
-    "blacklist": ["ipad"]
+    "blacklistItems": ["ipad"]
 
 }' http://localhost:8000/queries.json
 echo ""
@@ -175,7 +175,7 @@ curl -H "Content-Type: application/json" -d '
 {
     "item": "surface",
     "num": 4,
-    "blacklist": ["ipad"]
+    "blacklistItems": ["ipad"]
 
 }' http://localhost:8000/queries.json
 echo ""
@@ -187,7 +187,7 @@ curl -H "Content-Type: application/json" -d '
 {
     "user": "u3",
     "num": 4,
-    "blacklist": ["ipad"]
+    "blacklistItems": ["ipad"]
 
 }' http://localhost:8000/queries.json
 echo ""
