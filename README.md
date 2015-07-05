@@ -77,18 +77,18 @@ This file allows the user to describe and set parameters that control the engine
 
 The “params” section controls most of the features of the MMR. Possible values are:
 
-* **appName**: string describing the app using the engine. Must be the same as is seen with `pio app list`
-* **indexName**: string describing the index for all indicators, something like "mmrindex". The Elasticsearch URI for its REST interface is `http:/**your-master-machine**/indexName/typeName/...` You can access ES through its REST interface here.
-* **typeName**: string describing the type in Elasticsearch terminology, something like "items". This has no important meaning but must be part of the Elastic search URI for queries.
-* **eventNames**: and array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
-* **maxQueryActions**: an integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
-* **num**: an integer telling the engine the maximum number of recs to return per query but less may be returned if the query produces less results or post recs filters like blacklists remove some.
-* **blacklistEvents**: array of strings corresponding to the actions taken on items, which will cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is often little need to recommend something the user has already bought. If this is not specified then the primary event is assumed. To blacklist no event, specify an enpty array. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a categpory page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the catagory and item ids should never match. If you want to filter certain categories, use a field filter and specify all categories allowed.
-* **backfill**: array of strings corresponding to the types of backfill available. These values are calculated from hot, popular, or trending items and are mixed into the query so they don’t occur unless the other query data produces no results. For example if there is no user history or similar items, only backfill will be returned. Backfil bias is always 1 so increasing the bias for user or item data is usual when including backfill so their results will dominate. **Note**: not sure if this is best, may want to boost lower than one and allow an override backfillBias since users will seldom want to mix personal and popular recommendations equally.
-* **fields**: array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
-* **userBias**: amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
-* **itemBias**: same as userbias but applied to similar items to the item supplied in the query.
-* **returnSelf**: boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
+* **appName**: required string describing the app using the engine. Must be the same as is seen with `pio app list`
+* **indexName**: required string describing the index for all indicators, something like "mmrindex". The Elasticsearch URI for its REST interface is `http:/**your-master-machine**/indexName/typeName/...` You can access ES through its REST interface here.
+* **typeName**: required string describing the type in Elasticsearch terminology, something like "items". This has no important meaning but must be part of the Elastic search URI for queries.
+* **eventNames**: required array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
+* **maxQueryActions**: optional, default = 500. An integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
+* **num**: optional, default = 20. An integer telling the engine the maximum number of recs to return per query but less may be returned if the query produces less results or post recs filters like blacklists remove some.
+* **blacklistEvents**: optional, default = the primary action. An array of strings corresponding to the actions taken on items, which will cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is often little need to recommend something the user has already bought. If this is not specified then the primary event is assumed. To blacklist no event, specify an enpty array. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a categpory page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the catagory and item ids should never match. If you want to filter certain categories, use a field filter and specify all categories allowed.
+* **backfill**: optional, default = none. An array of strings corresponding to the types of backfill available. These values are calculated from hot, popular, or trending items and are mixed into the query so they don’t occur unless the other query data produces no results. For example if there is no user history or similar items, only backfill will be returned. Backfil bias is always 1 so increasing the bias for user or item data is usual when including backfill so their results will dominate. **Note**: not sure if this is best, may want to boost lower than one and allow an override backfillBias since users will seldom want to mix personal and popular recommendations equally.
+* **fields**: optional, deafult = none. An array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
+* **userBias**: optional, default = none. Amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
+* **itemBias**: optional, default = none. Same as userbias but applied to similar items to the item supplied in the query.
+* **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
 
 ###Queries
 
@@ -99,27 +99,29 @@ Query fields determine what data is used to match when returning recs. Some fiel
       “userBias”: -maxFloat..maxFloat,
       “item”: “53454543513”, 
       “itemBias”: -maxFloat..maxFloat,  
-      “num”: 4,// this number is optional overrides the default in engine.json maxRecs
-      “fields”: [
+      “num”: 4,
+      "fields”: [
         {
-          “name”: ”fieldname” // may have several fields in query
-          “values”: [“fieldValue1”, ...],// values in the field query
-          “bias”: -maxFloat..maxFloat }// negative means a filter, positive is a boost 
+          “name”: ”fieldname”
+          “values”: [“fieldValue1”, ...],
+          “bias”: -maxFloat..maxFloat 
         },...
       ]
-      “blacklistItems”: [“itemId1”, “itemId2”, ...]// overrides the blacklist in engine.json and is optional
-      "returnSelf": true | false //default = false, will not return query item as recommendation
+      “blacklistItems”: [“itemId1”, “itemId2”, ...]
+      "returnSelf": true | false,
       “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
 
-* **user** contains a unique id for the user. This may be a user not in the **training** data, so a new or anonymous user who has an anonymous id. All user history captured in near realtime can be used to influence recommendations, there is no need to retrain to enable this.
-* **userBias** the amount to favor the user's history in making recs. The user may be anonymous as long as the id is unique from any authenticated user. This tells the recommender to return recs based on the user’s event history. Used for personalized recommendations. Overrides and bias in engine.json
-* **item** contains the unique item identifier
-* **itemBias** the amount to favor similar items in making recs. This tells the recommender to return items similar to this the item specified. Use for “people who liked this also liked these”. Overrides any bias in engine.json
-* **fields**: array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
-num max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
-* **blacklist** Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
-* **returnSelf**: boolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
+* **user**: optional, contains a unique id for the user. This may be a user not in the **training**: data, so a new or anonymous user who has an anonymous id. All user history captured in near realtime can be used to influence recommendations, there is no need to retrain to enable this.
+* **userBias**: optional, the amount to favor the user's history in making recs. The user may be anonymous as long as the id is unique from any authenticated user. This tells the recommender to return recs based on the user’s event history. Used for personalized recommendations. Overrides and bias in engine.json
+* **item**: optional, contains the unique item identifier
+* **itemBias**: optional, the amount to favor similar items in making recs. This tells the recommender to return items similar to this the item specified. Use for “people who liked this also liked these”. Overrides any bias in engine.json
+* **fields**: optionsl, array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
+* **num**: optional max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
+* **blacklistItems**: optional. Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
+* **returnSelf**: optionalboolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
+ 
+All query params are optiional, the only rule is that there must be an item or user specified. Defaults are either noted or taken from algorithm values, which themselves may have defaults. This allows very simple queries for the simple, most used cases.
  
 The query returns personalized recommendations, similar items, or a mix including backfill. The query itself determines this by supplying item, user or both. Some examples are:
 
@@ -192,6 +194,12 @@ To begin using on new data with an engine that has been used with sample data or
 5. Perform `pio build`, `pio train`, and `pio deploy`
 6. Copy and edit the sample query script to match your new data. For new user ids pick a user that exists in the events, same for metadata `fields`, and items.
 7. Run your edited query script and check the recs.
+
+##Using Handmade Sample Data with Queries
+
+Create a new model with the above steps. Use the sample data in `data/sample-handmade-data.txt` in the import step for your event data. A sample script is provided in `query-handmade.sh`, which can be run after `pio deploy`.
+
+The sample data is trivailly simple and so can be interpreted almost intuitively when you look at it. This makes testing query changes much easier since the results are human-understandable.
 
 ## Versions WIP
 
