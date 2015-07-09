@@ -19,6 +19,7 @@
   },
   "algorithms": [
     {
+      "comment": "setup for example 'handmade' data, make sure to change for your needs",
       "name": "mmr",
       "params": {
         "appName": "MMRPhonesFake",

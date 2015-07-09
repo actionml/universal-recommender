@@ -9,23 +9,34 @@ The Multimodal Reccomender is a Cooccurrence type that creates indicators from s
 
  1. [Install the PredictionIO framework](https://docs.prediction.io/install/) **be sure to choose HBase and Elasticsearch** for storage. This template requires Elasticsearch.
  2. Make sure the PIO console and services are running, check with `pio status`
- 3. [Install this template](https://docs.prediction.io/templates/recommendation/quickstart/) 
+ 3. [Install this template](https://docs.prediction.io/templates/recommendation/quickstart/) **be sure to specify this template** with `pio template get PredictionIO/template-scala-parallel-multimodal-recommendation`
+ 
+**To import and experiment with the simple example data**
 
-Create a new model with the above steps. Use the sample data in `data/sample-handmade-data.txt` in the import step for your event data. A sample script is provided in `query-handmade.sh`, which can be run after `pio deploy`.
+1. Create a new app name, change `appName` in `engine.json`
+2. Run `pio app new **your-new-app-name**`
+4. Import sample events by running `python data/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
+3. The engine.json file in the root directory of your new MMR template is set up for the data you just imported (make sure to create a new one for your data) Edit this file and change the `appName` parameter to match what you called the app in step #2
+5. Perform `pio build`, `pio train`, and `pio deploy`
+6. To execute some sample queries run `./examples/query-handmade.sh`
 
-The sample data is trivailly simple and so can be interpreted almost intuitively when you look at it. This makes testing query changes much easier since the results are human-understandable.
+If there are timeouts, enable the delays that are commented out in the script&mdash;for now. In the production environment the engines will "warm up" with caching and will execute queries much faster. Also all services can be configured or scaled to meet virtually any performance needs.
 
+##What is a Multimodal Recommender
+
+The Multimodal Recommender (MMR) will accept a range of data, auto correlate it, and allow for very flexible queries. The MMR is different from most recommenders in these ways:
+
+* It takes a single very strong "primary" event type&mdash;one that clearly reflects a user's preference&mdash;and correlates any number of other event types to the primary event. This has the effect of using virtually any user action to recommend the primary action. Much of a user’s clickstream can be used to make recommendations. If a user has no history of the primary action (purchase for instance) but does have history of views, personalized recommendations for purchases can still be made. With user purchase history the recommendations become better. ALS-type recommenders have been used with event weights but except for ratings these often do not result in better performance.
+* It can boost and filter based on events or item metadata/properties. This means it can give personalized recs that are biased toward “SciFi” and filtered to only include “Promoted” items when the business rules call for this.
+* It can use a user's context to make recommendations even when the user is new. If usage data has been gathered for other users for referring URL, device type, or location, for instance, there may be a corelation between this data and items preferred. The MMR can detect this **if** it exists and recommend based on this context, even to new users. We call this "micro-segmented" recommendations since they are not personal but group users based on limited contextual information. These will not be as good as when more is know about the user but may be better than simply returning popular items.
+* It includes a fallback to some form of item popularity when there is no other information known about the user (not implemented in v0.1.0).
+* All of the above can be mixed into a single query for blended results and so the query can be tuned to a great many applicaitons. Also since only one query is made and boosting is supported, a query can be constructed with several fallbacks. Usage data is most important so boost that high, micro-segemnting data may be better than popularity so boost that lower, and popularity fills in if no other recommendations are available.
+
+Other features:
+
+ * Makes recommendations based on realtime user history. Even anonymous users will get recommendations if they have recorded preference history and a user-id. There is no hard requirement to retrain the model to make this happen. 
 
 ##Configuration, Events, and Queries
-
-The Multimodal Recommender (MMR) will accept a range of data, auto correlate it, and allow for very flexible queries. It is implemented as a PredictionIO Engine. The MMR is different from most recommenders in these ways:
-
-* It takes a single very strong "primary" event type&mdash;one that clearly reflects a user's preference&mdash;and correlates any number of other event types to the primary event. This has the effect of using virtually any user action to recommend the primary action. Much of a user’s clickstream can be used to make recommendations. If a user has no history of the primary action (purchase for instance) but does have history of views, personalized recommendations for purchases can be made. With user purchase history the recommendations become better. ALS-type recommenders have been used with event weights but except for ratings these seldom actually result in better performance.
-* It can boost and filter based on events or item metadata. This means it can give personalized recs that are biased toward “SciFi” and filtered to only include “Promoted” items when the business rule call for this.
-* It can use a user's context to make recommendations even when the user is new. If usage data has been gathered for other users referring URL, device type, or location, for instance, there may be a corelation between this data and some items that were prefered. The MMR can detect this when it exists and recommend based on this context, even to new users. We call this "micro-segmented" recommendations since they are not personal but group users based on limited contextual information. These will not be as good as when more is know about the user but may be better than simply returning popular items.
-* It includes a fallback to some form of item popularity when there is no other information known about the user.
-* All of the above can be mixed into a single query for blended results and so the query can be tuned to a great many applicaitons. Also since only one query is made and boosting is supported, a query can be constructed with several fallbacks. Usage data is most important so boost that high, micro-segemnted data may be useful so boost that lower, and popularity is given no boost for when you have no other data.
-
 ###Biases
 
 These take the form of boosts and filters where a neutral bias is 1.0. The importance of some part of the query may be boosted by a positive non-zero float. If the bias is < 0 it is considered a filter&mdash;meaning no recommendation is made that lacks the filter value(s). One example of a filter is where it may make sense to show only "electronics" recommendations when the user is viewing an electroncs product. Biases are often applied to a list of data, for instance the user is looking at a video page with a cast of actors. The "cast" list is metadata attached to items and a query can show "people who liked this, also liked these" type recs but also include the current cast boosted by 0.5. This can be seen as showing similar item recs but using the cast in the query in a way that will not overpower the similar items (since by default they have a neutral 1.0 boost).
@@ -201,7 +212,7 @@ To begin using on new data with an engine that has been used with sample data or
 
 ## Versions
 
-### v-0.1.0
+### v0.1.0
 
  - user and item based queries supported
  - multiple usage events supported
@@ -213,6 +224,6 @@ To begin using on new data with an engine that has been used with sample data or
 ### Known issues
 
   - dates not implemented
-  - index droped then written, with correct management of index refresh this could mean 0 downtime for Elasticsearch, delete in train, refresh during deploy 
-  - No popularity based fallback yet. - use the EventStore plugin to modify a field in ES docs
+  - index droped then refreshed in `pio train` so no need to redeploy if the server is running. This violates conventions for other templates but is actually good. It means we have a hot-swapped model. If there are server timeouts during train, for the refresh response or for ongoing queries, we may need to find optimizations.
+  - popularity fallback not implemented.
 
