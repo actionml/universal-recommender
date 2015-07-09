@@ -1,15 +1,22 @@
 # Multimodal Recommendation (MMR) Template
 
-## Documentation
-
 Please refer to http://docs.prediction.io/templates/recommendation/quickstart/
 Other documentation of the algorithm is [here](http://mahout.apache.org/users/algorithms/intro-cooccurrence-spark.html)
 
-The Multimodal Reccomender is a Cooccurrence type that creates indicators from user actions (events) and performs the
-recommend query with a Search Engine.
+The Multimodal Reccomender is a Cooccurrence type that creates indicators from several user actions (events) and performs the recommendations query with a Search Engine.
+
+##Quickstart
+
+ 1. [Install the PredictionIO framework](https://docs.prediction.io/install/) **be sure to choose HBase and Elasticsearch** for storage. This template requires Elasticsearch.
+ 2. Make sure the PIO console and services are running, check with `pio status`
+ 3. [Install this template](https://docs.prediction.io/templates/recommendation/quickstart/) 
+
+Create a new model with the above steps. Use the sample data in `data/sample-handmade-data.txt` in the import step for your event data. A sample script is provided in `query-handmade.sh`, which can be run after `pio deploy`.
+
+The sample data is trivailly simple and so can be interpreted almost intuitively when you look at it. This makes testing query changes much easier since the results are human-understandable.
 
 
-##Configuration, and Queries
+##Configuration, Events, and Queries
 
 The Multimodal Recommender (MMR) will accept a range of data, auto correlate it, and allow for very flexible queries. It is implemented as a PredictionIO Engine. The MMR is different from most recommenders in these ways:
 
@@ -36,7 +43,7 @@ This file allows the user to describe and set parameters that control the engine
         "params" : {
           "name": "sample-movielens",
           "appName": "MMRApp1",
-          "eventNames": ["rate", "buy"] // name your events with any string
+          "eventNames": ["buy", "view"] // name your events with any string
         }
       },
       {“comment”: “This is for Mahout and Elasticsearch, the values are minimums and should not be removed”},
@@ -55,11 +62,10 @@ This file allows the user to describe and set parameters that control the engine
             "appName": "MMRApp1",
             "indexName": "mmrindex",
             "typeName": "items",
+            "eventNames": ["buy", "view"]
             "blacklistEvents": ["buy", "view"],
-            "backfill": "trending" or "popular" or "trending",
-            "maxQueryActions": 20,
+            "maxQueryActions": 500,
             "num": 20,
-            "seed": 3,
             "userbias": -maxFloat..maxFloat,
             "itembias": -maxFloat..maxFloat,
             "returnSelf": true | false,
@@ -84,7 +90,6 @@ The “params” section controls most of the features of the MMR. Possible valu
 * **maxQueryActions**: optional, default = 500. An integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
 * **num**: optional, default = 20. An integer telling the engine the maximum number of recs to return per query but less may be returned if the query produces less results or post recs filters like blacklists remove some.
 * **blacklistEvents**: optional, default = the primary action. An array of strings corresponding to the actions taken on items, which will cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is often little need to recommend something the user has already bought. If this is not specified then the primary event is assumed. To blacklist no event, specify an enpty array. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a categpory page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the catagory and item ids should never match. If you want to filter certain categories, use a field filter and specify all categories allowed.
-* **backfill**: optional, default = none. An array of strings corresponding to the types of backfill available. These values are calculated from hot, popular, or trending items and are mixed into the query so they don’t occur unless the other query data produces no results. For example if there is no user history or similar items, only backfill will be returned. Backfil bias is always 1 so increasing the bias for user or item data is usual when including backfill so their results will dominate. **Note**: not sure if this is best, may want to boost lower than one and allow an override backfillBias since users will seldom want to mix personal and popular recommendations equally.
 * **fields**: optional, deafult = none. An array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **userBias**: optional, default = none. Amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
 * **itemBias**: optional, default = none. Same as userbias but applied to similar items to the item supplied in the query.
@@ -109,7 +114,6 @@ Query fields determine what data is used to match when returning recs. Some fiel
       ]
       “blacklistItems”: [“itemId1”, “itemId2”, ...]
       "returnSelf": true | false,
-      “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
 
 * **user**: optional, contains a unique id for the user. This may be a user not in the **training**: data, so a new or anonymous user who has an anonymous id. All user history captured in near realtime can be used to influence recommendations, there is no need to retrain to enable this.
@@ -195,24 +199,20 @@ To begin using on new data with an engine that has been used with sample data or
 6. Copy and edit the sample query script to match your new data. For new user ids pick a user that exists in the events, same for metadata `fields`, and items.
 7. Run your edited query script and check the recs.
 
-##Using Handmade Sample Data with Queries
+## Versions
 
-Create a new model with the above steps. Use the sample data in `data/sample-handmade-data.txt` in the import step for your event data. A sample script is provided in `query-handmade.sh`, which can be run after `pio deploy`.
+### v-0.1.0
 
-The sample data is trivailly simple and so can be interpreted almost intuitively when you look at it. This makes testing query changes much easier since the results are human-understandable.
+ - user and item based queries supported
+ - multiple usage events supported
+ - filters and boosts supported on item properties and on user or item based results.
+ - fast writing to Elasticsearch using Spark
+ - convention over configuration for queries, defaults make simple/typical queries simple and overrides add greater expressivness.
 
-## Versions WIP
-
-### Work in progress, runs on sample data, use at your own risk
-
-  - all implmented and working except date and backfill
   
 ### Known issues
 
   - dates not implemented
-  - synchronous query, should we do async?
   - index droped then written, with correct management of index refresh this could mean 0 downtime for Elasticsearch, delete in train, refresh during deploy 
-  - Only doing usage events, content similarity is not implemented and non-trivial
-  - Context is not allowed in queries yet (location, time of day, device, etc) allowed if they are sent as user events to the event store
   - No popularity based fallback yet. - use the EventStore plugin to modify a field in ES docs
 
