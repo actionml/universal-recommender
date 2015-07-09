@@ -202,7 +202,20 @@ Create a new model with the above steps. Use the sample data in `data/sample-han
 
 The sample data is trivailly simple and so can be interpreted almost intuitively when you look at it. This makes testing query changes much easier since the results are human-understandable.
 
-## Versions WIP
+## Versions
+
+### v-0.2.0
+
+ - date range filters
+ - trending/popularity used for backfill when no other recs are returned by the query
+
+### v-0.1.0
+
+ - user and item based queries supported
+ - multiple usage events supported
+ - filters and boosts supported on item properties and on user or item based results.
+ - fast writing to Elasticsearch using Spark
+ - convention over configuration for queries, defaults make simple/typical queries simple and overrides add greater expressivness.
 
 ### Work in progress, runs on sample data, use at your own risk
 
