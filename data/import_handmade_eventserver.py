@@ -5,6 +5,7 @@ Import sample data for recommendation engine
 import predictionio
 import argparse
 import random
+import datetime
 
 RATE_ACTIONS_DELIMITER = ","
 SEED = 3
@@ -13,7 +14,10 @@ def import_events(client, file):
   f = open(file, 'r')
   random.seed(SEED)
   count = 0
+  event_date = datetime.datetime.now().isoformat()
+  date_increment = datetime.timedelta(days = 1)
   print "Importing data..."
+
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
     # For demonstration purpose action names are taken from input along with secondary actions on
@@ -42,10 +46,12 @@ def import_events(client, file):
         event=data[1],
         entity_type="item",
         entity_id=data[0],
-        properties= { "category": [data[2]] }
+        properties= { "category": [data[2]], "expiredate": event_date}
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2]
+      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
+            " given expiration date of: " + event_date
     count += 1
+    event_date += date_increment
   f.close()
   print "%s events are imported." % count
 

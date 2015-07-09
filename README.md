@@ -36,7 +36,7 @@ This file allows the user to describe and set parameters that control the engine
         "params" : {
           "name": "sample-movielens",
           "appName": "MMRApp1",
-          "eventNames": ["rate", "buy"] // name your events with any string
+          "eventNames": ["buy", "view"]
         }
       },
       {“comment”: “This is for Mahout and Elasticsearch, the values are minimums and should not be removed”},
@@ -55,6 +55,7 @@ This file allows the user to describe and set parameters that control the engine
             "appName": "MMRApp1",
             "indexName": "mmrindex",
             "typeName": "items",
+            "eventNames": ["buy", "view"],
             "blacklistEvents": ["buy", "view"],
             "backfill": "trending" or "popular" or "trending",
             "maxQueryActions": 20,
@@ -109,7 +110,7 @@ Query fields determine what data is used to match when returning recs. Some fiel
       ]
       “blacklistItems”: [“itemId1”, “itemId2”, ...]
       "returnSelf": true | false,
-      “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
+      “currentTime”: <current_time >
     }
 
 * **user**: optional, contains a unique id for the user. This may be a user not in the **training**: data, so a new or anonymous user who has an anonymous id. All user history captured in near realtime can be used to influence recommendations, there is no need to retrain to enable this.
@@ -119,7 +120,7 @@ Query fields determine what data is used to match when returning recs. Some fiel
 * **fields**: optionsl, array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **num**: optional max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
 * **blacklistItems**: optional. Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
-* **returnSelf**: optionalboolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
+* **returnSelf**: optional boolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
  
 All query params are optiional, the only rule is that there must be an item or user specified. Defaults are either noted or taken from algorithm values, which themselves may have defaults. This allows very simple queries for the simple, most used cases.
  

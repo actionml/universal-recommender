@@ -1,5 +1,7 @@
 package org.template
 
+import java.util.Date
+
 import io.prediction.controller.{EngineFactory, Engine}
 
 /** This file contains case classes that are used with reflection to specify how query and config
@@ -18,7 +20,8 @@ case class Query(
     blacklistItems: Option[List[String]] = None, // default: whatever is in algorithm params or None
     returnSelf: Option[Boolean] = None,// means for an item query should the item itself be returned, defaults
                                        // to what is in the algorithm params or false
-    num: Option[Int] = None) // default: whatever is in algorithm params, which itself has a default--probably 20
+    num: Option[Int] = None, // default: whatever is in algorithm params, which itself has a default--probably 20
+    beforeDate: Option[Date] = None)
   extends Serializable
 
 /** Used to specify how Fields are represented in engine.json */
