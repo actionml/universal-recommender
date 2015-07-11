@@ -6,15 +6,10 @@ import _root_.io.prediction.controller.EmptyActualResult
 import _root_.io.prediction.controller.Params
 import _root_.io.prediction.data.storage.{PropertyMap, Event}
 import _root_.io.prediction.data.store.PEventStore
-//import org.apache.mahout.math.RandomAccessSparseVector
 import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
-//import org.apache.mahout.sparkbindings._
-//import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
-//import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 import grizzled.slf4j.Logger
-//import org.joda.time.DateTime
 
 /** Taken from engine.json these are passed in to the DataSource constructor
   *

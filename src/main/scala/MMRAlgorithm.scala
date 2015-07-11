@@ -19,28 +19,34 @@ import grizzled.slf4j.Logger
   * engine.json so set these for use in the algorithm when they are not present in the engine.json
   */
 object defaultMMRAlgorithmParams {
-  val DefaultMaxQueryActions = 500
+  val DefaultMaxEventsPerEventType = 500
   val DefaultNum = 20
+  val DefaultMaxIndicatorsPerEventType = 50
+  val DefaultMaxQueryEvents = 100 // default number of user history events to use in recs query
 }
 
 /** Instantiated from engine.json */
 case class MMRAlgorithmParams(
     appName: String, // filled in from engine.json
-    indexName: String = "mmrindex", // can optionally be used to specify the elasticsearch index name
-    typeName: String = "items", // can optionally be used to specify the elasticsearch type name
+    indexName: String, // can optionally be used to specify the elasticsearch index name
+    typeName: String, // can optionally be used to specify the elasticsearch type name
     eventNames: List[String], // names used to ID all user actions
-    blacklistEvents: Option[List[String]], // list of events used to determine which recs to filter out, used for
-                                           // things like not showing items a user has purchased. Default is anything
-                                           // the user took the primary action on, to not filter anything specify an
-                                           // empty array
-    backfill: Option[String], // popular or trending
-    maxQueryActions: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxQueryActions),//default = DefaultMaxQueryItems
+    // list of events used to determine which recs to filter out, used for
+    // things like not showing items a user has purchased. Default is anything
+    // the user took the primary action on, to filter nothing specify an
+    // empty array in engine.json
+    blacklistEvents: Option[List[String]] = None,
+    //todo: backfill: Option[String] = None, // popular or trending
+    // number of events in user-based recs query
+    maxQueryEvents: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxQueryEvents),
+    maxEventsPerEventType: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxEventsPerEventType),
+    maxIndicatorsPerEventType: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxIndicatorsPerEventType),
     num: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultNum), // default max # of recs requested
     userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
     itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
     returnSelf: Option[Boolean] = None, // query building logic defaults this to false
     fields: Option[List[Field]] = None, //defaults to no fields
-    seed: Option[Long] = Some(System.currentTimeMillis())) // seed is not used presently
+    seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducable unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content indicators with
@@ -67,8 +73,12 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
     logger.info("Actions read now creating indicators")
     val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
-      data.actions.map(_._2).toArray) // strip action names
-      .map(_.asInstanceOf[IndexedDatasetSpark]) // we know this is a Spark version of IndexedDataset
+      data.actions.map(_._2).toArray,
+      randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
+      maxInterestingItemsPerThing = ap.maxIndicatorsPerEventType
+        .getOrElse(defaultMMRAlgorithmParams.DefaultMaxIndicatorsPerEventType),
+      maxNumInteractions = ap.maxEventsPerEventType.getOrElse(defaultMMRAlgorithmParams.DefaultMaxEventsPerEventType))
+      .map(_.asInstanceOf[IndexedDatasetSpark]) // strip action names
     val cooccurrenceIndicators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     logger.info("Indicators created now putting into MMRModel")
@@ -162,7 +172,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
       // create a list of all boosted query indicators
       val recentUserHistory = if ( ap.userBias.getOrElse(1f) >= 0f )
-        alluserEvents._1.slice(0, ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions) - 1)
+        alluserEvents._1.slice(0, ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents) - 1)
       else List.empty[BoostableIndicators]
 
       val similarItems = if ( ap.itemBias.getOrElse(1f) >= 0f )
@@ -178,7 +188,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
         // strip any boosts
         alluserEvents._1.map { i =>
           FilterIndicators(i.actionName, i.itemIDs)
-        }.slice(0, ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions) - 1)
+        }.slice(0, ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents) - 1)
       } else List.empty[FilterIndicators]
 
       val similarItemsFilter = if ( ap.itemBias.getOrElse(1f) < 0f ) {
@@ -240,8 +250,8 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
                 " ignored.")
               List.empty[String]
           }
-          val rItems = if (items.size <= ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions))
-            items else items.slice(0, ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions) - 1)
+          val rItems = if (items.size <= ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents))
+            items else items.slice(0, ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents) - 1)
           BoostableIndicators(action, rItems, itemEventsBoost)
         }
       } else List.empty[BoostableIndicators] // no similar items
@@ -261,7 +271,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
         // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
         //eventNames = Some(Seq(action)),// get all and separate later
         targetEntityType = None,
-        // limit = Some(maxQueryActions), // this will get all history then each action can be limited before using in
+        // limit = Some(maxQueryEvents), // this will get all history then each action can be limited before using in
         // the query
         latest = true,
         // set time limit to avoid super long DB access
@@ -287,7 +297,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
       for ( event <- recentEvents )
         if (event.event == action && items.size <
-          ap.maxQueryActions.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryActions)) {
+          ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents)) {
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }

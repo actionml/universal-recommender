@@ -72,7 +72,9 @@ This file allows the user to describe and set parameters that control the engine
             "typeName": "items",
             "eventNames": ["buy", "view"]
             "blacklistEvents": ["buy", "view"],
-            "maxQueryActions": 500,
+            "maxEventsPerEventType": 100,
+            "maxIndicatorsPerEventType": 50,
+            "maxQueryEvents": 500,
             "num": 20,
             "userbias": -maxFloat..maxFloat,
             "itembias": -maxFloat..maxFloat,
@@ -95,7 +97,9 @@ The “params” section controls most of the features of the MMR. Possible valu
 * **indexName**: required string describing the index for all indicators, something like "mmrindex". The Elasticsearch URI for its REST interface is `http:/**your-master-machine**/indexName/typeName/...` You can access ES through its REST interface here.
 * **typeName**: required string describing the type in Elasticsearch terminology, something like "items". This has no important meaning but must be part of the Elastic search URI for queries.
 * **eventNames**: required array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
-* **maxQueryActions**: optional, default = 500. An integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
+* **maxEventsPerEventType** optional, default = 500. Amount of usage history to keep use in model calculation.
+* **maxIndicatorsPerEventType**: optional, default = 50. An integer that controls how many of the strongest indicators are created for every event type named in `eventNames`.
+* **maxQueryEvents**: optional, default = 100. An integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
 * **num**: optional, default = 20. An integer telling the engine the maximum number of recs to return per query but less may be returned if the query produces less results or post recs filters like blacklists remove some.
 * **blacklistEvents**: optional, default = the primary action. An array of strings corresponding to the actions taken on items, which will cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is often little need to recommend something the user has already bought. If this is not specified then the primary event is assumed. To blacklist no event, specify an empty array. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a category page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the category and item ids should never match. If you want to filter certain categories, use a field filter and specify all categories allowed.
 * **fields**: optional, default = none. An array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
