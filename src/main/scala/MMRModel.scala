@@ -35,15 +35,16 @@ class MMRModel(
   def save(id: String, params: MMRAlgorithmParams, sc: SparkContext): Boolean = {
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
-    logger.info("Saving mmr model")
 
     // convert cooccurrence matrices into indicators as RDD[(itemID, (actionName, Seq[itemID])]
     // do they need to be in Elasticsearch format
+    logger.info("Converting cooccurrence matrices into indicators")
     val indicators = coocurrenceMatrices.map { case (actionName, dataset) =>
       dataset.toStringMapRDD(actionName)
     }
 
     // convert the PropertyMap into Map[String, Seq[String]] for ES
+    logger.info("Converting PropertyMap into Elasticsearch style rdd")
     val fields = fieldsRDD.map { case (item, pm ) =>
       var m: Map[String, Seq[String]] = Map()
       for (key <- pm.keySet){
@@ -53,24 +54,26 @@ class MMRModel(
     }
 
     // Elasticsearch takes a Map with all fields, not a tuple
+    logger.info("Joining all indicators into doc + fields for saveToES")
     val esFields = joinAll(fields, indicators(0), indicators.drop(1)).map { case (item, map) =>
         val esMap = map + ("id" -> item)
         esMap
     }
 
-    val debug = esFields.take(1)(0)
-
     // May specifiy a remapping parameter to put certain fields in different places in the ES document
     // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
     // recreate it, no swapping yet
+    logger.info(s"Deleting index: /${params.indexName}/${params.typeName}")
     esClient.deleteIndex(params.indexName)
+    logger.info(s"Creating new index: /${params.indexName}/${params.typeName}")
     esClient.createIndex(params.indexName)
 
     // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
+    logger.info(s"Writing new ES style rdd to index: /${params.indexName}/${params.typeName}")
     esFields.saveToEs(s"/${params.indexName}/${params.typeName}", Map("es.mapping.id" -> "id"))
     // todo: check to see if a Flush is needed after writing all new data to the index
     // esClient.admin().indices().flush(new FlushRequest("mmrindex")).actionGet()
-    val dbFields = esFields.collect()
+    logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
     true
   }
 
