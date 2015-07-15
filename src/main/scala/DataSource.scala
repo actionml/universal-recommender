@@ -60,7 +60,6 @@ class DataSource(val dsp: DataSourceParams)
         (event.entityId, event.targetEntityId.get)
       }.cache()
       //todo: take out when not debugging
-      val debugActions = actionRDD.take(5)
       (eventName, actionRDD)
     }
 
