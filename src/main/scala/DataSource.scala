@@ -6,25 +6,20 @@ import _root_.io.prediction.controller.EmptyActualResult
 import _root_.io.prediction.controller.Params
 import _root_.io.prediction.data.storage.{PropertyMap, Event}
 import _root_.io.prediction.data.store.PEventStore
-//import org.apache.mahout.math.RandomAccessSparseVector
 import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
-//import org.apache.mahout.sparkbindings._
-//import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
-//import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 import grizzled.slf4j.Logger
-//import org.joda.time.DateTime
 
 /** Taken from engine.json these are passed in to the DataSource constructor
   *
   * @param appName registered name for the app
   * @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
-  *                   will be used to create the primary indicator and cross-cooccurrence secondary indicators.
+  *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
   */
 case class DataSourceParams(
    appName: String,
-   eventNames: List[String]) // IMPORTANT: eventNames must be exactly the same as MMRAlgorithmParams eventNames
+   eventNames: List[String]) // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
   extends Params
 
 /** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
@@ -52,7 +47,7 @@ class DataSource(val dsp: DataSourceParams)
       //targetEntityType = Some(Some("item"))
       )(sc)
 
-     // now separate the events by event name
+    // now separate the events by event name
     val actionRDDs = eventNames.map { eventName =>
       val actionRDD = eventsRDD.filter { event =>
 
@@ -64,8 +59,7 @@ class DataSource(val dsp: DataSourceParams)
       }.map { event =>
         (event.entityId, event.targetEntityId.get)
       }.cache()
-      //todo: take out when not debugging
-      val debugActions = actionRDD.take(5)
+
       (eventName, actionRDD)
     }
 

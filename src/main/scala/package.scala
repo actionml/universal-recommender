@@ -23,7 +23,7 @@ package object conversions {
       val columnIDDictionary_bcast = sc.broadcast(columnIDDictionary)
 
       // may want to mapPartition and create bulk updates as a slight optimization
-      // creates an RDD of (itemID, Map[indicatorName, list-of-indicator-values])
+      // creates an RDD of (itemID, Map[correlatorName, list-of-correlator-values])
       indexedDataset.matrix.rdd.map[(String, Map[String, Seq[String]])] { case (rowNum, itemVector) =>
 
         // turn non-zeros into list for sorting

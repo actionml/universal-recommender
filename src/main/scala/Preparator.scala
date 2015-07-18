@@ -14,7 +14,7 @@ class Preparator
     * "distributed row matrices" from the input string keyed rdds.
     * @param sc Spark context
     * @param trainingData list of (actionName, actionRDD)
-    * @return list of (indicatorName, indicatorIndexedDataset)
+    * @return list of (correlatorName, correlatorIndexedDataset)
     */
   def prepare(sc: SparkContext, trainingData: TrainingData): PreparedData = {
     // now that we have all actions in separate RDDs we must merge any user dictionaries and

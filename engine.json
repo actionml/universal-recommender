@@ -19,13 +19,15 @@
   },
   "algorithms": [
     {
-      "name": "mmr",
+      "comment": "setup for example 'handmade' data, make sure to change for your needs",
+      "name": "ur",
       "params": {
-        "appName": "MMRPhonesFake",
-        "indexName": "mmrindex",
+        "appName": "URPhonesFake",
+        "indexName": "urindex",
         "typeName": "items",
-        "eventNames": ["purchase", "view"],
+        "eventNames": ["purchase", "view"]
       }
     }
   ]
 }
+

@@ -1,6 +1,51 @@
 #!/usr/bin/env bash
 
 echo ""
+echo "Recommendations for user: u1"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
+echo "Recommendations for user: u2"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u2"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
+echo "Recommendations for user: u3"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u3"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
+echo "Recommendations for user: u4"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u4"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
+echo "Recommendations for user: u5"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u5"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
 echo "Recommendations for user: u1 with a tablets boost"
 curl -H "Content-Type: application/json" -d '
 {

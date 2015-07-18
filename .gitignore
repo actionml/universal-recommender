@@ -24,7 +24,6 @@ project/plugins/project/
 .idea
 
 #PredictionIO specific
-data/sample_movielens_data.txt
 manifest.json
 target/
 pio.log

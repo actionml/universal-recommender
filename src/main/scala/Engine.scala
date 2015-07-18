@@ -47,7 +47,7 @@ object RecommendationEngine extends EngineFactory {
     new Engine(
       classOf[DataSource],
       classOf[Preparator],
-      Map("mmr" -> classOf[MMRAlgorithm]), // IMPORTANT: "mmr" must be the "name" of the parameter set in engine.json
+      Map("ur" -> classOf[URAlgorithm]), // IMPORTANT: "mmr" must be the "name" of the parameter set in engine.json
       classOf[Serving])
   }
 }
