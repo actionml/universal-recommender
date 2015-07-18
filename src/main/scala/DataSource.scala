@@ -15,11 +15,11 @@ import grizzled.slf4j.Logger
   *
   * @param appName registered name for the app
   * @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
-  *                   will be used to create the primary indicator and cross-cooccurrence secondary indicators.
+  *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
   */
 case class DataSourceParams(
    appName: String,
-   eventNames: List[String]) // IMPORTANT: eventNames must be exactly the same as MMRAlgorithmParams eventNames
+   eventNames: List[String]) // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
   extends Params
 
 /** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
@@ -47,7 +47,7 @@ class DataSource(val dsp: DataSourceParams)
       //targetEntityType = Some(Some("item"))
       )(sc)
 
-     // now separate the events by event name
+    // now separate the events by event name
     val actionRDDs = eventNames.map { eventName =>
       val actionRDD = eventsRDD.filter { event =>
 
@@ -59,9 +59,12 @@ class DataSource(val dsp: DataSourceParams)
       }.map { event =>
         (event.entityId, event.targetEntityId.get)
       }.cache()
-      //todo: take out when not debugging
+
       (eventName, actionRDD)
     }
+
+    val debug = eventsRDD.count()
+    val debug2 = actionRDDs.map(_._2.count())
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
     val fieldsRDD = PEventStore.aggregateProperties(

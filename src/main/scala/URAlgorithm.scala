@@ -18,15 +18,15 @@ import grizzled.slf4j.Logger
 /** Setting the option in the params case class doesn't work as expected when the param is missing from
   * engine.json so set these for use in the algorithm when they are not present in the engine.json
   */
-object defaultMMRAlgorithmParams {
+object defaultURAlgorithmParams {
   val DefaultMaxEventsPerEventType = 500
   val DefaultNum = 20
-  val DefaultMaxIndicatorsPerEventType = 50
+  val DefaultMaxCorrelatorsPerEventType = 50
   val DefaultMaxQueryEvents = 100 // default number of user history events to use in recs query
 }
 
 /** Instantiated from engine.json */
-case class MMRAlgorithmParams(
+case class URAlgorithmParams(
     appName: String, // filled in from engine.json
     indexName: String, // can optionally be used to specify the elasticsearch index name
     typeName: String, // can optionally be used to specify the elasticsearch type name
@@ -38,10 +38,10 @@ case class MMRAlgorithmParams(
     blacklistEvents: Option[List[String]] = None,
     //todo: backfill: Option[String] = None, // popular or trending
     // number of events in user-based recs query
-    maxQueryEvents: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxQueryEvents),
-    maxEventsPerEventType: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxEventsPerEventType),
-    maxIndicatorsPerEventType: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultMaxIndicatorsPerEventType),
-    num: Option[Int] = Some(defaultMMRAlgorithmParams.DefaultNum), // default max # of recs requested
+    maxQueryEvents: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxQueryEvents),
+    maxEventsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxEventsPerEventType),
+    maxCorrelatorsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+    num: Option[Int] = Some(defaultURAlgorithmParams.DefaultNum), // default max # of recs requested
     userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
     itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
     returnSelf: Option[Boolean] = None, // query building logic defaults this to false
@@ -49,40 +49,40 @@ case class MMRAlgorithmParams(
     seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducable unless supplied
 
-/** Creates cooccurrence, cross-cooccurrence and eventually content indicators with
+/** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
   * [[org.apache.mahout.math.cf.SimilarityAnalysis]] The analysis part of the recommender is
   * done here but the algorithm can predict only when the coocurrence data is indexed in a
-  * search engine like Elasticsearch. This is done in MMRModel.save.
+  * search engine like Elasticsearch. This is done in URModel.save.
   *
   * @param ap taken from engine.json to describe limits and event types
   */
-class MMRAlgorithm(val ap: MMRAlgorithmParams)
-  extends P2LAlgorithm[PreparedData, MMRModel, Query, PredictedResult] {
+class URAlgorithm(val ap: URAlgorithmParams)
+  extends P2LAlgorithm[PreparedData, URModel, Query, PredictedResult] {
 
-  case class BoostableIndicators(actionName: String, itemIDs: Seq[String], boost: Option[Float])
-  case class FilterIndicators(actionName: String, itemIDs: Seq[String])
+  case class BoostableCorrelators(actionName: String, itemIDs: Seq[String], boost: Option[Float])
+  case class FilterCorrelators(actionName: String, itemIDs: Seq[String])
 
   @transient lazy val logger = Logger[this.type]
 
-  def train(sc: SparkContext, data: PreparedData): MMRModel = {
+  def train(sc: SparkContext, data: PreparedData): URModel = {
     // No one likes empty training data.
     require(data.actions.take(1).nonEmpty,
       s"Primary action in PreparedData cannot be empty." +
       " Please check if DataSource generates TrainingData" +
       " and Preprator generates PreparedData correctly.")
 
-    logger.info("Actions read now creating indicators")
+    logger.info("Actions read now creating correlators")
     val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
       data.actions.map(_._2).toArray,
       randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
-      maxInterestingItemsPerThing = ap.maxIndicatorsPerEventType
-        .getOrElse(defaultMMRAlgorithmParams.DefaultMaxIndicatorsPerEventType),
-      maxNumInteractions = ap.maxEventsPerEventType.getOrElse(defaultMMRAlgorithmParams.DefaultMaxEventsPerEventType))
+      maxInterestingItemsPerThing = ap.maxCorrelatorsPerEventType
+        .getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+      maxNumInteractions = ap.maxEventsPerEventType.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType))
       .map(_.asInstanceOf[IndexedDatasetSpark]) // strip action names
-    val cooccurrenceIndicators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
+    val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
-    logger.info("Indicators created now putting into MMRModel")
-    new MMRModel(cooccurrenceIndicators, data.fieldsRDD, ap.indexName)
+    logger.info("Correlators created now putting into URModel")
+    new URModel(cooccurrenceCorrelators, data.fieldsRDD, ap.indexName)
   }
 
   /** Return a list of items recommended for a user identified in the query
@@ -118,7 +118,7 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     * @param model <strong>Ignored!</strong> since the model is already in Elasticsearch
     * @param query contains query spec
     */
-  def predict(model: MMRModel, query: Query): PredictedResult = {
+  def predict(model: URModel, query: Query): PredictedResult = {
     logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
 
     val queryAndBlacklist = buildQuery(ap, query)
@@ -162,50 +162,50 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
   }
 
   /** Build a query from default algorithms params and the query itself taking into account defaults */
-  def buildQuery(ap: MMRAlgorithmParams, query: Query): (String, List[Event]) = {
+  def buildQuery(ap: URAlgorithmParams, query: Query): (String, List[Event]) = {
 
     try{ // require the minimum of a user or item, if not then return nothing
       require( query.item.nonEmpty || query.user.nonEmpty, "Warning: a query must include either a user or item id")
 
-      // create a list of all query indicators that can have a bias (boost or filter) attached
+      // create a list of all query correlators that can have a bias (boost or filter) attached
       val alluserEvents = getBiasedRecentUserActions(query)
 
-      // create a list of all boosted query indicators
+      // create a list of all boosted query correlators
       val recentUserHistory = if ( ap.userBias.getOrElse(1f) >= 0f )
-        alluserEvents._1.slice(0, ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents) - 1)
-      else List.empty[BoostableIndicators]
+        alluserEvents._1.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
+      else List.empty[BoostableCorrelators]
 
       val similarItems = if ( ap.itemBias.getOrElse(1f) >= 0f )
         getBiasedSimilarItems(query)
-      else List.empty[BoostableIndicators]
+      else List.empty[BoostableCorrelators]
 
       val boostedMetadata = getBoostedMetadata(query)
 
-      val allBoostedIndicators = recentUserHistory ++ similarItems ++ boostedMetadata
+      val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata
 
-      // create a lsit of all query indicators that are to be used to filter results
+      // create a lsit of all query correlators that are to be used to filter results
       val recentUserHistoryFilter = if ( ap.userBias.getOrElse(1f) < 0f ) {
         // strip any boosts
         alluserEvents._1.map { i =>
-          FilterIndicators(i.actionName, i.itemIDs)
-        }.slice(0, ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents) - 1)
-      } else List.empty[FilterIndicators]
+          FilterCorrelators(i.actionName, i.itemIDs)
+        }.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
+      } else List.empty[FilterCorrelators]
 
       val similarItemsFilter = if ( ap.itemBias.getOrElse(1f) < 0f ) {
         getBiasedSimilarItems(query).map { i =>
-          FilterIndicators(i.actionName, i.itemIDs)
+          FilterCorrelators(i.actionName, i.itemIDs)
         }.toList
-      } else List.empty[FilterIndicators]
+      } else List.empty[FilterCorrelators]
 
       val filteringMetadata = getFilteringMetadata(query)
 
-      val allFilteringIndicators = recentUserHistoryFilter ++ similarItemsFilter ++ filteringMetadata
+      val allFilteringCorrelators = recentUserHistoryFilter ++ similarItemsFilter ++ filteringMetadata
 
-      // since users have action history and items have indicators and both correspond to the same "actions" like
-      // purchase or view, we'll pass both to the query if the user history or items indicators are empty
+      // since users have action history and items have correlators and both correspond to the same "actions" like
+      // purchase or view, we'll pass both to the query if the user history or items correlators are empty
       // then metadata or backfill must be relied on to return results.
 
-      val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultMMRAlgorithmParams.DefaultNum))
+      val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultURAlgorithmParams.DefaultNum))
 
       val json =
         (
@@ -213,12 +213,12 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
           ("query"->
             ("bool"->
               ("should"->
-                allBoostedIndicators.map { i =>
+                allBoostedCorrelators.map { i =>
                   ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}
 
               ) ~
               ("must"->
-                allFilteringIndicators.map { i =>
+                allFilteringCorrelators.map { i =>
                   ("terms" -> (i.actionName -> i.itemIDs))}
               )
             )
@@ -233,8 +233,8 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
     }
   }
 
-  /** Get similar items for an item, these are already in the action indicators in ES */
-  def getBiasedSimilarItems(query: Query): Seq[BoostableIndicators] = {
+  /** Get similar items for an item, these are already in the action correlators in ES */
+  def getBiasedSimilarItems(query: Query): Seq[BoostableCorrelators] = {
     if (query.item.nonEmpty) {
       val m = esClient.getSource(ap.indexName, ap.typeName, query.item.get)
 
@@ -243,24 +243,25 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
         val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
         ap.eventNames.map { action =>
           val items = try {
-            m.get(action).asInstanceOf[util.ArrayList[String]].toList
+            if (m.containsKey(action) && m.get(action) != null) m.get(action).asInstanceOf[util.ArrayList[String]].toList
+            else List.empty[String]
           } catch {
             case cce: ClassCastException =>
               logger.warn(s"Bad value in item ${query.item} corresponding to key: ${action} that was not a List[String]" +
                 " ignored.")
               List.empty[String]
           }
-          val rItems = if (items.size <= ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents))
-            items else items.slice(0, ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents) - 1)
-          BoostableIndicators(action, rItems, itemEventsBoost)
+          val rItems = if (items.size <= ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents))
+            items else items.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
+          BoostableCorrelators(action, rItems, itemEventsBoost)
         }
-      } else List.empty[BoostableIndicators] // no similar items
-    } else List.empty[BoostableIndicators] // no item specified
+      } else List.empty[BoostableCorrelators] // no similar items
+    } else List.empty[BoostableCorrelators] // no item specified
   }
 
   /** Get recent events of the user on items to create the recommendations query from */
   def getBiasedRecentUserActions(
-    query: Query): (Seq[BoostableIndicators], List[Event]) = {
+    query: Query): (Seq[BoostableCorrelators], List[Event]) = {
 
     val recentEvents = try {
       LEventStore.findByEntity(
@@ -297,40 +298,40 @@ class MMRAlgorithm(val ap: MMRAlgorithmParams)
 
       for ( event <- recentEvents )
         if (event.event == action && items.size <
-          ap.maxQueryEvents.getOrElse(defaultMMRAlgorithmParams.DefaultMaxQueryEvents)) {
+          ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents)) {
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
-      BoostableIndicators(action, items, userEventsBoost)// userBias may be None, which will cause no JSON output for this
+      BoostableCorrelators(action, items, userEventsBoost)// userBias may be None, which will cause no JSON output for this
     }
     (rActions, recentEvents)
   }
 
   /** get all metadata fields that potentially have boosts (not filters) */
-  def getBoostedMetadata( query: Query ): List[BoostableIndicators] = {
+  def getBoostedMetadata( query: Query ): List[BoostableCorrelators] = {
     val paramsBoostedFields = ap.fields.getOrElse(List.empty[Field]).filter( field => field.bias < 0 ).map { field =>
-      BoostableIndicators(field.name, field.values, Some(field.bias))
+      BoostableCorrelators(field.name, field.values, Some(field.bias))
     }
     
     val queryBoostedFields = query.fields.getOrElse(List.empty[Field]).filter { field =>
       field.bias >=  0f
     }.map { field =>
-      BoostableIndicators(field.name, field.values, Some(field.bias))
+      BoostableCorrelators(field.name, field.values, Some(field.bias))
     }
 
     (queryBoostedFields ++ paramsBoostedFields).distinct  // de-dup and favor query fields
   }
 
   /** get all metadata fields that are filters (not boosts) */
-  def getFilteringMetadata( query: Query ): List[FilterIndicators] = {
+  def getFilteringMetadata( query: Query ): List[FilterCorrelators] = {
     val paramsFilterFields = ap.fields.getOrElse(List.empty[Field]).filter( field => field.bias >= 0 ).map { field =>
-      FilterIndicators(field.name, field.values)
+      FilterCorrelators(field.name, field.values)
     }
 
     val queryFilterFields = query.fields.getOrElse(List.empty[Field]).filter { field =>
       field.bias <  0f
     }.map { field =>
-      FilterIndicators(field.name, field.values)
+      FilterCorrelators(field.name, field.values)
     }
 
     (queryFilterFields ++ paramsFilterFields).distinct // de-dup and favor query fields

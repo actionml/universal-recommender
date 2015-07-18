@@ -1,12 +1,12 @@
-# Multimodal Recommendation (MMR) Template
+# Universal Recommendation Template
 
-The Multimodal Recommender is a Cooccurrence type that creates indicators from several user actions (events) and performs the recommendations query with a Search Engine.
+The Universal Recommender is a Cooccurrence type that creates correlators from several user actions (events) and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make user of any part of their user's clickstream. TBD: several forms of popularity type backfill and content-based correlators for content based recs. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
 
 ##Quick Start
 
  1. [Install the PredictionIO framework](https://docs.prediction.io/install/) **be sure to choose HBase and Elasticsearch** for storage. This template requires Elasticsearch.
  2. Make sure the PIO console and services are running, check with `pio status`
- 3. [Install this template](https://docs.prediction.io/start/download/) **be sure to specify this template** with `pio template get PredictionIO/template-scala-parallel-multimodal-recommendation`
+ 3. [Install this template](https://docs.prediction.io/start/download/) **be sure to specify this template** with `pio template get PredictionIO/template-scala-parallel-universal-recommendation`
  
 **To import and experiment with the simple example data**
 
@@ -19,13 +19,13 @@ The Multimodal Recommender is a Cooccurrence type that creates indicators from s
 
 If there are timeouts, enable the delays that are commented out in the script&mdash;for now. In the production environment the engines will "warm up" with caching and will execute queries much faster. Also all services can be configured or scaled to meet virtually any performance needs.
 
-##What is a Multimodal Recommender
+##What is a Universal Recommender
 
-The Multimodal Recommender (MMR) will accept a range of data, auto correlate it, and allow for very flexible queries. The MMR is different from most recommenders in these ways:
+The Universal Recommender (UR) will accept a range of data, auto correlate it, and allow for very flexible queries. The MMR is different from most recommenders in these ways:
 
 * It takes a single very strong "primary" event type&mdash;one that clearly reflects a user's preference&mdash;and correlates any number of other event types to the primary event. This has the effect of using virtually any user action to recommend the primary action. Much of a user’s clickstream can be used to make recommendations. If a user has no history of the primary action (purchase for instance) but does have history of views, personalized recommendations for purchases can still be made. With user purchase history the recommendations become better. ALS-type recommenders have been used with event weights but except for ratings these often do not result in better performance.
 * It can boost and filter based on events or item metadata/properties. This means it can give personalized recs that are biased toward “SciFi” and filtered to only include “Promoted” items when the business rules call for this.
-* It can use a user's context to make recommendations even when the user is new. If usage data has been gathered for other users for referring URL, device type, or location, for instance, there may be a correlation between this data and items preferred. The MMR can detect this **if** it exists and recommend based on this context, even to new users. We call this "micro-segmented" recommendations since they are not personal but group users based on limited contextual information. These will not be as good as when more is know about the user but may be better than simply returning popular items.
+* It can use a user's context to make recommendations even when the user is new. If usage data has been gathered for other users for referring URL, device type, or location, for instance, there may be a correlation between this data and items preferred. The UR can detect this **if** it exists and recommend based on this context, even to new users. We call this "micro-segmented" recommendations since they are not personal but group users based on limited contextual information. These will not be as good as when more is know about the user but may be better than simply returning popular items.
 * It includes a fallback to some form of item popularity when there is no other information known about the user (not implemented in v0.1.0).
 * All of the above can be mixed into a single query for blended results and so the query can be tuned to a great many applications. Also since only one query is made and boosting is supported, a query can be constructed with several fallbacks. Usage data is most important so boost that high, micro-segemnting data may be better than popularity so boost that lower, and popularity fills in if no other recommendations are available.
 
@@ -50,7 +50,7 @@ This file allows the user to describe and set parameters that control the engine
       "datasource": {
         "params" : {
           "name": "sample-movielens",
-          "appName": "MMRApp1",
+          "appName": "URApp1",
           "eventNames": ["buy", "view"] // name your events with any string
         }
       },
@@ -65,15 +65,15 @@ This file allows the user to describe and set parameters that control the engine
       },
       "algorithms": [
         {
-          "name": "mmr",
+          "name": "ur",
           "params": {
-            "appName": "MMRApp1",
-            "indexName": "mmrindex",
+            "appName": "URApp1",
+            "indexName": "urindex",
             "typeName": "items",
             "eventNames": ["buy", "view"]
             "blacklistEvents": ["buy", "view"],
             "maxEventsPerEventType": 100,
-            "maxIndicatorsPerEventType": 50,
+            "maxCorrelatorsPerEventType": 50,
             "maxQueryEvents": 500,
             "num": 20,
             "userbias": -maxFloat..maxFloat,
@@ -91,14 +91,14 @@ This file allows the user to describe and set parameters that control the engine
       ]
     }
 
-The “params” section controls most of the features of the MMR. Possible values are:
+The “params” section controls most of the features of the UR. Possible values are:
 
 * **appName**: required string describing the app using the engine. Must be the same as is seen with `pio app list`
-* **indexName**: required string describing the index for all indicators, something like "mmrindex". The Elasticsearch URI for its REST interface is `http:/**your-master-machine**/indexName/typeName/...` You can access ES through its REST interface here.
+* **indexName**: required string describing the index for all correlators, something like "urindex". The Elasticsearch URI for its REST interface is `http:/**your-master-machine**/indexName/typeName/...` You can access ES through its REST interface here.
 * **typeName**: required string describing the type in Elasticsearch terminology, something like "items". This has no important meaning but must be part of the Elastic search URI for queries.
 * **eventNames**: required array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
 * **maxEventsPerEventType** optional, default = 500. Amount of usage history to keep use in model calculation.
-* **maxIndicatorsPerEventType**: optional, default = 50. An integer that controls how many of the strongest indicators are created for every event type named in `eventNames`.
+* **maxCorrelatorsPerEventType**: optional, default = 50. An integer that controls how many of the strongest correlators are created for every event type named in `eventNames`.
 * **maxQueryEvents**: optional, default = 100. An integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
 * **num**: optional, default = 20. An integer telling the engine the maximum number of recs to return per query but less may be returned if the query produces less results or post recs filters like blacklists remove some.
 * **blacklistEvents**: optional, default = the primary action. An array of strings corresponding to the actions taken on items, which will cause them to be removed from recs. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is often little need to recommend something the user has already bought. If this is not specified then the primary event is assumed. To blacklist no event, specify an empty array. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a category page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the category and item ids should never match. If you want to filter certain categories, use a field filter and specify all categories allowed.
@@ -147,7 +147,7 @@ The query returns personalized recommendations, similar items, or a mix includin
 	  “user”: “xyz”
 	}
 	
-This gets all default values from the engine.json and uses only action indicators for the types specified there.
+This gets all default values from the engine.json and uses only action correlators for the types specified there.
 
 ###Simple Non-contextual Similar Items
 
@@ -232,6 +232,6 @@ To begin using on new data with an engine that has been used with sample data or
 
  * Other documentation of the algorithm is [here](http://mahout.apache.org/users/algorithms/intro-cooccurrence-spark.html)
  * A free ebook, which talks about the general idea: [Practical Machine Learning](https://www.mapr.com/practical-machine-learning).
- * A slide deck, which talks about mixing actions and other indicator types, including content-based ones: [Creating a Unified Recommender](http://www.slideshare.net/pferrel/unified-recommender-39986309?ref=http://occamsmachete.com/ml/)
+ * A slide deck, which talks about mixing actions and other correlator types, including content-based ones: [Creating a Unified Recommender](http://www.slideshare.net/pferrel/unified-recommender-39986309?ref=http://occamsmachete.com/ml/)
  * Two blog posts: What's New in Recommenders: part [#1](http://occamsmachete.com/ml/2014/08/11/mahout-on-spark-whats-new-in-recommenders/) [#2](http://occamsmachete.com/ml/2014/09/09/mahout-on-spark-whats-new-in-recommenders-part-2/)
  * A post describing the log-likelihood ratio: [Surprise and Coincidence](http://tdunning.blogspot.com/2008/03/surprise-and-coincidence.html) LLR is used to reduce noise in the data while keeping the calculations O(n) complexity.

@@ -20,10 +20,10 @@
   "algorithms": [
     {
       "comment": "setup for example 'handmade' data, make sure to change for your needs",
-      "name": "mmr",
+      "name": "ur",
       "params": {
-        "appName": "MMRPhonesFake",
-        "indexName": "mmrindex",
+        "appName": "URPhonesFake",
+        "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase", "view"]
       }
