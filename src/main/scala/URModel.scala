@@ -58,7 +58,7 @@ class URModel(
 
     // Elasticsearch takes a Map with all fields, not a tuple
     logger.info("Grouping all correlators into doc + fields for writing to index")
-    val fields = (correlators :+ properties).filterNot(c => c.isEmpty())
+    val esFields = groupAll((correlators :+ properties).filterNot(c => c.isEmpty()))
 
     // May specifiy a remapping parameter to put certain fields in different places in the ES document
     // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
