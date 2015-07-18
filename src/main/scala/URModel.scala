@@ -59,18 +59,6 @@ class URModel(
     // Elasticsearch takes a Map with all fields, not a tuple
     logger.info("Grouping all correlators into doc + fields for writing to index")
     val fields = (correlators :+ properties).filterNot(c => c.isEmpty())
-    val esFields = groupAll(fields)
-    /*val esFields = fields.foldLeft[RDD[(String, (Map[String, Seq[String]]))]](fields.head) {(rdd1, rdd2) =>
-      val debug4 = rdd2.take(1)
-      if (!rdd1.equals(rdd2)) rdd1.cogroup[Map[String, Seq[String]]](rdd2).map { case(i, pairMapSeqs)  =>
-          (i, pairMapSeqs._1.head ++ pairMapSeqs._2.head) // since only one map per id, the iterators will only have one
-        }
-      else rdd2
-
-    }
-    */
-
-    val debug3 = esFields.collect()
 
     // May specifiy a remapping parameter to put certain fields in different places in the ES document
     // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
@@ -93,9 +81,7 @@ class URModel(
   
   def groupAll( fields: Seq[RDD[(String, (Map[String, Seq[String]]))]]): RDD[(String, (Map[String, Seq[String]]))] = {
     if (fields.size > 1) {
-      val f1 = fields.head.cogroup[Map[String, Seq[String]]](groupAll(fields.drop(1)))
-      val debug6 = f1.collect()
-      val f2 = f1.map { case (key, pairMapSeqs) =>
+      fields.head.cogroup[Map[String, Seq[String]]](groupAll(fields.drop(1))).map { case (key, pairMapSeqs) =>
         if (pairMapSeqs._1.size != 0 && pairMapSeqs._2 != 0)
           (key, pairMapSeqs._1.head ++ pairMapSeqs._2.head)
         else if (pairMapSeqs._1.size == 0 && pairMapSeqs._2 != 0)
@@ -105,8 +91,6 @@ class URModel(
         else
           (key, Map.empty[String, Seq[String]])// yikes, this should never happen but ok, check
       }
-      val debug7 = f2.collect()
-      f2
     } else fields.head
   }
 

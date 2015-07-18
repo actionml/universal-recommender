@@ -63,9 +63,6 @@ class DataSource(val dsp: DataSourceParams)
       (eventName, actionRDD)
     }
 
-    val debug = eventsRDD.count()
-    val debug2 = actionRDDs.map(_._2.count())
-
     // aggregating all $set/$unsets for metadata fields, which are attached to items
     val fieldsRDD = PEventStore.aggregateProperties(
       appName= dsp.appName,
