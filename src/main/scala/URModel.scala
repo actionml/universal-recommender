@@ -13,12 +13,12 @@ import org.apache.spark.SparkContext
 
 /** Universal Recommender models to save in ES */
 class URModel(
-    coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
-    fieldsRDD: RDD[(String, PropertyMap)],
-    indexName: String,
-    nullModel: Boolean = false)
-    // a little hack to allow a dummy model used to save but not
-    // retrieve (see companion object's apply)
+  coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
+  fieldsRDD: RDD[(String, PropertyMap)],
+  indexName: String,
+  nullModel: Boolean = false)
+// a little hack to allow a dummy model used to save but not
+// retrieve (see companion object's apply)
   extends PersistentModel[URAlgorithmParams] {
   @transient lazy val logger = Logger[this.type]
 
@@ -59,6 +59,8 @@ class URModel(
     // Elasticsearch takes a Map with all fields, not a tuple
     logger.info("Grouping all correlators into doc + fields for writing to index")
     val esFields = groupAll((correlators :+ properties).filterNot(c => c.isEmpty()))
+    (correlators :+ properties).foreach(rdd =>
+      logger.info(s"Correlator ${rdd.take(1).head._1} has ${rdd.count()} elements"))
 
     // May specifiy a remapping parameter to put certain fields in different places in the ES document
     // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
@@ -78,31 +80,37 @@ class URModel(
     logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
     true
   }
-  
+
   def groupAll( fields: Seq[RDD[(String, (Map[String, Seq[String]]))]]): RDD[(String, (Map[String, Seq[String]]))] = {
-    if (fields.size > 1) {
+    if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
       fields.head.cogroup[Map[String, Seq[String]]](groupAll(fields.drop(1))).map { case (key, pairMapSeqs) =>
-        if (pairMapSeqs._1.size != 0 && pairMapSeqs._2 != 0)
-          (key, pairMapSeqs._1.head ++ pairMapSeqs._2.head)
-        else if (pairMapSeqs._1.size == 0 && pairMapSeqs._2 != 0)
-          (key, pairMapSeqs._2.head)// only ever one map per list since they were from dictinct rdds
-        else if (pairMapSeqs._2.size == 0 && pairMapSeqs._1 != 0)
-          (key, pairMapSeqs._1.head)// only ever one map per list since they were from dictinct rdds
-        else
-          (key, Map.empty[String, Seq[String]])// yikes, this should never happen but ok, check
+        // to be safe merge all maps but should only be one per rdd element
+        val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Seq[String]])(_ ++ _)
+        val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Seq[String]])(_ ++ _)
+        val fullMap = rdd1Maps ++ rdd2Maps
+        /*        if (pairMapSeqs._1.nonEmpty && pairMapSeqs._2.nonEmpty)
+                  (key, pairMapSeqs._1.head ++ pairMapSeqs._2.head)
+                else if (pairMapSeqs._1.isEmpty && pairMapSeqs._2.nonEmpty)
+                  (key, pairMapSeqs._2.head)// only ever one map per list since they were from dictinct rdds
+                else if (pairMapSeqs._1.nonEmpty && pairMapSeqs._2.isEmpty)
+                  (key, pairMapSeqs._1.head)// only ever one map per list since they were from dictinct rdds
+                else
+                  (key, Map.empty[String, Seq[String]])// yikes, this should never happen but ok, check
+        */
+        (key, fullMap)
       }
     } else fields.head
   }
 
   override def toString = {
-  /*s"userFeatures: [${userFeatures.count()}]" +
-    s"(${userFeatures.take(2).toList}...)" +
-    s" productFeatures: [${productFeatures.count()}]" +
-    s"(${productFeatures.take(2).toList}...)" +
-    s" userStringIntMap: [${userStringIntMap.size}]" +
-    s"(${userStringIntMap.take(2)}...)" +
-    s" itemStringIntMap: [${itemStringIntMap.size}]" +
-    s"(${itemStringIntMap.take(2)}...)" */
+    /*s"userFeatures: [${userFeatures.count()}]" +
+      s"(${userFeatures.take(2).toList}...)" +
+      s" productFeatures: [${productFeatures.count()}]" +
+      s"(${productFeatures.take(2).toList}...)" +
+      s" userStringIntMap: [${userStringIntMap.size}]" +
+      s"(${userStringIntMap.take(2)}...)" +
+      s" itemStringIntMap: [${itemStringIntMap.size}]" +
+      s"(${itemStringIntMap.take(2)}...)" */
     s"URModel in Elasticsearch at index: ${indexName}"
   }
 
