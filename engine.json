@@ -4,9 +4,8 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "name": "sample-handmade-data.txt",
-      "appName": "MMRPhonesFake",
-      "eventNames": ["purchase", "view"]
+      "appName": "epinions",
+      "eventNames": ["rate", "trust"]
     }
   },
   "sparkConf": {
@@ -19,13 +18,13 @@
   },
   "algorithms": [
     {
-      "comment": "setup for example 'handmade' data, make sure to change for your needs",
+      "comment": "setup for epinions data, make sure to change for your needs",
       "name": "ur",
       "params": {
-        "appName": "URPhonesFake",
+        "appName": "epinions",
         "indexName": "urindex",
         "typeName": "items",
-        "eventNames": ["purchase", "view"]
+        "eventNames": ["rate", "trust"]
       }
     }
   ]

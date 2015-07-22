@@ -4,7 +4,7 @@ import java.util
 import io.prediction.controller.P2LAlgorithm
 import io.prediction.controller.Params
 import io.prediction.data.storage.Event
-import io.prediction.data.store.LEventStore
+import io.prediction.data.store.{PEventStore, LEventStore}
 import org.apache.mahout.math.cf.SimilarityAnalysis
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import scala.collection.JavaConverters._
@@ -264,6 +264,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
     query: Query): (Seq[BoostableCorrelators], List[Event]) = {
 
     val recentEvents = try {
+      /* to retur an rdd use
+      PEventStore.find(
+        appName = ap.appName,
+        entityType = Some("user"),
+        entityId = Some(query.user.get),
+        eventNames = Some(ap.eventNames)
+      )(sc).collect().toList
+      */
       LEventStore.findByEntity(
         appName = ap.appName,
         // entityType and entityId is specified for fast lookup
