@@ -1,6 +1,6 @@
 # Universal Recommendation Template
 
-The Universal Recommender is a Cooccurrence type that creates correlators from several user actions (events) and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make user of any part of their user's clickstream. TBD: several forms of popularity type backfill and content-based correlators for content based recs. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
+The Universal Recommender is a Cooccurrence type that creates correlators from several user actions, events, or profile information and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make use of any part of their user's clickstream or even profile and context information in making recommendations. TBD: several forms of popularity type backfill and content-based correlators for content based recs. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
 
 ##Quick Start
 
