@@ -59,8 +59,6 @@ class URModel(
     // Elasticsearch takes a Map with all fields, not a tuple
     logger.info("Grouping all correlators into doc + fields for writing to index")
     val esFields = groupAll((correlators :+ properties).filterNot(c => c.isEmpty()))
-    (correlators :+ properties).foreach(rdd =>
-      logger.info(s"Correlator ${rdd.take(1).head._1} has ${rdd.count()} elements"))
 
     // May specifiy a remapping parameter to put certain fields in different places in the ES document
     // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and

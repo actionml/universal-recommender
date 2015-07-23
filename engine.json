@@ -5,7 +5,7 @@
   "datasource": {
     "params" : {
       "name": "sample-handmade-data.txt",
-      "appName": "MMRPhonesFake",
+      "appName": "handmade",
       "eventNames": ["purchase", "view"]
     }
   },
@@ -22,7 +22,7 @@
       "comment": "setup for example 'handmade' data, make sure to change for your needs",
       "name": "ur",
       "params": {
-        "appName": "URPhonesFake",
+        "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase", "view"]
