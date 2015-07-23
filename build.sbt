@@ -1,4 +1,4 @@
-name := "template-scala-parallel-recommendation"
+name := "template-scala-parallel-universal-recommendation"
 
 organization := "io.prediction"
 
@@ -9,7 +9,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % "1.3.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.3.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
-  // Mahout's Spark jars in managed lib/
+  // Mahout's Spark code is a managed snapshot in lib/
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
   "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.0.Beta4"

@@ -21,8 +21,6 @@ If there are timeouts, enable the delays that are commented out in the script&md
 
 ##What is a Universal Recommender
 
-The Universal Recommender (UR) will accept a range of data, auto correlate it, and allow for very flexible queries. The MMR is different from most recommenders in these ways:
-
 * It takes a single very strong "primary" event type&mdash;one that clearly reflects a user's preference&mdash;and correlates any number of other event types to the primary event. This has the effect of using virtually any user action to recommend the primary action. Much of a user’s clickstream can be used to make recommendations. If a user has no history of the primary action (purchase for instance) but does have history of views, personalized recommendations for purchases can still be made. With user purchase history the recommendations become better. ALS-type recommenders have been used with event weights but except for ratings these often do not result in better performance.
 * It can boost and filter based on events or item metadata/properties. This means it can give personalized recs that are biased toward “SciFi” and filtered to only include “Promoted” items when the business rules call for this.
 * It can use a user's context to make recommendations even when the user is new. If usage data has been gathered for other users for referring URL, device type, or location, for instance, there may be a correlation between this data and items preferred. The UR can detect this **if** it exists and recommend based on this context, even to new users. We call this "micro-segmented" recommendations since they are not personal but group users based on limited contextual information. These will not be as good as when more is know about the user but may be better than simply returning popular items.
@@ -76,6 +74,7 @@ This file allows the user to describe and set parameters that control the engine
             "maxCorrelatorsPerEventType": 50,
             "maxQueryEvents": 500,
             "num": 20,
+            "seed": 3,
             "userbias": -maxFloat..maxFloat,
             "itembias": -maxFloat..maxFloat,
             "returnSelf": true | false,
@@ -126,6 +125,7 @@ Query fields determine what data is used to match when returning recs. Some fiel
       ]
       “blacklistItems”: [“itemId1”, “itemId2”, ...]
       "returnSelf": true | false,
+      “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
 
 * **user**: optional, contains a unique id for the user. This may be a user not in the **training**: data, so a new or anonymous user who has an anonymous id. All user history captured in near realtime can be used to influence recommendations, there is no need to retrain to enable this.
@@ -221,12 +221,14 @@ To begin using on new data with an engine that has been used with sample data or
  - fast writing to Elasticsearch using Spark
  - convention over configuration for queries, defaults make simple/typical queries simple and overrides add greater expressiveness.
 
-  
+### v-0.2.0
+
+ - date range filters
+ - trending/popularity used for backfill when no other recs are returned by the query
+
 ### Known issues
 
-  - dates not implemented
   - index dropped then refreshed in `pio train` so no need to redeploy if the server is running. This violates conventions for other templates but is actually good. It means we have a hot-swapped model. If there are server timeouts during train, for the refresh response or for ongoing queries, we may need to find optimizations.
-  - popularity fallback not implemented.
 
 ## References
 
