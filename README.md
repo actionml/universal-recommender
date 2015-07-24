@@ -1,6 +1,6 @@
 # Universal Recommendation Template
 
-The Universal Recommender is a Cooccurrence type that creates correlators from several user actions, events, or profile information and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make use of any part of their user's clickstream or even profile and context information in making recommendations. TBD: several forms of popularity type backfill and content-based correlators for content based recs. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
+The Universal Recommender (UR) is a Cooccurrence type that creates correlators from several user actions, events, or profile information and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make use of any part of their user's clickstream or even profile and context information in making recommendations. TBD: several forms of popularity type backfill and content-based correlators for content based recs. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
 
 ##Quick Start
 
@@ -13,7 +13,7 @@ The Universal Recommender is a Cooccurrence type that creates correlators from s
 1. Create a new app name, change `appName` in `engine.json`
 2. Run `pio app new **your-new-app-name**`
 4. Import sample events by running `python data/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
-3. The engine.json file in the root directory of your new MMR template is set up for the data you just imported (make sure to create a new one for your data) Edit this file and change the `appName` parameter to match what you called the app in step #2
+3. The engine.json file in the root directory of your new UR template is set up for the data you just imported (make sure to create a new one for your data) Edit this file and change the `appName` parameter to match what you called the app in step #2
 5. Perform `pio build`, `pio train`, and `pio deploy`
 6. To execute some sample queries run `./examples/query-handmade.sh`
 
