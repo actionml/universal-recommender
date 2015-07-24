@@ -58,7 +58,11 @@ class URModel(
 
     // Elasticsearch takes a Map with all fields, not a tuple
     logger.info("Grouping all correlators into doc + fields for writing to index")
-    val esFields = groupAll((correlators :+ properties).filterNot(c => c.isEmpty()))
+    val esFields = groupAll((correlators :+ properties).filterNot(c => c.isEmpty())).map { case (item, map) =>
+      val esMap = map + ("id" -> item)
+      esMap
+    }
+
 
     // May specifiy a remapping parameter to put certain fields in different places in the ES document
     // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
@@ -71,10 +75,10 @@ class URModel(
 
     // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
     logger.info(s"Writing new ES style rdd to index: ${esIndexURI}")
-    esFields.saveToEs (esIndexURI, Map("es.mapping.id" -> "_1"))
+    esFields.saveToEs (esIndexURI, Map("es.mapping.id" -> "id"))
     //esFields.saveToEs (esIndexURI)
     // todo: check to see if a Flush is needed after writing all new data to the index
-    // esClient.admin().indices().flush(new FlushRequest("mmrindex")).actionGet()
+    // esClient.admin().indices().flush(new FlushRequest(params.indexName)).actionGet()
     logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
     true
   }
@@ -129,9 +133,9 @@ object URModel
     */
   def apply(id: String, params: URAlgorithmParams, sc: Option[SparkContext]): URModel = {
     // todo: need changes in PIO to remove the need for this
-    val mmrm = new URModel(null, null, null, true)
+    val urm = new URModel(null, null, null, true)
     logger.info("Created dummy null model")
-    mmrm
+    urm
   }
 
 }
