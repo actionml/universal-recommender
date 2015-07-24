@@ -27,26 +27,26 @@ object defaultURAlgorithmParams {
 
 /** Instantiated from engine.json */
 case class URAlgorithmParams(
-  appName: String, // filled in from engine.json
-  indexName: String, // can optionally be used to specify the elasticsearch index name
-  typeName: String, // can optionally be used to specify the elasticsearch type name
-  eventNames: List[String], // names used to ID all user actions
-  // list of events used to determine which recs to filter out, used for
-  // things like not showing items a user has purchased. Default is anything
-  // the user took the primary action on, to filter nothing specify an
-  // empty array in engine.json
-  blacklistEvents: Option[List[String]] = None,
-  //todo: backfill: Option[String] = None, // popular or trending
-  // number of events in user-based recs query
-  maxQueryEvents: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxQueryEvents),
-  maxEventsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxEventsPerEventType),
-  maxCorrelatorsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
-  num: Option[Int] = Some(defaultURAlgorithmParams.DefaultNum), // default max # of recs requested
-  userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
-  itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
-  returnSelf: Option[Boolean] = None, // query building logic defaults this to false
-  fields: Option[List[Field]] = None, //defaults to no fields
-  seed: Option[Long] = None) // seed is not used presently
+    appName: String, // filled in from engine.json
+    indexName: String, // can optionally be used to specify the elasticsearch index name
+    typeName: String, // can optionally be used to specify the elasticsearch type name
+    eventNames: List[String], // names used to ID all user actions
+    // list of events used to determine which recs to filter out, used for
+    // things like not showing items a user has purchased. Default is anything
+    // the user took the primary action on, to filter nothing specify an
+    // empty array in engine.json
+    blacklistEvents: Option[List[String]] = None,
+    //todo: backfill: Option[String] = None, // popular or trending
+    // number of events in user-based recs query
+    maxQueryEvents: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxQueryEvents),
+    maxEventsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxEventsPerEventType),
+    maxCorrelatorsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+    num: Option[Int] = Some(defaultURAlgorithmParams.DefaultNum), // default max # of recs requested
+    userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
+    itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
+    returnSelf: Option[Boolean] = None, // query building logic defaults this to false
+    fields: Option[List[Field]] = None, //defaults to no fields
+    seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducable unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
@@ -264,14 +264,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
     query: Query): (Seq[BoostableCorrelators], List[Event]) = {
 
     val recentEvents = try {
-      /* to retur an rdd use
-      PEventStore.find(
-        appName = ap.appName,
-        entityType = Some("user"),
-        entityId = Some(query.user.get),
-        eventNames = Some(ap.eventNames)
-      )(sc).collect().toList
-      */
       LEventStore.findByEntity(
         appName = ap.appName,
         // entityType and entityId is specified for fast lookup

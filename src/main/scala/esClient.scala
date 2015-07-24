@@ -22,7 +22,7 @@ object esClient {
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
     * the changes will not be reflected.
-    * @param indexName will delete all types under this index, types are not used by the MMR
+    * @param indexName will delete all types under this index, types are not used by the UR
     * @param refresh
     * @return true if all is well
     */
@@ -96,7 +96,7 @@ object esClient {
     *
     * @param indexName index that contains the doc/item
     * @param typeName type name used to construct ES REST URI
-    * @param doc for MMR the item id
+    * @param doc for UR the item id
     * @return source [java.util.Map] of field names to any valid field values or null if empty
     */
   def getSource(indexName: String, typeName: String, doc: String): util.Map[String, AnyRef] = {

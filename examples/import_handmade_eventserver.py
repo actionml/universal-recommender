@@ -21,7 +21,7 @@ def import_events(client, file):
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
     # For demonstration purpose action names are taken from input along with secondary actions on
-    # For the MMR add some item metadata
+    # For the UR add some item metadata
 
     if (data[1] == "purchase"):
       client.create_event(
