@@ -36,8 +36,8 @@ case class Field( // no optional values for fields, whne specified
 /** Used to specify how Fields are represented in engine.json */
 case class DateRange( // no optional values for fields, whne specified
     name: String, // name of item property for the date comparison
-    beforeDate: Option[String], // empty strings means no filter
-    afterDate: Option[String]) // both empty should be ignored
+    before: Option[String], // empty strings means no filter
+    after: Option[String]) // both empty should be ignored
     //format: Option[String] = None) // todo: warning!, not used yet, supports only iso standard for now
   extends Serializable
 

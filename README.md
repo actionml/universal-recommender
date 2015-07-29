@@ -181,6 +181,30 @@ This returns items that are similar to the query item, and blacklist and backfil
 
 This returns items based on user "xyz" history filtered by categories and boosted to favor more genre specific items. The values for fields have been attached to items with $set events where the “name” corresponds to a doc field and the “values” correspond to the contents of the field. The “bias” is used to indicate a filter or a boost. For Solr or Elasticsearch the boost is sent as-is to the engine and it’s meaning is determined by the engine (Lucene in either case). As always the blacklist and backfill use the defaults in engine.json.
 
+###Date ranges as query filters
+
+    {
+	  “user”: “xyz”, 
+	  “fields”: [
+	    {
+	      “name”: “categories”
+	      “values”: [“series”, “mini-series”],
+	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
+	    },{
+	      “name”: “genre”,
+	      “values”: [“sci-fi”, “detective”]
+	      “bias”: 1.2 // boost/favor recs with the `genre’ = `sci-fi` or ‘detective’
+	    }
+	  ],
+      "dateRange": {
+        "name": "availabledate",
+        "before": "2015-08-15T11:28:45.114-07:00",
+        "after": "2015-08-20T11:28:45.114-07:00       
+      }
+	}
+
+Items are assumed to have a field of the same `name` that has a date associated with it using a `$set` event. The query will return only those recs where the date field is in reange. Either date bound can be omitted for a on-sided range. The range applies to all returned recs, even those for popular items. 	
+
 ###Contextual Personalized with Similar Items
 
 	{

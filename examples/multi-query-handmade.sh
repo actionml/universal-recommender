@@ -276,8 +276,8 @@ curl -H "Content-Type: application/json" -d '
     "user": "u1",
     "dateRange":{
         "name": "expiredate",
-        "beforeDate": "2015-08-16T11:28:45.114-07:00",
-        "afterDate": "2015-08-14T11:28:45.114-07:00"
+        "before": "2015-08-16T11:28:45.114-07:00",
+        "after": "2015-08-14T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
@@ -289,7 +289,7 @@ curl -H "Content-Type: application/json" -d '
     "user": "u1",
     "dateRange":{
         "name": "expiredate",
-        "afterDate": "2015-08-12T11:28:45.114-07:00"
+        "after": "2015-08-12T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
@@ -301,7 +301,7 @@ curl -H "Content-Type: application/json" -d '
     "user": "u1",
     "dateRange":{
         "name": "expiredate",
-        "beforeDate": "2015-08-18T11:28:45.114-07:00"
+        "before": "2015-08-18T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
@@ -313,8 +313,8 @@ curl -H "Content-Type: application/json" -d '
     "user": "u1",
     "dateRange":{
         "name": "expiredate",
-        "beforeDate": "2015-08-16T11:28:45.114-07:00",
-        "afterDate": "2015-08-14T11:28:45.114-07:00"
+        "before": "2015-08-16T11:28:45.114-07:00",
+        "after": "2015-08-14T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
@@ -331,8 +331,8 @@ curl -H "Content-Type: application/json" -d '
     }],
     "dateRange":{
         "name": "expiredate",
-        "beforeDate": "2015-08-16T11:28:45.114-07:00",
-        "afterDate": "2015-08-14T11:28:45.114-07:00"
+        "before": "2015-08-16T11:28:45.114-07:00",
+        "after": "2015-08-14T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
@@ -349,8 +349,8 @@ curl -H "Content-Type: application/json" -d '
     }],
     "dateRange":{
         "name": "expiredate",
-        "beforeDate": "2015-08-18T11:28:45.114-07:00",
-        "afterDate": "2015-08-13T11:28:45.114-07:00"
+        "before": "2015-08-18T11:28:45.114-07:00",
+        "after": "2015-08-13T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""

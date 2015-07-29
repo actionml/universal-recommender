@@ -370,10 +370,10 @@ class URAlgorithm(val ap: URAlgorithmParams)
     */
   def getFilteringDateRange( query: Query ): JValue = {
 
-    if(query.dateRange.nonEmpty && (query.dateRange.get.afterDate.nonEmpty || query.dateRange.get.beforeDate.nonEmpty)){
+    if(query.dateRange.nonEmpty && (query.dateRange.get.after.nonEmpty || query.dateRange.get.before.nonEmpty)){
       val name = query.dateRange.get.name
-      val before = query.dateRange.get.beforeDate
-      val after = query.dateRange.get.afterDate
+      val before = query.dateRange.get.before
+      val after = query.dateRange.get.after
       val json =
         (
           ("constant_score" ->
