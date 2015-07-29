@@ -4,7 +4,7 @@ echo ""
 echo "Recommendations for user: u1"
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1"
+    "user": "u1",
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
@@ -54,7 +54,7 @@ curl -H "Content-Type: application/json" -d '
     "fields": [{
         "name": "category",
         "values": ["tablets"],
-        "bias": 2
+        "bias": 5
     }]
 }' http://localhost:8000/queries.json
 echo ""
@@ -116,7 +116,7 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for item: surface, should return none."
+echo "Recommendations for item: surface, should return results but with low scores"
 curl -H "Content-Type: application/json" -d '
 {
     "item": "surface",
@@ -126,10 +126,10 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u3 who would not get recs without multiple action types"
+echo "Recommendations for user: u5 who would not get recs without multiple action types"
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u3",
+    "user": "u5",
     "num": 4
 }' http://localhost:8000/queries.json
 echo ""
@@ -227,17 +227,16 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u3 who would not get recs without multiple action types, blacklist 'ipad'"
+echo "Recommendations for user: u5 who would not get recs without multiple action types, blacklist 'iphone'"
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u3",
+    "user": "u5",
     "num": 4,
-    "blacklistItems": ["ipad"]
+    "blacklistItems": ["iphone"]
 
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
-
 
 echo ""
 echo "Recommendations for item: galaxy"
@@ -267,7 +266,94 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 #sleep 2
 
+echo ""
+echo ""
+echo "Warning: for the date range queries to work you must substitude dates that fit in the range when the events were imported"
+echo ""
+echo "Recommendations for user: u1, narrow date range before 8/16 and after 8/14"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "dateRange":{
+        "name": "expiredate",
+        "beforeDate": "2015-08-16T11:28:45.114-07:00",
+        "afterDate": "2015-08-14T11:28:45.114-07:00"
+    }
+}' http://localhost:8000/queries.json
+echo ""
 
+echo ""
+echo "Recommendations for user: u1 after 8/12 so all"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "dateRange":{
+        "name": "expiredate",
+        "afterDate": "2015-08-12T11:28:45.114-07:00"
+    }
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u1 before 8/18 so all"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "dateRange":{
+        "name": "expiredate",
+        "beforeDate": "2015-08-18T11:28:45.114-07:00"
+    }
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u1, no filter, narrow date range before 8/16 and after 8/14"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "dateRange":{
+        "name": "expiredate",
+        "beforeDate": "2015-08-16T11:28:45.114-07:00",
+        "afterDate": "2015-08-14T11:28:45.114-07:00"
+    }
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u1, 'tablets' filter, narrow date range before 8/16 and after 8/14"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "fields": [{
+        "name": "category",
+        "values": ["tablets"],
+        "bias": -2
+    }],
+    "dateRange":{
+        "name": "expiredate",
+        "beforeDate": "2015-08-16T11:28:45.114-07:00",
+        "afterDate": "2015-08-14T11:28:45.114-07:00"
+    }
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u3, 'phones' boost, wide date range before 8/18 and after 8/13"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u3",
+    "fields": [{
+        "name": "category",
+        "values": ["phones"],
+        "bias": 2
+    }],
+    "dateRange":{
+        "name": "expiredate",
+        "beforeDate": "2015-08-18T11:28:45.114-07:00",
+        "afterDate": "2015-08-13T11:28:45.114-07:00"
+    }
+}' http://localhost:8000/queries.json
+echo ""
 
 
 

@@ -4,9 +4,10 @@ import java.util
 import io.prediction.controller.P2LAlgorithm
 import io.prediction.controller.Params
 import io.prediction.data.storage.Event
-import io.prediction.data.store.{PEventStore, LEventStore}
+import io.prediction.data.store.LEventStore
 import org.apache.mahout.math.cf.SimilarityAnalysis
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
+import org.json4s.JsonAST.{JNothing, JNull, JValue}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 import org.apache.spark.SparkContext
@@ -46,6 +47,7 @@ case class URAlgorithmParams(
     itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
     returnSelf: Option[Boolean] = None, // query building logic defaults this to false
     fields: Option[List[Field]] = None, //defaults to no fields
+    dateFields: Option[List[String]] = None, //field names to be turned into dates in the model, default = none
     seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducable unless supplied
 
@@ -108,6 +110,18 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *          {
     *            "terms": {
     *              "category": ["cat1"]
+    *            }
+    *          },
+    *          {
+    *            "constant_score": {
+    *              "filter": {
+    *                "range" : {
+    *                  "expiredate" : {
+    *                    "gte": "2015-08-15T11:28:45.114-07:00"
+    *                    "lt": "2015-08-20T11:28:45.114-07:00"
+    *                  }
+    *                }
+    *              }
     *            }
     *          }
     *        ]
@@ -199,6 +213,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
       val filteringMetadata = getFilteringMetadata(query)
 
+      val filteringDateRange = getFilteringDateRange(query)
+
       val allFilteringCorrelators = recentUserHistoryFilter ++ similarItemsFilter ++ filteringMetadata
 
       // since users have action history and items have correlators and both correspond to the same "actions" like
@@ -206,6 +222,10 @@ class URAlgorithm(val ap: URAlgorithmParams)
       // then metadata or backfill must be relied on to return results.
 
       val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultURAlgorithmParams.DefaultNum))
+
+      val mustFields = allFilteringCorrelators.map { i =>
+        render(("terms" -> (i.actionName -> i.itemIDs)))}
+      val must = mustFields :+ getFilteringDateRange(query)
 
       val json =
         (
@@ -215,17 +235,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
                 ("should"->
                   allBoostedCorrelators.map { i =>
                     ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}
-
-                  ) ~
-                  ("must"->
-                    allFilteringCorrelators.map { i =>
-                      ("terms" -> (i.actionName -> i.itemIDs))}
-                    )
-                )
+                ) ~
+                ("must"-> must)
               )
+            )
           )
       val j = compact(render(json))
-      logger.info(s"Query: \n${j}\n")
+      //logger.info(s"Query: \n${j}\n")
       (compact(render(json)), alluserEvents._2)
     } catch {
       case e: IllegalArgumentException =>
@@ -335,6 +351,44 @@ class URAlgorithm(val ap: URAlgorithmParams)
     }
 
     (queryFilterFields ++ paramsFilterFields).distinct // de-dup and favor query fields
+  }
+
+  /** get all metadata fields that are filters (not boosts) */
+  /*
+    *          {
+    *            "constant_score": {
+    *              "filter": {
+    *                "range" : {
+    *                  "expiredate" : {
+    *                    "gte": "2015-08-15T11:28:45.114-07:00",
+    *                    "lt": "2015-08-20T11:28:45.114-07:00"
+    *                  }
+    *                }
+    *              }
+    *            }
+    *          }
+    */
+  def getFilteringDateRange( query: Query ): JValue = {
+
+    if(query.dateRange.nonEmpty && (query.dateRange.get.afterDate.nonEmpty || query.dateRange.get.beforeDate.nonEmpty)){
+      val name = query.dateRange.get.name
+      val before = query.dateRange.get.beforeDate
+      val after = query.dateRange.get.afterDate
+      val json =
+        (
+          ("constant_score" ->
+            ("filter" ->
+              ("range" ->
+                (name ->
+                  ("gt" -> after ) ~
+                  ("lt" -> before )
+                )
+              )
+            )
+          )
+        )
+      render(json)
+    } else JNothing
   }
 
 }

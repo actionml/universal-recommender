@@ -1,11 +1,16 @@
 package org.template
 
+import java.util.Date
+
 import grizzled.slf4j.Logger
 
 import io.prediction.controller.{PersistentModelLoader, PersistentModel}
 import io.prediction.data.storage.PropertyMap
 import org.apache.spark.rdd.RDD
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
+import org.joda.time.DateTime
+import org.json4s.JsonAST.JArray
+import org.json4s._
 import org.template.conversions.IndexedDatasetConversions
 import org.elasticsearch.spark._
 import org.apache.spark.SparkContext
@@ -41,24 +46,45 @@ class URModel(
     // do they need to be in Elasticsearch format
     logger.info("Converting cooccurrence matrices into correlators")
     val correlators = coocurrenceMatrices.map { case (actionName, dataset) =>
-      val db = dataset.matrix.nrow
-      val db2 = dataset.matrix.ncol
       dataset.toStringMapRDD(actionName)
     }
 
-    // convert the PropertyMap into Map[String, Seq[String]] for ES
+    // convert the PropertyMap into Map[String, Any] for ES
+    // todo: properties come in different types so this should check to make sure the Field has a defined type
     logger.info("Converting PropertyMap into Elasticsearch style rdd")
     val properties = fieldsRDD.map { case (item, pm ) =>
-      var m: Map[String, Seq[String]] = Map()
+      var m: Map[String, Any] = Map()
       for (key <- pm.keySet){
-        m = m  + (key -> pm.get[List[String]](key))
+        val k = key
+        val v = pm.get[JValue](key)
+        try{ // if we get something unexpected, add ignore and add nothing to the map
+          pm.get[JValue](key) match {
+            case JArray(list) => // assumes all lists are string tokens for bias
+              val l = list.map {
+                case JString(s) => s
+                case _ => ""
+              }
+              m = m + (key -> l)
+            case JString(s) => // assumes all single strings are dates!
+              val dateTime = new DateTime(s)
+              val date: java.util.Date = dateTime.toDate()
+              m = m + (key -> date)
+          }
+        } catch {
+          // todo: what exception can be generated above?
+          case e: ClassCastException => e
+          //got something we didn't expect so ignore it, put nothing in the map
+        }
       }
       (item, m)
     }
 
     // Elasticsearch takes a Map with all fields, not a tuple
     logger.info("Grouping all correlators into doc + fields for writing to index")
-    val esFields = groupAll((correlators :+ properties).filterNot(c => c.isEmpty())).map { case (item, map) =>
+    val esRDDs: List[RDD[(String, Map[String, Any])]] =
+      (correlators.asInstanceOf[ List[RDD[(String, Map[String, Any])]]] :+ properties).filterNot(c => c.isEmpty())
+    val esFields = groupAll(esRDDs).map { case (item, map) =>
+      // todo: every map's items must be checked for value type and converted before writing to ES
       val esMap = map + ("id" -> item)
       esMap
     }
@@ -76,43 +102,24 @@ class URModel(
     // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
     logger.info(s"Writing new ES style rdd to index: ${esIndexURI}")
     esFields.saveToEs (esIndexURI, Map("es.mapping.id" -> "id"))
-    //esFields.saveToEs (esIndexURI)
     // todo: check to see if a Flush is needed after writing all new data to the index
-    // esClient.admin().indices().flush(new FlushRequest(params.indexName)).actionGet()
     logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
     true
   }
   
-  def groupAll( fields: Seq[RDD[(String, (Map[String, Seq[String]]))]]): RDD[(String, (Map[String, Seq[String]]))] = {
+  def groupAll( fields: Seq[RDD[(String, (Map[String, Any]))]]): RDD[(String, (Map[String, Any]))] = {
     if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
-      fields.head.cogroup[Map[String, Seq[String]]](groupAll(fields.drop(1))).map { case (key, pairMapSeqs) =>
+      fields.head.cogroup[Map[String, Any]](groupAll(fields.drop(1))).map { case (key, pairMapSeqs) =>
         // to be safe merge all maps but should only be one per rdd element
-        val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Seq[String]])(_ ++ _)
-        val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Seq[String]])(_ ++ _)
+        val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Any])(_ ++ _)
+        val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Any])(_ ++ _)
         val fullMap = rdd1Maps ++ rdd2Maps
-/*        if (pairMapSeqs._1.nonEmpty && pairMapSeqs._2.nonEmpty)
-          (key, pairMapSeqs._1.head ++ pairMapSeqs._2.head)
-        else if (pairMapSeqs._1.isEmpty && pairMapSeqs._2.nonEmpty)
-          (key, pairMapSeqs._2.head)// only ever one map per list since they were from dictinct rdds
-        else if (pairMapSeqs._1.nonEmpty && pairMapSeqs._2.isEmpty)
-          (key, pairMapSeqs._1.head)// only ever one map per list since they were from dictinct rdds
-        else
-          (key, Map.empty[String, Seq[String]])// yikes, this should never happen but ok, check
-*/
         (key, fullMap)
       }
     } else fields.head
   }
 
   override def toString = {
-  /*s"userFeatures: [${userFeatures.count()}]" +
-    s"(${userFeatures.take(2).toList}...)" +
-    s" productFeatures: [${productFeatures.count()}]" +
-    s"(${productFeatures.take(2).toList}...)" +
-    s" userStringIntMap: [${userStringIntMap.size}]" +
-    s"(${userStringIntMap.take(2)}...)" +
-    s" itemStringIntMap: [${itemStringIntMap.size}]" +
-    s"(${itemStringIntMap.take(2)}...)" */
     s"URModel in Elasticsearch at index: ${indexName}"
   }
 

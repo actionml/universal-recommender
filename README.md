@@ -123,9 +123,13 @@ Query fields determine what data is used to match when returning recs. Some fiel
           “bias”: -maxFloat..maxFloat 
         },...
       ]
+      "dateRange": {
+        "name": "dateFieldname",
+        "beforeDate": "latestDate",
+        "afterDate": "earliestDate"
+      }
       “blacklistItems”: [“itemId1”, “itemId2”, ...]
       "returnSelf": true | false,
-      “currentTime”: <current_time >, // ISO8601 "2015-01-03T00:12:34.000Z"
     }
 
 * **user**: optional, contains a unique id for the user. This may be a user not in the **training**: data, so a new or anonymous user who has an anonymous id. All user history captured in near realtime can be used to influence recommendations, there is no need to retrain to enable this.
@@ -135,6 +139,7 @@ Query fields determine what data is used to match when returning recs. Some fiel
 * **fields**: optional, array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **num**: optional max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
 * **blacklistItems**: optional. Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
+* **dateRange** optional, default is not range filter. One of the bound can be omitted but not both. Values for the `beforeDate` and `afterDate` are strings in ISO 8601 format.
 * **returnSelf**: optional boolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
  
 All query params are optional, the only rule is that there must be an item or user specified. Defaults are either noted or taken from algorithm values, which themselves may have defaults. This allows very simple queries for the simple, most used cases.

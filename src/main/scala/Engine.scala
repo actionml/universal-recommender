@@ -28,16 +28,17 @@ case class Query(
 case class Field( // no optional values for fields, whne specified
     name: String, // name of metadata field
     values: Array[String], // fields can have multiple values like tags of a single value as when using hierarchical
-    // taxonomies
-    bias: Float) // any positive value is a boost, negative is a filter
+    // taxo)omies
+    bias: Float)// any positive value is a boost, negative is a filter
   extends Serializable
+
 
 /** Used to specify how Fields are represented in engine.json */
 case class DateRange( // no optional values for fields, whne specified
     name: String, // name of item property for the date comparison
-    beforeDate: String, // empty strings means no filter
-    afterDate: String,
-    format: Option[String] = None) // warning, not used yet, supports only iso standard for now
+    beforeDate: Option[String], // empty strings means no filter
+    afterDate: Option[String]) // both empty should be ignored
+    //format: Option[String] = None) // todo: warning!, not used yet, supports only iso standard for now
   extends Serializable
 
 /** results of a MMRAlgoritm.predict */

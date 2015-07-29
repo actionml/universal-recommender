@@ -6,6 +6,7 @@ import predictionio
 import argparse
 import random
 import datetime
+import pytz
 
 RATE_ACTIONS_DELIMITER = ","
 SEED = 3
@@ -14,7 +15,8 @@ def import_events(client, file):
   f = open(file, 'r')
   random.seed(SEED)
   count = 0
-  event_date = datetime.datetime.now().isoformat()
+  event_date = datetime.datetime.now()
+  #event_date = datetime.now(pytz.utc)
   date_increment = datetime.timedelta(days = 1)
   print "Importing data..."
 
@@ -46,10 +48,10 @@ def import_events(client, file):
         event=data[1],
         entity_type="item",
         entity_id=data[0],
-        properties= { "category": [data[2]], "expiredate": event_date}
+        properties= { "category": [data[2]], "expiredate": event_date.isoformat() + "Z"}
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
-            " given expiration date of: " + event_date
+            " properties/expiredate: " + event_date.isoformat() + "Z"
     count += 1
     event_date += date_increment
   f.close()
