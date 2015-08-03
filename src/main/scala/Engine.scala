@@ -17,6 +17,8 @@ case class Query(
     item: Option[String] = None, // must be a user or item id
     itemBias: Option[Float] = None, // default: whatever is in algorithm params or 1
     fields: Option[List[Field]] = None, // default: whatever is in algorithm params or None
+    currentDate: Option[String] = None, // if used will override dateRange filter, currentDate must lie between the item's
+    // expireDateName value and availableDateName value, all are ISO 8601 dates
     dateRange: Option[DateRange] = None, // optional before and after filter applied to a date field
     blacklistItems: Option[List[String]] = None, // default: whatever is in algorithm params or None
     returnSelf: Option[Boolean] = None,// means for an item query should the item itself be returned, defaults
@@ -32,13 +34,12 @@ case class Field( // no optional values for fields, whne specified
     bias: Float)// any positive value is a boost, negative is a filter
   extends Serializable
 
-
-/** Used to specify how Fields are represented in engine.json */
-case class DateRange( // no optional values for fields, whne specified
-    name: String, // name of item property for the date comparison
-    before: Option[String], // empty strings means no filter
-    after: Option[String]) // both empty should be ignored
-    //format: Option[String] = None) // todo: warning!, not used yet, supports only iso standard for now
+/** Used to specify the date range for a query */
+case class DateRange(
+  name: String, // name of item property for the date comparison
+  before: Option[String], // empty strings means no filter
+  after: Option[String]) // both empty should be ignored
+//format: Option[String] = None) // todo: warning!, not used yet, supports only iso standard for now
   extends Serializable
 
 /** results of a MMRAlgoritm.predict */

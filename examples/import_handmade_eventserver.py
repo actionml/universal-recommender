@@ -15,9 +15,12 @@ def import_events(client, file):
   f = open(file, 'r')
   random.seed(SEED)
   count = 0
-  event_date = datetime.datetime.now()
+  # year, month, day[, hour[, minute[, second[
+  event_date = datetime.datetime(2015, 8, 13, 12, 24, 41)
   #event_date = datetime.now(pytz.utc)
   date_increment = datetime.timedelta(days = 1)
+  available_date = event_date + datetime.timedelta(days = -2)
+  expire_date = event_date + datetime.timedelta(days = 2)
   print "Importing data..."
 
   for line in f:
@@ -48,12 +51,14 @@ def import_events(client, file):
         event=data[1],
         entity_type="item",
         entity_id=data[0],
-        properties= { "category": [data[2]], "expiredate": event_date.isoformat() + "Z"}
+        properties= { "category": [data[2]], "expiredate": expire_date.isoformat(), "availabledate": available_date.isoformat()}
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
-            " properties/expiredate: " + event_date.isoformat() + "Z"
+            " properties/availabledate: " + available_date.isoformat() + \
+            " properties/expiredate: " + expire_date.isoformat()
     count += 1
-    event_date += date_increment
+    expire_date += date_increment
+    available_date += date_increment
   f.close()
   print "%s events are imported." % count
 

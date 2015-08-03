@@ -21,6 +21,7 @@ class URModel(
     coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
     fieldsRDD: RDD[(String, PropertyMap)],
     indexName: String,
+    dateName: String,
     nullModel: Boolean = false)
     // a little hack to allow a dummy model used to save but not
     // retrieve (see companion object's apply)
@@ -65,14 +66,16 @@ class URModel(
                 case _ => ""
               }
               m = m + (key -> l)
-            case JString(s) => // assumes all single strings are dates!
-              val dateTime = new DateTime(s)
-              val date: java.util.Date = dateTime.toDate()
-              m = m + (key -> date)
+            case JString(s) => // name for this field is in engine params
+              if ( key == dateName) {
+                val dateTime = new DateTime(s)
+                val date: java.util.Date = dateTime.toDate()
+                m = m + (key -> date)
+              }
           }
         } catch {
-          // todo: what exception can be generated above?
           case e: ClassCastException => e
+          case e: IllegalArgumentException => e
           //got something we didn't expect so ignore it, put nothing in the map
         }
       }

@@ -36,7 +36,13 @@ If there are timeouts, enable the delays that are commented out in the script&md
 
 These take the form of boosts and filters where a neutral bias is 1.0. The importance of some part of the query may be boosted by a positive non-zero float. If the bias is < 0 it is considered a filter&mdash;meaning no recommendation is made that lacks the filter value(s). One example of a filter is where it may make sense to show only "electronics" recommendations when the user is viewing an electronics product. Biases are often applied to a list of data, for instance the user is looking at a video page with a cast of actors. The "cast" list is metadata attached to items and a query can show "people who liked this, also liked these" type recs but also include the current cast boosted by 0.5. This can be seen as showing similar item recs but using the cast in the query in a way that will not overpower the similar items (since by default they have a neutral 1.0 boost).
 
+###Dates
 
+Dates can be used to filter recommendations in one of two ways. The methods allow the date range to be attahed to every item and checked against the current date or allow an item's date to be checked to be within a range specified in the query. One or the other of these methods can be employed in a recommendations query as long as the correct item properties have been set.
+
+ 1. The recs query can specific a `dateRange` that must encompass a date property for all values. If an item has no date property it will not be returned as a recommendation. The date field name is specified in the engine.json `date` option. The fields should contain an ISO 8601 formatted date string.
+ 2. The items may contain an `expireDate` field and/or an `availableDate` field. Their names are specified in the engine.json. Then when a query contains a field called `currentDate` no recommendations will be returned which have expired or are not yet available. 
+ 
 ###Engine.json
 
 This file allows the user to describe and set parameters that control the engine operations. Some of the parameters work as defaults values for every query and can be overridden or added to in the query.
@@ -75,6 +81,9 @@ This file allows the user to describe and set parameters that control the engine
             "maxQueryEvents": 500,
             "num": 20,
             "seed": 3,
+            "expireDateName": "expireDateFieldName",
+            "availableDateName": "availableDateFieldName",
+            "dateName": "dateFieldName",
             "userbias": -maxFloat..maxFloat,
             "itembias": -maxFloat..maxFloat,
             "returnSelf": true | false,
@@ -104,6 +113,9 @@ The “params” section controls most of the features of the UR. Possible value
 * **fields**: optional, default = none. An array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **userBias**: optional, default = none. Amount to favor user history in creating recs, 1 is neutral, and negative number means to use as a filter so the user history must be used i recs, any positive number greater than one will boost the importance of user history in recs.
 * **itemBias**: optional, default = none. Same as userbias but applied to similar items to the item supplied in the query.
+* **expireDateName** optional, name of the item properties field that contains the date the item expires or is unavailable to recommend.
+* **availableDateName** optional, name of the item properties field that contains the date the item is available to recommend. 
+* **dateName** optional, a date or timestamp used in a `dateRange` recommendations filter.
 * **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
 
 ###Queries
@@ -125,9 +137,10 @@ Query fields determine what data is used to match when returning recs. Some fiel
       ]
       "dateRange": {
         "name": "dateFieldname",
-        "beforeDate": "latestDate",
-        "afterDate": "earliestDate"
-      }
+        "beforeDate": "2015-09-15T11:28:45.114-07:00",
+        "afterDate": "2015-08-15T11:28:45.114-07:00"
+      },
+      "currentDate": "2015-08-15T11:28:45.114-07:00",
       “blacklistItems”: [“itemId1”, “itemId2”, ...]
       "returnSelf": true | false,
     }
@@ -139,7 +152,8 @@ Query fields determine what data is used to match when returning recs. Some fiel
 * **fields**: optional, array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **num**: optional max number of recs to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recs.
 * **blacklistItems**: optional. Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recs. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
-* **dateRange** optional, default is not range filter. One of the bound can be omitted but not both. Values for the `beforeDate` and `afterDate` are strings in ISO 8601 format.
+* **dateRange** optional, default is not range filter. One of the bound can be omitted but not both. Values for the `beforeDate` and `afterDate` are strings in ISO 8601 format. A date range is ignored if **currentDate** is also specified in the query.
+* **currentDate** optional, must be specified if used. Overrides the **dateRange** is both are in the query.
 * **returnSelf**: optional boolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
  
 All query params are optional, the only rule is that there must be an item or user specified. Defaults are either noted or taken from algorithm values, which themselves may have defaults. This allows very simple queries for the simple, most used cases.
@@ -182,6 +196,7 @@ This returns items that are similar to the query item, and blacklist and backfil
 This returns items based on user "xyz" history filtered by categories and boosted to favor more genre specific items. The values for fields have been attached to items with $set events where the “name” corresponds to a doc field and the “values” correspond to the contents of the field. The “bias” is used to indicate a filter or a boost. For Solr or Elasticsearch the boost is sent as-is to the engine and it’s meaning is determined by the engine (Lucene in either case). As always the blacklist and backfill use the defaults in engine.json.
 
 ###Date ranges as query filters
+When the a date is stored in the items properties it can be used in a date range query. This is most often used by the app server since it may know what the range is, while a client query may only know the current date and so use the "Current Date" filter below.
 
     {
 	  “user”: “xyz”, 
@@ -202,8 +217,28 @@ This returns items based on user "xyz" history filtered by categories and booste
         "after": "2015-08-20T11:28:45.114-07:00       
       }
 	}
+	
 
 Items are assumed to have a field of the same `name` that has a date associated with it using a `$set` event. The query will return only those recs where the date field is in reange. Either date bound can be omitted for a on-sided range. The range applies to all returned recs, even those for popular items. 	
+
+###Current Date as a query filter
+When setting an available date and expire date on items, the current date can be used as a filter, the UR will check that the current date is before the expire date, and after or equal to the available date. You can use either expire date or available date or both. The names of these item fields is specified in the engin.json.
+
+    {
+	  “user”: “xyz”, 
+	  “fields”: [
+	    {
+	      “name”: “categories”
+	      “values”: [“series”, “mini-series”],
+	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
+	    },{
+	      “name”: “genre”,
+	      “values”: [“sci-fi”, “detective”]
+	      “bias”: 1.2 // boost/favor recs with the `genre’ = `sci-fi` or ‘detective’
+	    }
+	  ],
+      "currentDate": "2015-08-15T11:28:45.114-07:00"  
+	}
 
 ###Contextual Personalized with Similar Items
 

@@ -25,7 +25,10 @@
         "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
-        "eventNames": ["purchase", "view"]
+        "eventNames": ["purchase", "view"],
+        "expireDateName": "expiredate",
+        "availableDateName": "availabledate",
+        "dateName": "date"
       }
     }
   ]
