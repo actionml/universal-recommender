@@ -125,6 +125,32 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *            }
     *          }
     *        ],
+    * "must": [
+    {
+      "constant_score": {
+        "filter": {
+          "range": {
+            "availabledate": {
+              "lte": "2015-08-30T12:24:41-07:00"
+            }
+          }
+        }z
+        "boost": 0
+      }
+    },
+    {
+      "constant_score": {
+        "filter": {
+          "range": {
+            "expiredate": {
+              "gt": "2015-08-30T12:24:41-07:00"
+            }
+          }
+        },
+        "boost": 0
+      }
+    }
+  ]
     *        "must": [
     *          {
     *            "terms": {
@@ -140,7 +166,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *                    "lt": "2015-08-20T11:28:45.114-07:00"
     *                  }
     *                }
-    *              }
+    *              }, "boost": 0
     *            }
     *          }
     *        ]
@@ -380,9 +406,23 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *                    "lt": "2015-08-20T11:28:45.114-07:00"
     *                  }
     *                }
-    *              }
+    *              },
+    *              "boost": 0
     *            }
     *          }
+    *
+    *          {
+    *            "constant_score": {
+    *              "filter": {
+    *                "range": {
+    *                  "expiredate": {
+    *                    "gt": "2015-08-30T12:24:41-07:00"
+    *                  }
+    *                }
+    *              },
+    *              "boost": 0
+    *           }
+    *m        }
     */
   def getFilteringDateRange( query: Query ): List[JValue] = {
     //todo: move the Jvalue DSL into functiion to DRY code
@@ -413,7 +453,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
             ("filter" ->
               ("range" ->
                 (expireDate ->
-                  ("gt" -> currentDate))))))
+                  ("gt" -> currentDate))) ~
+              ("boost" -> 0))))
       json = json :+ render(expire)
     }
 
@@ -429,7 +470,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
               ("range" ->
                 (name ->
                   ("gt" -> after ) ~
-                  ("lt" -> before ))))))
+                  ("lt" -> before ))) ~
+              ("boost" -> 0))))
       json = json :+ render(range)
     }
     json
