@@ -21,7 +21,7 @@ class URModel(
     coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
     fieldsRDD: RDD[(String, PropertyMap)],
     indexName: String,
-    dateName: String,
+    dateNames: List[String] = List.empty[String],
     nullModel: Boolean = false)
     // a little hack to allow a dummy model used to save but not
     // retrieve (see companion object's apply)
@@ -53,6 +53,7 @@ class URModel(
     // convert the PropertyMap into Map[String, Any] for ES
     // todo: properties come in different types so this should check to make sure the Field has a defined type
     logger.info("Converting PropertyMap into Elasticsearch style rdd")
+    val closureDateNames = dateNames
     val properties = fieldsRDD.map { case (item, pm ) =>
       var m: Map[String, Any] = Map()
       for (key <- pm.keySet){
@@ -67,7 +68,7 @@ class URModel(
               }
               m = m + (key -> l)
             case JString(s) => // name for this field is in engine params
-              if ( key == dateName) {
+              if (closureDateNames.contains(key)) { // one of the date fields
                 val dateTime = new DateTime(s)
                 val date: java.util.Date = dateTime.toDate()
                 m = m + (key -> date)
@@ -143,7 +144,7 @@ object URModel
     */
   def apply(id: String, params: URAlgorithmParams, sc: Option[SparkContext]): URModel = {
     // todo: need changes in PIO to remove the need for this
-    val urm = new URModel(null, null, null, true)
+    val urm = new URModel(null, null, null, nullModel =  true)
     logger.info("Created dummy null model")
     urm
   }

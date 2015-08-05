@@ -101,7 +101,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     logger.info("Correlators created now putting into URModel")
-    new URModel(cooccurrenceCorrelators, data.fieldsRDD, ap.indexName, ap.dateName.getOrElse(""))
+    val dateNames: List[String] = List(ap.dateName.getOrElse(""), ap.availableDateName.getOrElse(""),
+      ap.expireDateName.getOrElse(""))
+    new URModel(cooccurrenceCorrelators, data.fieldsRDD, ap.indexName, dateNames = dateNames)
   }
 
   /** Return a list of items recommended for a user identified in the query
@@ -150,7 +152,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     * @param query contains query spec
     */
   def predict(model: URModel, query: Query): PredictedResult = {
-    logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
+    //logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
 
     val queryAndBlacklist = buildQuery(ap, query)
     val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
@@ -254,7 +256,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
                     ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}) ~
                 ("must"-> must))))
       val j = compact(render(json))
-      //logger.info(s"Query: \n${j}\n")
+      logger.info(s"Query: \n${j}\n")
       (compact(render(json)), alluserEvents._2)
     } catch {
       case e: IllegalArgumentException =>
@@ -331,6 +333,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
+      items = items.distinct
       BoostableCorrelators(action, items, userEventsBoost)// userBias may be None, which will cause no JSON output for this
     }
     (rActions, recentEvents)
