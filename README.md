@@ -6,13 +6,13 @@ The Universal Recommender (UR) is a Cooccurrence type that creates correlators f
 
  1. [Install the PredictionIO framework](https://docs.prediction.io/install/) **be sure to choose HBase and Elasticsearch** for storage. This template requires Elasticsearch.
  2. Make sure the PIO console and services are running, check with `pio status`
- 3. [Install this template](https://docs.prediction.io/start/download/) **be sure to specify this template** with `pio template get PredictionIO/template-scala-parallel-universal-recommendation`
+ 3. [Install this template](https://docs.prediction.io/start/download/) with `pio template get PredictionIO/template-scala-parallel-universal-recommendation`
  
 **To import and experiment with the simple example data**
 
 1. Create a new app name, change `appName` in `engine.json`
 2. Run `pio app new **your-new-app-name**`
-4. Import sample events by running `python data/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
+4. Import sample events by running `python examples/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
 3. The engine.json file in the root directory of your new UR template is set up for the data you just imported (make sure to create a new one for your data) Edit this file and change the `appName` parameter to match what you called the app in step #2
 5. Perform `pio build`, `pio train`, and `pio deploy`
 6. To execute some sample queries run `./examples/query-handmade.sh`

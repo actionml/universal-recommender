@@ -1,12 +1,12 @@
 {
-  "id": "default",
+  "id": "klout",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
       "name": "sample-handmade-data.txt",
-      "appName": "handmade",
-      "eventNames": ["purchase", "view"]
+      "appName": "yipjustin-exp1",
+      "eventNames": ["opened", "clicked", "klout_topic"]
     }
   },
   "sparkConf": {
@@ -22,12 +22,13 @@
       "comment": "setup for example 'handmade' data, make sure to change for your needs",
       "name": "ur",
       "params": {
-        "appName": "handmade",
-        "indexName": "urindex",
+        "appName": "yipjustin-exp1",
+        "indexName": "urindex_klout",
         "typeName": "items",
-        "eventNames": ["purchase", "view"]
+        "blacklistEvents": [],
+        "maxCorrelatorsPerEventType": 100,
+        "eventNames": ["opened", "clicked", "klout_topic"]
       }
     }
   ]
 }
-

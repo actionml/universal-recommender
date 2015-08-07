@@ -46,6 +46,8 @@ class URModel(
       dataset.toStringMapRDD(actionName)
     }
 
+    val allActions = coocurrenceMatrices.map(_._1)
+
     // convert the PropertyMap into Map[String, Seq[String]] for ES
     logger.info("Converting PropertyMap into Elasticsearch style rdd")
     val properties = fieldsRDD.map { case (item, pm ) =>
@@ -56,6 +58,12 @@ class URModel(
       (item, m)
     }
 
+    val allPropKeys = properties.flatMap(_._2.keySet).distinct.collect()
+
+    // these need to be indexed with "not_analyzed" and no norms so have to
+    // collect all field names before ES index create
+    val allFields = (allActions ++ allPropKeys).distinct // shouldn't need distinct but it's fast
+
     // Elasticsearch takes a Map with all fields, not a tuple
     logger.info("Grouping all correlators into doc + fields for writing to index")
     val esFields = groupAll((correlators :+ properties).filterNot(c => c.isEmpty())).map { case (item, map) =>
@@ -63,21 +71,16 @@ class URModel(
       esMap
     }
 
-
-    // May specifiy a remapping parameter to put certain fields in different places in the ES document
-    // todo: need to write, then hot swap index to live index, prehaps using aliases? To start let's delete index and
-    // recreate it, no swapping yet
     val esIndexURI = s"/${params.indexName}/${params.typeName}"
     logger.info(s"Deleting index: ${esIndexURI}")
     esClient.deleteIndex(params.indexName)
     logger.info(s"Creating new index: ${esIndexURI}")
-    esClient.createIndex(params.indexName)
+    esClient.createIndex(params.indexName, params.typeName, allFields)
 
     // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
     logger.info(s"Writing new ES style rdd to index: ${esIndexURI}")
     esFields.saveToEs (esIndexURI, Map("es.mapping.id" -> "id"))
-    //esFields.saveToEs (esIndexURI)
-    // todo: check to see if a Flush is needed after writing all new data to the index
+    // todo: check to see if a flush or refresh is needed after writing all new data to the index
     // esClient.admin().indices().flush(new FlushRequest(params.indexName)).actionGet()
     logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
     true

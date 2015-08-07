@@ -214,18 +214,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
               ("bool"->
                 ("should"->
                   allBoostedCorrelators.map { i =>
-                    ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}
-
-                  ) ~
-                  ("must"->
-                    allFilteringCorrelators.map { i =>
-                      ("terms" -> (i.actionName -> i.itemIDs))}
-                    )
-                )
-              )
-          )
-      val j = compact(render(json))
-      logger.info(s"Query: \n${j}\n")
+                    ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}) ~
+                ("must"->
+                  allFilteringCorrelators.map { i =>
+                    ("terms" -> (i.actionName -> i.itemIDs))}))))
+       val j = compact(render(json))
+      // logger.info(s"Query: \n${j}\n")
       (compact(render(json)), alluserEvents._2)
     } catch {
       case e: IllegalArgumentException =>
@@ -310,7 +304,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
-      BoostableCorrelators(action, items, userEventsBoost)// userBias may be None, which will cause no JSON output for this
+      // userBias may be None, which will cause no JSON output for this
+      BoostableCorrelators(action, items.distinct, userEventsBoost)
     }
     (rActions, recentEvents)
   }
