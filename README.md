@@ -213,6 +213,10 @@ To begin using on new data with an engine that has been used with sample data or
 
 ## Versions
 
+### v0.1.1
+
+ - ids are now exact matches, for v0.1.0 the ids had to be lower case and were subject to tokenizing analysis so using that version is not recommended.
+
 ### v0.1.0
 
  - user and item based queries supported
