@@ -178,7 +178,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     * @param query contains query spec
     */
   def predict(model: URModel, query: Query): PredictedResult = {
-    //logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
+    logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
 
     val queryAndBlacklist = buildQuery(ap, query)
     val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
@@ -269,7 +269,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultURAlgorithmParams.DefaultNum))
 
       val mustFields: List[JValue] = allFilteringCorrelators.map { i =>
-        render(("terms" -> (i.actionName -> i.itemIDs)))}.toList
+        render(("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> 0)))}.toList
       val must: List[JValue] = mustFields ::: filteringDateRange
 
       val json =
@@ -282,7 +282,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
                     ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}) ~
                 ("must"-> must))))
       val j = compact(render(json))
-      logger.info(s"Query: \n${j}\n")
+      //logger.info(s"Query: \n${j}\n")
       (compact(render(json)), alluserEvents._2)
     } catch {
       case e: IllegalArgumentException =>
@@ -359,8 +359,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
           items = event.targetEntityId.get :: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
-      items = items.distinct
-      BoostableCorrelators(action, items, userEventsBoost)// userBias may be None, which will cause no JSON output for this
+      // userBias may be None, which will cause no JSON output for this
+      BoostableCorrelators(action, items.distinct, userEventsBoost)
     }
     (rActions, recentEvents)
   }
@@ -433,46 +433,97 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val availableDate = ap.availableDateName.get // never None
       val currentDate = query.currentDate.get
 
-      val available =
-        (
+      val available = s"""
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "${availableDate}": {
+        |          "lte": "${currentDate}"
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
+        """.stripMargin
+        /*(
           ("constant_score" ->
             ("filter" ->
               ("range" ->
                 (availableDate ->
                   ("lte" -> currentDate))))))
-
-      json = json :+ render(available)
+*/
+      json = json :+ parse(available)
     }
 
     if (query.currentDate.nonEmpty && ap.expireDateName.nonEmpty){
       val expireDate = ap.expireDateName.get
       val currentDate = query.currentDate.get
-      val expire =
-        (
+      val expire = s"""
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "${expireDate}": {
+        |          "gt": "${currentDate}"
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
+        """.stripMargin
+/*        (
           ("constant_score" ->
             ("filter" ->
               ("range" ->
                 (expireDate ->
                   ("gt" -> currentDate))) ~
               ("boost" -> 0))))
-      json = json :+ render(expire)
+*/
+      json = json :+ parse(expire)
     }
 
     if (query.currentDate.isEmpty && query.dateRange.nonEmpty &&
       (query.dateRange.get.after.nonEmpty || query.dateRange.get.before.nonEmpty)) {
       val name = query.dateRange.get.name
-      val before = query.dateRange.get.before
-      val after = query.dateRange.get.after
-      val range =
-        (
-          ("constant_score" ->
-            ("filter" ->
-              ("range" ->
-                (name ->
-                  ("gt" -> after ) ~
-                  ("lt" -> before ))) ~
-              ("boost" -> 0))))
-      json = json :+ render(range)
+      val before = query.dateRange.get.before.getOrElse("")
+      val after = query.dateRange.get.after.getOrElse("")
+      val rangeStart = s"""
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "${name}": {
+        """.stripMargin
+
+      val rangeAfter = s"""
+        |          "gt": "${after}"
+        """.stripMargin
+
+      val rangeBefore = s"""
+        |          "lt": "${before}"
+        """.stripMargin
+
+      val rangeEnd = s"""
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
+        """.stripMargin
+
+      var range = rangeStart
+      if (!after.isEmpty) {
+        range += rangeAfter
+        if (!before.isEmpty) range += ","
+      }
+      if (!before.isEmpty) range += rangeBefore
+      range += rangeEnd
+
+      json = json :+ parse(range)
     }
     json
   }

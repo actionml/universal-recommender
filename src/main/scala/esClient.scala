@@ -12,9 +12,15 @@ import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.get.GetResponse
 import org.json4s.jackson.JsonMethods._
 
-/** Defines methods to use on Elasticsearch
-  * Todo: is an object the right packaging given the PIO workflow?
+/** Elasticsearch notes:
+  * 1) every query clause wil laffect scores unless it has a constant_score and boost: 0
+  * 2) the Spark index writer is fast but must assemble all data for the index before the write occurs
+  * 3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
+  * 4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
+  *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
   */
+
+/** Defines methods to use on Elasticsearch. */
 object esClient {
   @transient lazy val logger = Logger[this.type]
 
@@ -44,14 +50,55 @@ object esClient {
   }
 
   /** Creates a new empty index in Elasticsearch
-    *
+    *"properties": {
+                "type" : "string",
+                "index" : "not_analyzed",
+                "norms" : {
+                    "enabled" : false
+                }
+            }
     * @param indexName elasticsearch name
     * @param refresh should the index be refreshed so the create is committed
     * @return true if all is well
     */
-  def createIndex(indexName: String, refresh: Boolean = false): Boolean = {
+  def createIndex(
+    indexName: String,
+    indexType: String = "items",
+    fieldNames: List[String],
+    refresh: Boolean = false): Boolean = {
     if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists()) {
-      val create = client.admin().indices().create(new CreateIndexRequest(indexName)).actionGet()
+      var mappings = """
+        |{
+        |  "properties": {
+        """.stripMargin.replace("\n", "")
+
+      val mappingsField = """
+        |    : {
+        |      "type": "string",
+        |      "index": "not_analyzed",
+        |      "norms" : {
+        |        "enabled" : false
+        |      }
+        |    },
+      """.stripMargin.replace("\n", "")
+
+      val mappingsTail = """
+        |    "id": {
+        |      "type": "string",
+        |      "index": "not_analyzed",
+        |      "norms" : {
+        |        "enabled" : false
+        |      }
+        |    }
+        |  }
+        |}
+      """.stripMargin.replace("\n", "")
+
+      fieldNames.foreach(mappings += _ + mappingsField)
+      mappings += mappingsTail
+
+      val cir = new CreateIndexRequest(indexName).mapping("items",mappings)
+      val create = client.admin().indices().create(cir).actionGet()
       if (!create.isAcknowledged) {
         logger.info(s"Index ${indexName} wasn't created, but may have quietly failed.")
       } else {

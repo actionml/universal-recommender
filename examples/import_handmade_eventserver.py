@@ -9,7 +9,7 @@ import datetime
 import pytz
 
 RATE_ACTIONS_DELIMITER = ","
-SEED = 3
+SEED = 1
 
 
 def import_events(client, file):
@@ -48,17 +48,41 @@ def import_events(client, file):
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2]
     elif (data[1] == "$set"):  # must be a set event
-      client.create_event(
-        event=data[1],
-        entity_type="item",
-        entity_id=data[0],
-        properties={"category": [data[2]], "expiredate": expire_date.isoformat(),
-                    "availabledate": available_date.isoformat(), "date": event_date.isoformat()}
-      )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
-            " properties/availabledate: " + available_date.isoformat() + \
-            " properties/date: " + event_date.isoformat() + \
-            " properties/expiredate: " + expire_date.isoformat()
+      date_choice = random.randint(0, 2)
+      if (date_choice == 2): # both bounds and date for daterange
+        client.create_event(
+          event=data[1],
+          entity_type="item",
+          entity_id=data[0],
+          properties={"category": [data[2]], "expiredate": expire_date.isoformat(),
+                      "availabledate": available_date.isoformat(), "date": event_date.isoformat()}
+        )
+        print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
+              " properties/availabledate: " + available_date.isoformat() + \
+              " properties/date: " + event_date.isoformat() + \
+              " properties/expiredate: " + expire_date.isoformat()
+      elif (date_choice == 1): # available bound and date for daterange
+        client.create_event(
+          event=data[1],
+          entity_type="item",
+          entity_id=data[0],
+          properties={"category": [data[2]],
+                      "availabledate": available_date.isoformat(), "date": event_date.isoformat()}
+        )
+        print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
+              " properties/availabledate: " + available_date.isoformat() + \
+              " properties/date: " + event_date.isoformat()
+      else: # expire bound and date for daterange
+        client.create_event(
+          event=data[1],
+          entity_type="item",
+          entity_id=data[0],
+          properties={"category": [data[2]], "expiredate": expire_date.isoformat(),
+                      "date": event_date.isoformat()}
+        )
+        print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
+              " properties/date: " + event_date.isoformat() + \
+              " properties/expiredate: " + expire_date.isoformat()
     count += 1
     expire_date += date_increment
     event_date += date_increment

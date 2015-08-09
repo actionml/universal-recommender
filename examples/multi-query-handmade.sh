@@ -268,59 +268,54 @@ echo ""
 
 echo ""
 echo ""
-echo "Warning: for the date range queries to work you must substitude dates that fit in the range when the events were imported"
+echo "Warning: for the date range queries to work you must substitude dates that fit in the range when the events were imported and this is fixed in examples/import_handmade_eventserver.py"
 echo ""
-echo "Recommendations for user: u1, narrow date range before 8/16 and after 8/14"
+echo "Recommendations for user: u1, no date range"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
-    "dateRange":{
-        "name": "expiredate",
-        "before": "2015-08-16T11:28:45.114-07:00",
-        "after": "2015-08-14T11:28:45.114-07:00"
-    }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u1 after 8/12 so all"
+echo "Recommendations for user: u1 after 8-12 so all"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
     "dateRange":{
-        "name": "expiredate",
+        "name": "date",
         "after": "2015-08-12T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u1 before 8/18 so all"
+echo "Recommendations for user: u1 before 10-01 so all"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
     "dateRange":{
-        "name": "expiredate",
-        "before": "2015-08-18T11:28:45.114-07:00"
+        "name": "date",
+        "before": "2015-10-01T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, no filter, narrow date range before 8/16 and after 8/14"
+echo "Recommendations for user: u1, no filter, narrow date range before 8/31 and after 8/02"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
     "dateRange":{
-        "name": "expiredate",
-        "before": "2015-08-16T11:28:45.114-07:00",
-        "after": "2015-08-14T11:28:45.114-07:00"
+        "name": "date",
+        "before": "2015-08-31T11:28:45.114-07:00",
+        "after": "2015-09-02T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, 'tablets' filter, narrow date range before 8/16 and after 8/14"
+echo "Recommendations for user: u1, 'tablets' filter, narrow date range before 8/31 and after 8/02"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -330,15 +325,15 @@ curl -H "Content-Type: application/json" -d '
         "bias": -2
     }],
     "dateRange":{
-        "name": "expiredate",
-        "before": "2015-08-16T11:28:45.114-07:00",
-        "after": "2015-08-14T11:28:45.114-07:00"
+        "name": "date",
+        "before": "2015-08-31T11:28:45.114-07:00",
+        "after": "2015-09-02T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u3, 'phones' boost, wide date range before 8/18 and after 8/13"
+echo "Recommendations for user: u3, 'phones' boost, wide date range before 9/05 and after 8/13"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u3",
@@ -348,10 +343,41 @@ curl -H "Content-Type: application/json" -d '
         "bias": 2
     }],
     "dateRange":{
-        "name": "expiredate",
-        "before": "2015-08-18T11:28:45.114-07:00",
+        "name": "date",
+        "before": "2015-09-05T11:28:45.114-07:00",
         "after": "2015-08-13T11:28:45.114-07:00"
     }
+}' http://localhost:8000/queries.json
+echo ""
+
+
+echo ""
+echo "Recommendations for user: u1 with no date range, should be: galaxy, nexus, surface"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "num": 10
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u1, should return nexus only. Note that items with a missing range in their properties will never be returned by this query"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "num": 10,
+    "currentDate": "2015-09-02T12:24:41-07:00"
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u1, should return nexus only. Note that items with a missing range in their properties will never be returned by this query"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "num": 10,
+    "currentDate": "2015-08-30T12:24:41-07:00"
 }' http://localhost:8000/queries.json
 echo ""
 

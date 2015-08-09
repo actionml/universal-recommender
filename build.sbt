@@ -9,8 +9,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % "1.3.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.3.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
-  // Mahout's Spark code is a managed snapshot in lib/
-  // Mahout's Spark code
+  // Mahout's Spark libs
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion,
   "org.apache.mahout" %% "mahout-spark" % mahoutVersion
     exclude("org.apache.spark", "spark-core_2.10"),
@@ -18,6 +17,7 @@ libraryDependencies ++= Seq(
   "org.apache.mahout"  % "mahout-hdfs" % mahoutVersion
     exclude("com.thoughtworks.xstream", "xstream")
     exclude("org.apache.hadoop", "hadoop-client"),
+  // other external libs
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
   "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.0.Beta4"
@@ -27,8 +27,6 @@ libraryDependencies ++= Seq(
 )
 
 resolvers += Resolver.mavenLocal
-
-resolvers += "mahout 0.11.0 rc repo" at " https://repository.apache.org/content/repositories/orgapachemahout-1013"
 
 assemblyMergeStrategy in assembly := {
   case "plugin.properties" => MergeStrategy.discard

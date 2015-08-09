@@ -1,18 +1,18 @@
 # Universal Recommendation Template
 
-The Universal Recommender is a Cooccurrence type that creates correlators from several user actions, events, or profile information and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make use of any part of their user's clickstream or even profile and context information in making recommendations. TBD: several forms of popularity type backfill and content-based correlators for content based recs. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
+The Universal Recommender (UR) is a Cooccurrence type that creates correlators from several user actions, events, or profile information and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make use of any part of their user's clickstream or even profile and context information in making recommendations. TBD: several forms of popularity type backfill and content-based correlators for content based recs. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
 
 ##Quick Start
 
  1. [Install the PredictionIO framework](https://docs.prediction.io/install/) **be sure to choose HBase and Elasticsearch** for storage. This template requires Elasticsearch.
  2. Make sure the PIO console and services are running, check with `pio status`
- 3. [Install this template](https://docs.prediction.io/start/download/) **be sure to specify this template** with `pio template get PredictionIO/template-scala-parallel-universal-recommendation`
+ 3. [Install this template](https://docs.prediction.io/start/download/) with `pio template get PredictionIO/template-scala-parallel-universal-recommendation`
  
 **To import and experiment with the simple example data**
 
 1. Create a new app name, change `appName` in `engine.json`
 2. Run `pio app new **your-new-app-name**`
-4. Import sample events by running `python data/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
+4. Import sample events by running `python examples/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
 3. The engine.json file in the root directory of your new UR template is set up for the data you just imported (make sure to create a new one for your data) Edit this file and change the `appName` parameter to match what you called the app in step #2
 5. Perform `pio build`, `pio train`, and `pio deploy`
 6. To execute some sample queries run `./examples/query-handmade.sh`
@@ -20,6 +20,8 @@ The Universal Recommender is a Cooccurrence type that creates correlators from s
 If there are timeouts, enable the delays that are commented out in the script&mdash;for now. In the production environment the engines will "warm up" with caching and will execute queries much faster. Also all services can be configured or scaled to meet virtually any performance needs.
 
 ##What is a Universal Recommender
+
+The Universal Recommender (UR) will accept a range of data, auto correlate it, and allow for very flexible queries. The UR is different from most recommenders in these ways:
 
 * It takes a single very strong "primary" event type&mdash;one that clearly reflects a user's preference&mdash;and correlates any number of other event types to the primary event. This has the effect of using virtually any user action to recommend the primary action. Much of a user’s clickstream can be used to make recommendations. If a user has no history of the primary action (purchase for instance) but does have history of views, personalized recommendations for purchases can still be made. With user purchase history the recommendations become better. ALS-type recommenders have been used with event weights but except for ratings these often do not result in better performance.
 * It can boost and filter based on events or item metadata/properties. This means it can give personalized recs that are biased toward “SciFi” and filtered to only include “Promoted” items when the business rules call for this.
@@ -277,6 +279,16 @@ To begin using on new data with an engine that has been used with sample data or
 
 ## Versions
 
+### v-0.2.0
+
+ - date range filters implemented
+ - trending/popularity used for backfill when no other recs are returned by the query
+ - filters/bias < 0 caused scores to be altered in v0.1.1 fixed in this version so filters have no effect on scoring.
+
+### v0.1.1
+
+ - ids are now exact matches, for v0.1.0 the ids had to be lower case and were subject to tokenizing analysis so using that version is not recommended.
+
 ### v0.1.0
 
  - user and item based queries supported
@@ -285,14 +297,10 @@ To begin using on new data with an engine that has been used with sample data or
  - fast writing to Elasticsearch using Spark
  - convention over configuration for queries, defaults make simple/typical queries simple and overrides add greater expressiveness.
 
-### v-0.2.0
-
- - date range filters
- - trending/popularity used for backfill when no other recs are returned by the query
-
 ### Known issues
 
   - index dropped then refreshed in `pio train` so no need to redeploy if the server is running. This violates conventions for other templates but is actually good. It means we have a hot-swapped model. If there are server timeouts during train, for the refresh response or for ongoing queries, we may need to find optimizations.
+  - popularity fallback not implemented.
 
 ## References
 
