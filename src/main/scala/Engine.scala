@@ -36,10 +36,9 @@ case class Field( // no optional values for fields, whne specified
 
 /** Used to specify the date range for a query */
 case class DateRange(
-  name: String, // name of item property for the date comparison
-  before: Option[String], // empty strings means no filter
-  after: Option[String]) // both empty should be ignored
-//format: Option[String] = None) // todo: warning!, not used yet, supports only iso standard for now
+    name: String, // name of item property for the date comparison
+    before: Option[String], // empty strings means no filter
+    after: Option[String]) // both empty should be ignored
   extends Serializable
 
 /** results of a MMRAlgoritm.predict */

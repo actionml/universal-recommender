@@ -50,13 +50,14 @@ class URModel(
       dataset.toStringMapRDD(actionName)
     }
 
-    // convert the PropertyMap into Map[String, Any] for ES
-    // todo: properties come in different types so this should check to make sure the Field has a defined type
+    // getting action names since they will be ES fields
+    logger.info(s"Getting a list of action name strings")
     val allActions = coocurrenceMatrices.map(_._1)
 
+    logger.info(s"Ready to pass date fields names to closure ${dateNames}")
+    val closureDateNames = dateNames
     // convert the PropertyMap into Map[String, Seq[String]] for ES
     logger.info("Converting PropertyMap into Elasticsearch style rdd")
-    val closureDateNames = dateNames
     val properties = fieldsRDD.map { case (item, pm ) =>
       var m: Map[String, Any] = Map()
       for (key <- pm.keySet){
@@ -86,6 +87,7 @@ class URModel(
       (item, m)
     }
 
+    // only way to get all property names is to check all items in the rdd--ugh
     val allPropKeys = properties.flatMap(_._2.keySet).distinct.collect()
 
     // these need to be indexed with "not_analyzed" and no norms so have to

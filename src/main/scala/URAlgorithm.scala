@@ -29,6 +29,8 @@ object defaultURAlgorithmParams {
 
   val DefaultExpireDateName = "expiredate" // default name for the expire date property of an item
   val DefaultAvailableDateName = "availabledate" //defualt name for and item's available after date
+  val DefaultDateName = "date" // when using a date range in the query this is the name of the item's date
+  val DefaultRecsModel = "all" // use CF + backfill
 }
 
 case class BackfillParams(
@@ -41,13 +43,9 @@ case class URAlgorithmParams(
     appName: String, // filled in from engine.json
     indexName: String, // can optionally be used to specify the elasticsearch index name
     typeName: String, // can optionally be used to specify the elasticsearch type name
-    recsModel: Option[String] = Some("all"), // or "backfill" todo: make a list for recs types to calculate like content
+    recsModel: Option[String] = Some(defaultURAlgorithmParams.DefaultRecsModel), // "all", "collabFiltering", "backfill"
     eventNames: List[String], // names used to ID all user actions
-    // list of events used to determine which recs to filter out, used for
-    // things like not showing items a user has purchased. Default is anything
-    // the user took the primary action on, to filter nothing specify an
-    // empty array in engine.json
-    blacklistEvents: Option[List[String]] = None,
+    blacklistEvents: Option[List[String]] = None,// None means use the primary event, empty array means no filter
     // number of events in user-based recs query
     maxQueryEvents: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxQueryEvents),
     maxEventsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxEventsPerEventType),
@@ -64,7 +62,7 @@ case class URAlgorithmParams(
     // name of date property field for when an item is no longer available
     expireDateName: Option[String] = Some(defaultURAlgorithmParams.DefaultExpireDateName),
     // used as the subject of a dateRange in queries, specifies the name of the item property 
-    dateName: Option[String] = None,
+    dateName: Option[String] = Some(defaultURAlgorithmParams.DefaultDateName),
     seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducible unless supplied
 
