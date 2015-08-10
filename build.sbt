@@ -1,5 +1,7 @@
 name := "template-scala-parallel-universal-recommendation"
 
+version := "0.2.0"
+
 organization := "io.prediction"
 
 val mahoutVersion = "0.11.0"
