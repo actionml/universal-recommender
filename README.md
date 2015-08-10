@@ -83,6 +83,12 @@ This file allows the user to describe and set parameters that control the engine
             "maxQueryEvents": 500,
             "num": 20,
             "seed": 3,
+            "recsModel": all
+			"backfillParams": {
+  				"backfillType": "popular",
+  				"eventnames": ["buy", "view"],
+  				"duration": 6000
+  			}	
             "expireDateName": "expireDateFieldName",
             "availableDateName": "availableDateFieldName",
             "dateName": "dateFieldName",
@@ -119,6 +125,8 @@ The “params” section controls most of the features of the UR. Possible value
 * **availableDateName** optional, name of the item properties field that contains the date the item is available to recommend. 
 * **dateName** optional, a date or timestamp used in a `dateRange` recommendations filter.
 * **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
+* **recsModel** optional, default = "all", which means  collaborative filtering with popular items returned when no other recommendations can be made. Otherwise: "all", "collabFiltering", "backfill". If only "backfill" is specified then the train will create only some backfill type like popular. If only "collabFiltering" is specified then if there are no recs available no backfill will be included.
+* **backfillParams** optional, default: backfillType = popular, eventNames = all used in creating recs, duration = 259200, which is the number of seconds in a 3 days. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce expected results. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and "trending" splits the event in two. So choose the duration accordingly.  
 
 ###Queries
 
