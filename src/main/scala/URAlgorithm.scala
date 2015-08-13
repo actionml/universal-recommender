@@ -3,13 +3,14 @@ package org.template
 import java.util
 import io.prediction.controller.P2LAlgorithm
 import io.prediction.controller.Params
-import io.prediction.data.storage.Event
+import io.prediction.data.storage.{PropertyMap, Event}
 import io.prediction.data.store.LEventStore
 import org.apache.mahout.math.cf.SimilarityAnalysis
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
+import org.apache.spark.rdd.RDD
 import org.json4s
 import org.json4s.JsonAST
-import org.json4s.JsonAST.{JArray, JNothing, JNull, JValue}
+import org.json4s.JsonAST._
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 import org.apache.spark.SparkContext
@@ -31,12 +32,13 @@ object defaultURAlgorithmParams {
   val DefaultAvailableDateName = "availabledate" //defualt name for and item's available after date
   val DefaultDateName = "date" // when using a date range in the query this is the name of the item's date
   val DefaultRecsModel = "all" // use CF + backfill
+  val DefaultBackfillParams = BackfillParams()
 }
 
 case class BackfillParams(
   backfillType: String = "popular",// trending, etc algo TBD
   eventnames: Option[List[String]] = None, // None means use the algo eventnames list, otherwise a list of events
-  duration: Int = 6000) // number of seconds worth of events to use in calculation of backfill
+  duration: Int = 259200) // number of seconds worth of events to use in calculation of backfill
 
 /** Instantiated from engine.json */
 case class URAlgorithmParams(
@@ -82,6 +84,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   @transient lazy val logger = Logger[this.type]
 
   def train(sc: SparkContext, data: PreparedData): URModel = {
+    
     // No one likes empty training data.
     require(data.actions.take(1).nonEmpty,
       s"Primary action in PreparedData cannot be empty." +
@@ -101,7 +104,16 @@ class URAlgorithm(val ap: URAlgorithmParams)
     logger.info("Correlators created now putting into URModel")
     val dateNames: List[String] = List(ap.dateName.getOrElse(""), ap.availableDateName.getOrElse(""),
       ap.expireDateName.getOrElse(""))
-    new URModel(cooccurrenceCorrelators, data.fieldsRDD, ap.indexName, dateNames = dateNames)
+
+    val backfillParams = ap.backfillParams.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
+    val popModel = PopModel.calc(ap.recsModel, ap.eventNames, ap.appName, backfillParams.duration)(sc)
+    val allPropertiesRDD = if (popModel.nonEmpty) {
+      data.fieldsRDD.join[Double](popModel.get).map { case( item, (pm, rank) ) =>
+        val newPM = pm.fields + ("popRank" -> JDouble(rank))
+        (item, PropertyMap(newPM, pm.firstUpdated, pm.lastUpdated))
+      }
+    } else data.fieldsRDD
+    new URModel(cooccurrenceCorrelators, allPropertiesRDD, ap.indexName, dateNames = dateNames)
   }
 
   /** Return a list of items recommended for a user identified in the query
@@ -123,32 +135,33 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *            }
     *          }
     *        ],
-    * "must": [
-    {
-      "constant_score": {
-        "filter": {
-          "range": {
-            "availabledate": {
-              "lte": "2015-08-30T12:24:41-07:00"
-            }
-          }
-        }z
-        "boost": 0
-      }
-    },
-    {
-      "constant_score": {
-        "filter": {
-          "range": {
-            "expiredate": {
-              "gt": "2015-08-30T12:24:41-07:00"
-            }
-          }
-        },
-        "boost": 0
-      }
-    }
-  ]
+    *        "must": [
+    *          {
+    *            "terms": {
+    *              "category": ["cat1"],
+    *              "boost": 0
+    *            }
+    *          },
+    *         {
+    *           "constant_score": {
+    *             "filter": {
+    *               "range": {
+    *                 "availabledate": {
+    *                   "lte": "2015-08-30T12:24:41-07:00"
+    *                 }
+    *               }
+    *             },
+    *             "boost": 0
+    *           }
+    *         },
+    *         {
+    *           "constant_score": {
+    *              "filter": {
+    *                 "match_all": {}
+    *              },
+    *              "boost": 0
+    *           }
+    *        }
     *        "must": [
     *          {
     *            "terms": {
@@ -266,19 +279,91 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
       val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultURAlgorithmParams.DefaultNum))
 
+      val shouldFields: List[JValue] = allBoostedCorrelators.map { i =>
+        render(("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost)))}.toList
+      val popModelSort = List(parse(
+        """
+          |{
+          |  "constant_score": {
+          |    "filter": {
+          |      "match_all": {}
+          |    },
+          |    "boost": 0
+          |  }
+          |}
+          |""".stripMargin))
+      val should: List[JValue] = shouldFields ::: popModelSort
+
+
       val mustFields: List[JValue] = allFilteringCorrelators.map { i =>
         render(("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> 0)))}.toList
       val must: List[JValue] = mustFields ::: filteringDateRange
 
+      /* Final form of query with all fields including popularity backfill
+
+      GET /urindex/items/_search
+       {
+         "size": 10,
+         "query": {
+            "bool": {
+               "should": [
+                  {
+                     "terms": {
+                        "purchase": [
+                           "whamajama"
+                        ]
+                     }
+                  },
+                  {
+                     "constant_score": {
+                        "filter": {
+                           "match_all": {}
+                        },
+                        "boost": 0
+                     }
+                  }
+               ],
+               "must": [
+                  {
+                     "terms": {
+                        "category": [
+                           "phones"
+                        ]
+                     }
+                  }
+               ],
+               "minimum_should_match": 1
+            }
+         },
+         "sort": [
+            {
+               "_score": {
+                  "order": "desc"
+               }
+            },
+            {
+               "popRank": {
+                  "unmapped_type": "double"
+               }
+            }
+         ]
+      }
+      */
+
+      val popQuery = List(
+        parse("""{"_score": {"order": "desc"}}"""),
+        parse("""{"popRank": {"unmapped_type": "double"}}"""))
+
       val json =
         (
           ("size" -> numRecs) ~
-            ("query"->
-              ("bool"->
-                ("should"->
-                  allBoostedCorrelators.map { i =>
-                    ("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))}) ~
-                ("must"-> must))))
+          ("query"->
+            ("bool"->
+              ("should"-> should) ~
+              ("must"-> must) ~
+              ("minimum_should_match" -> 1))
+          ) ~
+          ("sort" -> popQuery))
       val j = compact(render(json))
       //logger.info(s"Query: \n${j}\n")
       (compact(render(json)), alluserEvents._2)
@@ -393,35 +478,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     (queryFilterFields ++ paramsFilterFields).distinct // de-dup and favor query fields
   }
 
-  /** get all metadata fields that are filters (not boosts) */
-  /*
-    *          {
-    *            "constant_score": {
-    *              "filter": {
-    *                "range" : {
-    *                  "expiredate" : {
-    *                    "gte": "2015-08-15T11:28:45.114-07:00",
-    *                    "lt": "2015-08-20T11:28:45.114-07:00"
-    *                  }
-    *                }
-    *              },
-    *              "boost": 0
-    *            }
-    *          }
-    *
-    *          {
-    *            "constant_score": {
-    *              "filter": {
-    *                "range": {
-    *                  "expiredate": {
-    *                    "gt": "2015-08-30T12:24:41-07:00"
-    *                  }
-    *                }
-    *              },
-    *              "boost": 0
-    *           }
-    *m        }
-    */
+  /** get part of query for dates and date ranges */
   def getFilteringDateRange( query: Query ): List[JValue] = {
     //todo: move the Jvalue DSL into functiion to DRY code
 
@@ -445,13 +502,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         |  }
         |}
         """.stripMargin
-        /*(
-          ("constant_score" ->
-            ("filter" ->
-              ("range" ->
-                (availableDate ->
-                  ("lte" -> currentDate))))))
-*/
+
       json = json :+ parse(available)
     }
 
@@ -472,14 +523,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         |  }
         |}
         """.stripMargin
-/*        (
-          ("constant_score" ->
-            ("filter" ->
-              ("range" ->
-                (expireDate ->
-                  ("gt" -> currentDate))) ~
-              ("boost" -> 0))))
-*/
+
       json = json :+ parse(expire)
     }
 

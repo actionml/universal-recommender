@@ -38,5 +38,3 @@ curl -H "Content-Type: application/json" -d '
 }' http://localhost:8000/queries.json
 echo ""
 echo ""
-
-

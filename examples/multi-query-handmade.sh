@@ -382,4 +382,66 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 
+echo""
+echo"Recs that rely on popularity since the user has no usage data"
+echo""
+echo""
+
+echo ""
+echo "Recommendations for non-existant user: u10, all from popularity"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u10",
+    "num": 10
+}' http://localhost:8000/queries.json
+echo ""
+
+
+echo ""
+echo "Recommendations for non-existant user: u10, all from popularity, tablets boost"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u10",
+    "num": 10,
+    "fields": [{
+        "name": "category",
+        "values": ["tablets"],
+        "bias": 1.005
+    }]
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for non-existant user: u10, all from popularity, tablets filter"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u10",
+    "num": 10,
+    "fields": [{
+        "name": "category",
+        "values": ["tablets"],
+        "bias": -1
+    }]
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for non-existant user: u10, all from popularity, tablets filter and date filter, should be nexus only"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u10",
+    "num": 10,
+    "currentDate": "2015-09-02T12:24:41-07:00",
+    "fields": [{
+        "name": "category",
+        "values": ["tablets"],
+        "bias": -1
+    }]
+}' http://localhost:8000/queries.json
+echo ""
+
 

@@ -87,7 +87,7 @@ This file allows the user to describe and set parameters that control the engine
 			"backfillParams": {
   				"backfillType": "popular",
   				"eventnames": ["buy", "view"],
-  				"duration": 6000
+  				"duration": 259200
   			}	
             "expireDateName": "expireDateFieldName",
             "availableDateName": "availableDateFieldName",
@@ -307,8 +307,8 @@ To begin using on new data with an engine that has been used with sample data or
 
 ### Known issues
 
+  - popularity fallback is implemented for "popularity" and works with queries that can't return enough recs but the model is only created when training the recs model. You cannot train the popularity model only at present.
   - index dropped then refreshed in `pio train` so no need to redeploy if the server is running. This violates conventions for other templates but is actually good. It means we have a hot-swapped model. If there are server timeouts during train, for the refresh response or for ongoing queries, we may need to find optimizations.
-  - popularity fallback not implemented.
 
 ## References
 

@@ -77,6 +77,8 @@ class URModel(
                 val date: java.util.Date = dateTime.toDate()
                 m = m + (key -> date)
               }
+            case JDouble(rank) => // only the ranking double from PopModel should be here
+              m = m + (key -> rank)
           }
         } catch {
           case e: ClassCastException => e
