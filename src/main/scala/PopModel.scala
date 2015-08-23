@@ -4,74 +4,102 @@ import io.prediction.data.storage.Event
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import io.prediction.data.store.PEventStore
-import org.joda.time.DateTime
+import org.joda.time.{Duration, DateTime, Interval}
 
 object PopModel {
   def calc (
     modelName: Option[String] = None,
     eventNames: List[String],
     appName: String,
-    duration: Int = 0 )(implicit sc: SparkContext): Option[RDD[(String, Double)]] = {
+    duration: Int = 0 )(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
 
     // based on type of popularity model return a set of (item-id, ranking-number) for all items
     modelName match {
-      case Some("all") => calcPopular(appName, eventNames, duration)
-      case Some("popular") => calcPopular(appName, eventNames, duration)
-      case Some("trending") => calcTrending(appName, eventNames, duration)
-      case Some("hot") => calcHot(appName, eventNames, duration)
-      case _ => None
+      case Some("popular") => calcPopular(appName, eventNames, new Interval(DateTime.now.minusSeconds(duration), DateTime.now))
+      case Some("trending") => calcTrending(appName, eventNames, new Interval(DateTime.now.minusSeconds(duration), DateTime.now))
+      case Some("hot") => calcHot(appName, eventNames, new Interval(DateTime.now.minusSeconds(duration), DateTime.now))
+      case _ => None // debatable, this is an error may want exception
     }
   }
 
-  /* wordcount
-  val textFile = spark.textFile("hdfs://...")
-  val counts = textFile.flatMap(line => line.split(" "))
-                 .map(word => (word, 1))
-                 .reduceByKey(_ + _)
-   */
+  /** Creates a rank from the number of named events per item for the duration */
   def calcPopular(appName: String, eventNames: List[String] = List.empty,
-    duration: Int = 0 )(implicit sc: SparkContext): Option[RDD[(String, Double)]] = {
+    interval: Interval)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
 
-    val events = getEventsRDD(appName, eventNames, DateTime.now().minusSeconds(duration))
-    val retval = Some( events.map { e => (e.targetEntityId, e.event) }
+    val events = eventsRDD(appName, eventNames, interval)
+    val retval = events.map { e => (e.targetEntityId, e.event) }
       .groupByKey()
-      .map { case(itemID, itEvents) => (itemID.get, itEvents.size.toDouble)}
-      .reduceByKey (_+_) )
-    val itemEventCounts = retval.get.collect()
-    retval
-
+      .map { case(itemID, itEvents) => (itemID.get, itEvents.size.toFloat)}
+      .reduceByKey (_+_) // make this a double in Elaseticsearch)
+    if (!retval.isEmpty()) Some(retval) else None
   }
 
+  /** Creates a rank for each item by dividing the duration in two and counting named events in both buckets
+    * then dividing most recent by less recent. This ranks by change in popularity or velocity of populatiy change.
+    * Interval(start, end) end instant is always greater than or equal to the start instant.
+    */
   def calcTrending(appName: String, eventNames: List[String] = List.empty,
-    duration: Int = 0 )(implicit sc: SparkContext): Option[RDD[(String, Double)]] = {
-    None
+    interval: Interval)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
+
+    val olderInterval = new Interval(interval.getStart,
+      interval.getStart().plusMillis((interval.toDurationMillis/2)toInt))
+    val newerInterval = new Interval(interval.getStart().plusMillis((interval.toDurationMillis/2)toInt), interval.getEnd)
+
+    val intervalMillis = interval.toDurationMillis
+    val olderPopRDD = calcPopular(appName, eventNames, olderInterval)
+    if ( olderPopRDD.nonEmpty) {
+      val newerPopRDD = calcPopular(appName, eventNames, newerInterval)
+      if ( newerPopRDD.nonEmpty ) {
+        val retval = newerPopRDD.get.join(olderPopRDD.get).map { case (item, (newerScore, olderScore)) =>
+          val velocity = (newerScore - olderScore)
+          (item, velocity)
+        }
+        if (!retval.isEmpty()) Some(retval) else None
+      } else None
+    } else None
   }
 
+  /** Creates a rank for each item by divding all events per item into three buckets and calculating the change in
+    * velocity over time, in other words the acceleration of popularity change.
+    */
   def calcHot(appName: String, eventNames: List[String] = List.empty,
-    duration: Int = 0 )(implicit sc: SparkContext): Option[RDD[(String, Double)]] = {
-    None
+    interval: Interval)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
+    val olderInterval = new Interval(interval.getStart,
+      interval.getStart().plusMillis((interval.toDurationMillis/3)toInt))
+    val middleInterval = new Interval(olderInterval.getEnd,
+      olderInterval.getEnd().plusMillis((olderInterval.toDurationMillis)toInt))
+    val newerInterval = new Interval(middleInterval.getEnd, interval.getEnd)
+
+    val olderPopRDD = calcPopular(appName, eventNames, olderInterval)
+    if (olderPopRDD.nonEmpty){
+      val middlePopRDD = calcPopular(appName, eventNames, middleInterval)
+      if (middlePopRDD.nonEmpty){
+        val newerPopRDD = calcPopular(appName, eventNames, newerInterval)
+        if (newerPopRDD.nonEmpty){
+          val newVelocityRDD = newerPopRDD.get.join(middlePopRDD.get).map { case( item, (newerScore, olderScore)) =>
+            val velocity = (newerScore - olderScore)
+            (item, velocity)
+          }
+          val oldVelocityRDD = middlePopRDD.get.join(olderPopRDD.get).map { case( item, (newerScore, olderScore)) =>
+            val velocity = (newerScore - olderScore)
+            (item, velocity)
+          }
+          Some( newVelocityRDD.join(oldVelocityRDD).map { case (item, (newVelocity, oldVelocity)) =>
+            val acceleration = (newVelocity - oldVelocity)
+            (item, acceleration)
+          })
+        } else None
+      } else None
+    } else None
   }
 
+  def eventsRDD(appName: String, eventNames: List[String], interval: Interval)
+    (implicit sc: SparkContext): RDD[Event] = {
 
-  /*  def find(
-    appName : scala.Predef.String,
-    channelName : scala.Option[scala.Predef.String] = { /* compiled code */ },
-    startTime : scala.Option[org.joda.time.DateTime] = { /* compiled code */ },
-    untilTime : scala.Option[org.joda.time.DateTime] = { /* compiled code */ },
-    entityType : scala.Option[scala.Predef.String] = { /* compiled code */ },
-    entityId : scala.Option[scala.Predef.String] = { /* compiled code */ },
-    eventNames : scala.Option[scala.Seq[scala.Predef.String]] = { /* compiled code */ },
-    targetEntityType : scala.Option[scala.Option[scala.Predef.String]] = { /* compiled code */ },
-    targetEntityId : scala.Option[scala.Option[scala.Predef.String]] = { /* compiled code */ })(sc : org.apache.spark.SparkContext) : org.apache.spark.rdd.RDD[io.prediction.data.storage.Event] = { /* compiled code */ }
-   */
-
-  def getEventsRDD(appName: String, eventNames: List[String], begin: DateTime)(implicit sc: SparkContext): RDD[Event] = {
-
-    val endTime = DateTime.now()
     PEventStore.find(
       appName = appName,
-      startTime = Some(begin),
-      untilTime = Some(endTime),
+      startTime = Some(interval.getStart),
+      untilTime = Some(interval.getEnd),
       eventNames = Some(eventNames)
     )(sc)
   }

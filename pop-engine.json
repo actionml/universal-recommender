@@ -1,6 +1,5 @@
 {
-  "comment":" This config file uses default settings for all but the required values see README.md for docs",
-  "id": "default",
+  "id": "popularity-only",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
@@ -26,7 +25,11 @@
         "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
-        "eventNames": ["purchase", "view"]
+        "eventNames": ["purchase", "view"],
+        "recsModel": "backfill",
+        "backfillField": {
+          "backfillType": "popular"
+        }
       }
     }
   ]

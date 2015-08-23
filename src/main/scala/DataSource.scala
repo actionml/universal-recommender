@@ -41,11 +41,8 @@ class DataSource(val dsp: DataSourceParams)
     val eventsRDD = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("user"),
-      eventNames = Some(eventNames)
-      // targetEntityType is optional field of an event.
-      // strictly speaking items are not the target type for all actions so use event name to differentiate
-      //targetEntityType = Some(Some("item"))
-      )(sc)
+      eventNames = Some(eventNames),
+      targetEntityType = Some(Some("item")))(sc)
 
     // now separate the events by event name
     val actionRDDs = eventNames.map { eventName =>

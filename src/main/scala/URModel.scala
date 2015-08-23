@@ -6,6 +6,7 @@ import grizzled.slf4j.Logger
 
 import io.prediction.controller.{PersistentModelLoader, PersistentModel}
 import io.prediction.data.storage.PropertyMap
+import org.apache.mahout.math.indexeddataset.IndexedDataset
 import org.apache.spark.rdd.RDD
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.joda.time.DateTime
@@ -18,11 +19,13 @@ import org.apache.spark.SparkContext
 
 /** Universal Recommender models to save in ES */
 class URModel(
-    coocurrenceMatrices: List[(String, IndexedDatasetSpark)],
-    fieldsRDD: RDD[(String, PropertyMap)],
+    coocurrenceMatrices: Option[List[(String, IndexedDataset)]],
+    fieldsRDD: Option[RDD[(String, PropertyMap)]],
     indexName: String,
-    dateNames: List[String] = List.empty[String],
-    nullModel: Boolean = false)
+    dateNames: Option[List[String]] = None,
+    nullModel: Boolean = false,
+    typeMappings: Option[Map[String, String]] = None, // maps fieldname that need type mapping in Elasticsearch
+    propertiesRDD: Option[RDD[collection.Map[String, Any]]] = None)
     // a little hack to allow a dummy model used to save but not
     // retrieve (see companion object's apply)
   extends PersistentModel[URAlgorithmParams] {
@@ -42,82 +45,95 @@ class URModel(
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
-    // for ES we need to create the entire index in an rdd of maps, one per item so we'll use
-    // convert cooccurrence matrices into correlators as RDD[(itemID, (actionName, Seq[itemID])]
-    // do they need to be in Elasticsearch format
-    logger.info("Converting cooccurrence matrices into correlators")
-    val correlators = coocurrenceMatrices.map { case (actionName, dataset) =>
-      dataset.toStringMapRDD(actionName)
-    }
-
-    // getting action names since they will be ES fields
-    logger.info(s"Getting a list of action name strings")
-    val allActions = coocurrenceMatrices.map(_._1)
-
-    logger.info(s"Ready to pass date fields names to closure ${dateNames}")
-    val closureDateNames = dateNames
-    // convert the PropertyMap into Map[String, Seq[String]] for ES
-    logger.info("Converting PropertyMap into Elasticsearch style rdd")
-    val properties = fieldsRDD.map { case (item, pm ) =>
-      var m: Map[String, Any] = Map()
-      for (key <- pm.keySet){
-        val k = key
-        val v = pm.get[JValue](key)
-        try{ // if we get something unexpected, add ignore and add nothing to the map
-          pm.get[JValue](key) match {
-            case JArray(list) => // assumes all lists are string tokens for bias
-              val l = list.map {
-                case JString(s) => s
-                case _ => ""
-              }
-              m = m + (key -> l)
-            case JString(s) => // name for this field is in engine params
-              if (closureDateNames.contains(key)) { // one of the date fields
-                val dateTime = new DateTime(s)
-                val date: java.util.Date = dateTime.toDate()
-                m = m + (key -> date)
-              }
-            case JDouble(rank) => // only the ranking double from PopModel should be here
-              m = m + (key -> rank)
-          }
-        } catch {
-          case e: ClassCastException => e
-          case e: IllegalArgumentException => e
-          //got something we didn't expect so ignore it, put nothing in the map
-        }
-      }
-      (item, m)
-    }
-
-    // only way to get all property names is to check all items in the rdd--ugh
-    val allPropKeys = properties.flatMap(_._2.keySet).distinct.collect()
-
-    // these need to be indexed with "not_analyzed" and no norms so have to
-    // collect all field names before ES index create
-    val allFields = (allActions ++ allPropKeys).distinct // shouldn't need distinct but it's fast
-
-    // Elasticsearch takes a Map with all fields, not a tuple
-    logger.info("Grouping all correlators into doc + fields for writing to index")
-    val esRDDs: List[RDD[(String, Map[String, Any])]] =
-      (correlators.asInstanceOf[ List[RDD[(String, Map[String, Any])]]] :+ properties).filterNot(c => c.isEmpty())
-    val esFields = groupAll(esRDDs).map { case (item, map) =>
-      // todo: every map's items must be checked for value type and converted before writing to ES
-      val esMap = map + ("id" -> item)
-      esMap
-    }
-
     val esIndexURI = s"/${params.indexName}/${params.typeName}"
-    logger.info(s"Deleting index: ${esIndexURI}")
-    esClient.deleteIndex(params.indexName)
-    logger.info(s"Creating new index: ${esIndexURI}")
-    esClient.createIndex(params.indexName, params.typeName, allFields)
 
-    // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
-    logger.info(s"Writing new ES style rdd to index: ${esIndexURI}")
-    esFields.saveToEs (esIndexURI, Map("es.mapping.id" -> "id"))
-    // todo: check to see if a flush or refresh is needed after writing all new data to the index
-    // esClient.admin().indices().flush(new FlushRequest(params.indexName)).actionGet()
-    logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
+    if (propertiesRDD.isEmpty) {
+      // for ES we need to create the entire index in an rdd of maps, one per item so we'll use
+      // convert cooccurrence matrices into correlators as RDD[(itemID, (actionName, Seq[itemID])]
+      // do they need to be in Elasticsearch format
+      logger.info("Converting cooccurrence matrices into correlators")
+      val correlators = if (coocurrenceMatrices.nonEmpty) coocurrenceMatrices.get.map { case (actionName, dataset) =>
+        dataset.asInstanceOf[IndexedDatasetSpark].toStringMapRDD(actionName).asInstanceOf[RDD[(String, Map[String, Any])]]
+        //} else List.empty[RDD[(String, Map[String, Seq[String]])]] // empty mena only calculating PopModel
+      } else List.empty[RDD[(String, Map[String, Any])]] // empty mena only calculating PopModel
+
+      // getting action names since they will be ES fields
+      logger.info(s"Getting a list of action name strings")
+      val allActions = coocurrenceMatrices.getOrElse(List.empty[(String, IndexedDatasetSpark)]).map(_._1)
+
+      logger.info(s"Ready to pass date fields names to closure ${dateNames}")
+      val closureDateNames = dateNames.getOrElse(List.empty[String])
+      // convert the PropertyMap into Map[String, Seq[String]] for ES
+      logger.info("Converting PropertyMap into Elasticsearch style rdd")
+      var properties = List.empty[RDD[(String, Map[String, Any])]]
+      var allPropKeys = List.empty[String]
+      if (fieldsRDD.nonEmpty) {
+        properties = List(fieldsRDD.get.map { case (item, pm) =>
+          var m: Map[String, Any] = Map()
+          for (key <- pm.keySet) {
+            val k = key
+            val v = pm.get[JValue](key)
+            try {
+              // if we get something unexpected, add ignore and add nothing to the map
+              pm.get[JValue](key) match {
+                case JArray(list) => // assumes all lists are string tokens for bias
+                  val l = list.map {
+                    case JString(s) => s
+                    case _ => ""
+                  }
+                  m = m + (key -> l)
+                case JString(s) => // name for this field is in engine params
+                  if (closureDateNames.contains(key)) {
+                    // one of the date fields
+                    val dateTime = new DateTime(s)
+                    val date: java.util.Date = dateTime.toDate()
+                    m = m + (key -> date)
+                  }
+                case JDouble(rank) => // only the ranking double from PopModel should be here
+                  m = m + (key -> rank)
+              }
+            } catch {
+              case e: ClassCastException => e
+              case e: IllegalArgumentException => e
+              //got something we didn't expect so ignore it, put nothing in the map
+            }
+          }
+          (item, m)
+        })
+        allPropKeys = properties.head.flatMap(_._2.keySet).distinct.collect().toList
+      }
+
+
+      // these need to be indexed with "not_analyzed" and no norms so have to
+      // collect all field names before ES index create
+      val allFields = (allActions ++ allPropKeys).distinct // shouldn't need distinct but it's fast
+
+      // Elasticsearch takes a Map with all fields, not a tuple
+      logger.info("Grouping all correlators into doc + fields for writing to index")
+      val esRDDs: List[RDD[(String, Map[String, Any])]] =
+        (correlators ::: properties).filterNot(c => c.isEmpty())
+      val esFields = groupAll(esRDDs).map { case (item, map) =>
+        // todo: every map's items must be checked for value type and converted before writing to ES
+        val esMap = map + ("id" -> item)
+        esMap
+      }
+
+      logger.info(s"Deleting index: ${esIndexURI}")
+      esClient.deleteIndex(params.indexName)
+      logger.info(s"Creating new index: ${esIndexURI}")
+      esClient.createIndex(params.indexName, params.typeName, allFields, typeMappings = typeMappings)
+
+      // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
+      logger.info(s"Writing new ES style rdd to index: ${esIndexURI}")
+      esFields.saveToEs(esIndexURI, Map("es.mapping.id" -> "id"))
+      // todo: check to see if a flush or refresh is needed after writing all new data to the index
+      // esClient.admin().indices().flush(new FlushRequest(params.indexName)).actionGet()
+      logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
+    } else {
+      // this happens when updating only the popularity backfill model, it will write out the existing
+      // index with upserted popularity ranking numbers. Seems draconian but the index should handle this
+      propertiesRDD.get.saveToEs(esIndexURI, Map("es.mapping.id" -> "id"))
+    }
     true
   }
   

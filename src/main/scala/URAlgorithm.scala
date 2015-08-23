@@ -3,21 +3,25 @@ package org.template
 import java.util
 import io.prediction.controller.P2LAlgorithm
 import io.prediction.controller.Params
+import io.prediction.data
 import io.prediction.data.storage.{PropertyMap, Event}
 import io.prediction.data.store.LEventStore
 import org.apache.mahout.math.cf.SimilarityAnalysis
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.rdd.RDD
+import org.joda.time.DateTime
 import org.json4s
 import org.json4s.JsonAST
 import org.json4s.JsonAST._
 import scala.collection.JavaConverters._
+import scala.collection.immutable
 import scala.concurrent.duration.Duration
 import org.apache.spark.SparkContext
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import scala.collection.convert.wrapAsScala._
 import grizzled.slf4j.Logger
+import org.elasticsearch.spark._
 
 /** Setting the option in the params case class doesn't work as expected when the param is missing from
   * engine.json so set these for use in the algorithm when they are not present in the engine.json
@@ -32,10 +36,12 @@ object defaultURAlgorithmParams {
   val DefaultAvailableDateName = "availabledate" //defualt name for and item's available after date
   val DefaultDateName = "date" // when using a date range in the query this is the name of the item's date
   val DefaultRecsModel = "all" // use CF + backfill
-  val DefaultBackfillParams = BackfillParams()
+  val DefaultBackfillParams = BackfillField()
+  val DefaultBackfillFieldName = "popRank"
 }
 
-case class BackfillParams(
+case class BackfillField(
+  name: String = "popRank",
   backfillType: String = "popular",// trending, etc algo TBD
   eventnames: Option[List[String]] = None, // None means use the algo eventnames list, otherwise a list of events
   duration: Int = 259200) // number of seconds worth of events to use in calculation of backfill
@@ -58,7 +64,7 @@ case class URAlgorithmParams(
     returnSelf: Option[Boolean] = None, // query building logic defaults this to false
     fields: Option[List[Field]] = None, //defaults to no fields
     // leave out for default or popular
-    backfillParams: Option[BackfillParams] = None,
+    backfillField: Option[BackfillField] = None,
     // name of date property field for when the item is avalable
     availableDateName: Option[String] = Some(defaultURAlgorithmParams.DefaultAvailableDateName),
     // name of date property field for when an item is no longer available
@@ -84,13 +90,36 @@ class URAlgorithm(val ap: URAlgorithmParams)
   @transient lazy val logger = Logger[this.type]
 
   def train(sc: SparkContext, data: PreparedData): URModel = {
-    
+
+    val dateNames = Some(List(ap.dateName.getOrElse(""), ap.availableDateName.getOrElse(""),
+      ap.expireDateName.getOrElse(""))) // todo: return None if all are empty?
+    val backfillFieldName = ap.backfillField.getOrElse(BackfillField()).name
+
+    ap.recsModel.getOrElse(defaultURAlgorithmParams.DefaultRecsModel) match {
+      case "all" => calcAll(sc, data, dateNames, backfillFieldName)
+      case "collabFiltering" => calcAll(sc, data, dateNames, backfillFieldName, popular = true )
+      case "backfill" => calcPop(sc, data, dateNames, backfillFieldName)
+      // error, throw an exception
+      case _ => throw new IllegalArgumentException("Bad recsModel in engine definition params, possibly a bad json value.")
+    }
+  }
+
+  def calcAll(
+    sc: SparkContext,
+    data: PreparedData,
+    dateNames: Option[List[String]] = None,
+    backfillFieldName: String,
+    popular: Boolean = true):
+    URModel = {
+
     // No one likes empty training data.
     require(data.actions.take(1).nonEmpty,
       s"Primary action in PreparedData cannot be empty." +
         " Please check if DataSource generates TrainingData" +
         " and Preprator generates PreparedData correctly.")
 
+    val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
+    val nonDefaultMappings = Map(backfillParams.name -> "float")
     logger.info("Actions read now creating correlators")
     val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
       data.actions.map(_._2).toArray,
@@ -101,19 +130,80 @@ class URAlgorithm(val ap: URAlgorithmParams)
       .map(_.asInstanceOf[IndexedDatasetSpark]) // strip action names
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
-    logger.info("Correlators created now putting into URModel")
-    val dateNames: List[String] = List(ap.dateName.getOrElse(""), ap.availableDateName.getOrElse(""),
-      ap.expireDateName.getOrElse(""))
+    val duration = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
+    val popModel = if (popular) {
+      val backfillEvents = backfillParams.eventnames.getOrElse(List(ap.eventNames.head))
+      PopModel.calc(Some(backfillParams.backfillType), backfillEvents, ap.appName, duration)(sc)
+    } else None
 
-    val backfillParams = ap.backfillParams.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
-    val popModel = PopModel.calc(ap.recsModel, ap.eventNames, ap.appName, backfillParams.duration)(sc)
     val allPropertiesRDD = if (popModel.nonEmpty) {
-      data.fieldsRDD.join[Double](popModel.get).map { case( item, (pm, rank) ) =>
-        val newPM = pm.fields + ("popRank" -> JDouble(rank))
-        (item, PropertyMap(newPM, pm.firstUpdated, pm.lastUpdated))
+      data.fieldsRDD.cogroup[Float](popModel.get).map { case (item, pms) =>
+        val pm = if (pms._1.nonEmpty && pms._2.nonEmpty) {
+          val newPM = pms._1.head.fields + (backfillFieldName -> JDouble(pms._2.head))
+          PropertyMap(newPM, pms._1.head.firstUpdated, DateTime.now())
+        } else if (pms._2.nonEmpty) PropertyMap(Map(backfillFieldName -> JDouble(pms._2.head)), DateTime.now(), DateTime.now())
+        else PropertyMap( Map.empty[String, JValue], DateTime.now, DateTime.now) // some error????
+        (item, pm)
       }
     } else data.fieldsRDD
-    new URModel(cooccurrenceCorrelators, allPropertiesRDD, ap.indexName, dateNames = dateNames)
+
+    logger.info("Correlators created now putting into URModel")
+    new URModel(
+      Some(cooccurrenceCorrelators),
+      Some(allPropertiesRDD),
+      ap.indexName,
+      dateNames,
+      typeMappings = Some(nonDefaultMappings))
+  }
+
+  /** This function creates a URModel from an existing index in Elasticsearch + new popularity ranking
+    * It is used when you want to re-calc the popularity model between training on useage data. It leaves
+    * the part of the model created from usage data alone and only modifies the popularity ranking.
+    */
+  def calcPop(
+    sc: SparkContext,
+    data: PreparedData,
+    dateNames: Option[List[String]] = None,
+    backfillFieldName: String = ""): URModel = {
+    val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
+    val backfillEvents = backfillParams.eventnames.getOrElse(List(ap.eventNames.head))//default to first/primary event
+    val popModel = PopModel.calc(Some(backfillParams.backfillType), backfillEvents, ap.appName, backfillParams.duration)(sc)
+    val popRDD = if (popModel.nonEmpty) {
+      val model = popModel.get.map { case (item, rank)  =>
+        val newPM = Map(backfillFieldName -> JDouble(rank))
+        (item, PropertyMap(newPM, DateTime.now, DateTime.now))// todo: Warning, this is WRONG, need to not upsert these dates
+      }
+      Some(model)
+    } else None
+
+    val propertiesRDD = if (popModel.nonEmpty) { // todo: Bad form! doing what URModel.save should do!!!!
+      val currentMetadata = esClient.getRDD(sc, ap.indexName, ap.typeName)
+      if (!currentMetadata.isEmpty()) { // may be an empty index so ignore
+        Some(popModel.get.cogroup[collection.Map[String, AnyRef]](currentMetadata)
+        .map { case (item, (ranks, pms)) =>
+          val map = pms.head + (backfillFieldName -> ranks.head)
+          map
+        })
+      } else None
+    } else None
+
+    //now insert new popularity rank without changing the rest of the metadata so URModel.save can write new values
+/*
+    coocurrenceMatrices: Option[List[(String, IndexedDataset)]],
+    fieldsRDD: Option[RDD[(String, PropertyMap)]],
+    indexName: String,
+    dateNames: Option[List[String]] = None,
+    nullModel: Boolean = false,
+    propertiesRDD: Option[RDD[Map[String, Any]]] = None)
+
+ */
+    new URModel(
+      None,
+      None,
+      ap.indexName,
+      None,
+      propertiesRDD = propertiesRDD,
+      typeMappings = Some(Map(backfillFieldName -> "float")))
   }
 
   /** Return a list of items recommended for a user identified in the query
@@ -187,11 +277,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *
     * @param model <strong>Ignored!</strong> since the model is already in Elasticsearch
     * @param query contains query spec
+    * @todo Need to prune that query to minimum required for data include, for instance no need for the popularity
+    *       ranking if no PopModel is being used, same for "must" clause and dates.
     */
   def predict(model: URModel, query: Query): PredictedResult = {
     logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
 
-    val queryAndBlacklist = buildQuery(ap, query)
+    val backfillFieldName = ap.backfillField.getOrElse(BackfillField()).name
+    val queryAndBlacklist = buildQuery(ap, query, backfillFieldName)
     val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
     removeBlacklisted(recs, query, queryAndBlacklist._2)
   }
@@ -232,7 +325,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   }
 
   /** Build a query from default algorithms params and the query itself taking into account defaults */
-  def buildQuery(ap: URAlgorithmParams, query: Query): (String, List[Event]) = {
+  def buildQuery(ap: URAlgorithmParams, query: Query, backfillFieldName: String = ""): (String, List[Event]) = {
 
     try{ // require the minimum of a user or item, if not then return nothing
       require( query.item.nonEmpty || query.user.nonEmpty, "Warning: a query must include either a user or item id")
@@ -300,6 +393,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val must: List[JValue] = mustFields ::: filteringDateRange
 
       /* Final form of query with all fields including popularity backfill
+      Todo: check that the query is pruned to minimum needed for the query data
 
       GET /urindex/items/_search
        {
@@ -310,7 +404,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
                   {
                      "terms": {
                         "purchase": [
-                           "whamajama"
+                           "some item"
                         ]
                      }
                   },
@@ -350,9 +444,19 @@ class URAlgorithm(val ap: URAlgorithmParams)
       }
       */
 
-      val popQuery = List(
-        parse("""{"_score": {"order": "desc"}}"""),
-        parse("""{"popRank": {"unmapped_type": "double"}}"""))
+      val popQuery = if (ap.recsModel.getOrElse("all") == "all" ||
+        ap.recsModel.getOrElse("all") == "backfill") {
+        Some(List(
+          parse( """{"_score": {"order": "desc"}}"""),
+          parse(
+            s"""
+               |{
+               |    "${backfillFieldName}": {
+               |      "unmapped_type": "double",
+               |      "order": "desc"
+               |    }
+               |}""".stripMargin)))
+      } else None
 
       val json =
         (
@@ -365,7 +469,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
           ) ~
           ("sort" -> popQuery))
       val j = compact(render(json))
-      //logger.info(s"Query: \n${j}\n")
+      logger.info(s"Query: \n${j}\n")
       (compact(render(json)), alluserEvents._2)
     } catch {
       case e: IllegalArgumentException =>
@@ -480,7 +584,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   /** get part of query for dates and date ranges */
   def getFilteringDateRange( query: Query ): List[JValue] = {
-    //todo: move the Jvalue DSL into functiion to DRY code
 
     var json: List[JValue] = List.empty[JValue]
     // currentDate in the query overrides the dateRange in the same query so ignore daterange if both

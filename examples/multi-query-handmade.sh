@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+echo "These queries are meant to be run on data created with "
+echo "'python examples/import_handmade_eventserver.py --accesskey <your-access-key>'"
+echo "If run on other data the comments about what to expect may not apply, especailly for date range queries"
+
 echo ""
 echo "Recommendations for user: u1"
 curl -H "Content-Type: application/json" -d '
@@ -382,10 +386,10 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 
-echo""
-echo"Recs that rely on popularity since the user has no usage data"
-echo""
-echo""
+echo ""
+echo "Recs that rely on popularity since the user has no usage data"
+echo ""
+echo ""
 
 echo ""
 echo "Recommendations for non-existant user: u10, all from popularity"
@@ -429,7 +433,7 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for non-existant user: u10, all from popularity, tablets filter and date filter, should be nexus only"
+echo "Recommendations for non-existant user: u10, all from popularity, tablets filter and date filter, should be nexus only if the date fields is valid, otherewise none"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {

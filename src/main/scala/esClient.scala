@@ -5,12 +5,17 @@ import java.util
 import grizzled.slf4j.Logger
 import io.prediction.data.storage.{StorageClientConfig, elasticsearch}
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.get.GetResponse
 import org.json4s.jackson.JsonMethods._
+import org.elasticsearch.spark._
+
+import scala.collection.immutable
 
 /** Elasticsearch notes:
   * 1) every query clause wil laffect scores unless it has a constant_score and boost: 0
@@ -24,7 +29,9 @@ import org.json4s.jackson.JsonMethods._
 object esClient {
   @transient lazy val logger = Logger[this.type]
 
-  private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
+  private val esClient = new elasticsearch.StorageClient(StorageClientConfig())
+  //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
+  private val client = new elasticsearch.StorageClient(StorageClientConfig()).client
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
     * the changes will not be reflected.
@@ -65,6 +72,7 @@ object esClient {
     indexName: String,
     indexType: String = "items",
     fieldNames: List[String],
+    typeMappings: Option[Map[String, String]] = None,
     refresh: Boolean = false): Boolean = {
     if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists()) {
       var mappings = """
@@ -72,15 +80,17 @@ object esClient {
         |  "properties": {
         """.stripMargin.replace("\n", "")
 
-      val mappingsField = """
+      def mappingsField(t: String) = {
+        s"""
         |    : {
-        |      "type": "string",
+        |      "type": "${t}",
         |      "index": "not_analyzed",
         |      "norms" : {
         |        "enabled" : false
         |      }
         |    },
-      """.stripMargin.replace("\n", "")
+        """.stripMargin.replace("\n", "")
+      }
 
       val mappingsTail = """
         |    "id": {
@@ -94,7 +104,12 @@ object esClient {
         |}
       """.stripMargin.replace("\n", "")
 
-      fieldNames.foreach(mappings += _ + mappingsField)
+      fieldNames.foreach { fieldName =>
+        if (typeMappings.nonEmpty && typeMappings.get.contains(fieldName))
+          mappings += (fieldName + mappingsField(typeMappings.get(fieldName)))
+        else
+          mappings += (fieldName + mappingsField("string"))
+      }
       mappings += mappingsTail
 
       val cir = new CreateIndexRequest(indexName).mapping("items",mappings)
@@ -150,5 +165,9 @@ object esClient {
     client.prepareGet(indexName, typeName, doc)
       .execute()
       .actionGet().getSource
+  }
+
+  def getRDD(sc: SparkContext, index: String, typeName: String): RDD[(String, collection.Map[String, AnyRef])] = {
+    sc.esRDD(index + "/" + typeName)
   }
 }
