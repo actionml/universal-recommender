@@ -31,8 +31,10 @@ class Preparator
     }
 
     // now make sure all matrices have identical row space since this corresponds to all users
+    val numUsers = userDictionary.get.size
+    val numPrimary = indexedDatasets.head._2.matrix.nrow
+    // todo: check to see that there are events in primary event IndexedDataset and abort if not.
     val rowAdjustedIds = indexedDatasets.map { case(eventName, eventIDS) =>
-      val numUsers = userDictionary.get.size
       (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs).newRowCardinality(numUsers))
     }
 

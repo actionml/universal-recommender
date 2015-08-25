@@ -91,10 +91,13 @@ class URModel(
                   }
                 case JDouble(rank) => // only the ranking double from PopModel should be here
                   m = m + (key -> rank)
+                case JInt(someInt) => // not sure what this is but pass it on
+                  m = m + (key -> someInt)
               }
             } catch {
               case e: ClassCastException => e
               case e: IllegalArgumentException => e
+              case e: MatchError => e
               //got something we didn't expect so ignore it, put nothing in the map
             }
           }

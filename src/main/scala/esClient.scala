@@ -31,6 +31,8 @@ object esClient {
 
   private val esClient = new elasticsearch.StorageClient(StorageClientConfig())
   //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
+  //should be
+//private val client = Storage.getSource("ELASTICSEARCH").client
   private val client = new elasticsearch.StorageClient(StorageClientConfig()).client
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index

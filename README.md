@@ -18,13 +18,12 @@ Check the prerequisites below before setup, it will inform choices made.
 5. Perform `pio build`, `pio train`, and `pio deploy`
 6. To execute some sample queries run `./examples/query-handmade.sh`
 
-**Important note for the impatient**: The eventName list in the engine.json file is extremely important. The first name in the list must be what is called the "primary event", not because it is more important or first in occurrence but because it defines the data that all else is to be correlated with. This event can be named anything but must be of the form (user-id, event-name, item-id). The type of item this event is attached to will define the type of item recommended even though other "secondary" events, profile data, and/or user contextual data may be atteched to different item types (categories, tags, genres, device-types, locations, etc.) **If there is no data for the primary event** for some number of users **there will be no recommendations returned**.
+##Important Notes for the Impatient
 
-##Prerequisites
-
- - **Elasticsearch**: The UR **requires Eleasticsearch** since it performs the last step in the algorithm and also serves recommendations. It will contain the model created at `pio train` time. Since it plays a part in serving recommendations it must be scaled to support fast queries.
-- **EventStore**: The UR can use and of the usual EventStore "sources" and Metadata Stores supported by PredictionIO framework. Currently this is Hbase + Elasticsearch, Postgres, MySQL, and other JDBC complient stores. "pio-env.sh" Should be setup to contain configuration for the required setup.
-- **PredictionIO Framework**: If you are not using Hbase or deploying the Univeral Recommender with a clustered version of Elasticsearch you must have PredictionIO v0.9.5+.
+ - When sending events through the SDK, REST API, or importing it is required that all usage/preference events are named in the engine.json and **there must be data for the first named event** otherwise there will be **no model created** and errors will occur during traing.
+ - When sending usage events it is required that the entityType is "user" and targetEntityType is "item". The type of the item is inferred from the event names, which must be one of the eventNames in the engine.json.
+ - **Elasticsearch**: The UR **requires Eleasticsearch** since it performs the last step in the algorithm and also serves recommendations. It will contain the model created at `pio train` time.
+- **EventStore**: The UR only supports Hbase + Elasticsearch. And requires that there be a localhost Elasticsearch instance running at all times. Using Postgres, MySQL, and other stores is not currently supported. This restriction will be removed in PIO v0.9.5 but Elasticsearch will still be required but you will be able to replace Hbase with Postgres, MySQL, or other JDBC Database.
  
 ##What is a Universal Recommender
 
@@ -363,7 +362,8 @@ To begin using on new data with an engine that has been used with sample data or
 
 ### Known issues
 
-  - currently we require a localhost version of Elasticsearch to be running continuously. Clusters are not supporte (should be fixed by release)
+  - currently we require a localhost version of Elasticsearch to be running continuously. Clusters are not supported (should be fixed by release)
+  - every ES index update should be a hot swap using an alias, this is not don currently.
   - index dropped then refreshed in `pio train` so no need to redeploy if the server is running. This violates conventions for other templates but is actually good. It means we have a hot-swapped model. If there are server timeouts during train, for the refresh response or for ongoing queries, we may need to find optimizations.
 
 ## References
