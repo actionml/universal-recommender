@@ -43,56 +43,56 @@ The following are examples of events as displayed from `pio export` These can be
 
 ###Simple Usage Event called "buy"
 
-{
-    "eventId": "AAI2Cci5tDlU1qo0ued2fQAAAU-z5AuYg1qNgNo",
-    "event": "buy",
-    "entityType": "user",
-    "entityId": "5470bff8ab1sdfssd4c4d4f5ef3154579c97ce",
-    "targetEntityType": "item",
-    "targetEntityId": "iphone",
-    "properties": {},
-    "eventTime": "2015-09-09T13:55:11.000-07:00",
-    "creationTime": "2015-09-09T21:59:52.986Z"
-}
+    {
+        "eventId": "AAI2Cci5tDlU1qo0ued2fQAAAU-z5AuYg1qNgNo",
+        "event": "buy",
+        "entityType": "user",
+        "entityId": "5470bff8ab1sdfssd4c4d4f5ef3154579c97ce",
+        "targetEntityType": "item",
+        "targetEntityId": "iphone",
+        "properties": {},
+        "eventTime": "2015-09-09T13:55:11.000-07:00",
+        "creationTime": "2015-09-09T21:59:52.986Z"
+    }
 
 ###Tag Preference Event
 
 When recording a user's preference for some tag. For example if the user "buy"s an item with this tag or clicks on a tag.
 
-{
-    "eventId": "AAI2Cci5tDlU1qo0ued2fQAAAU-z5AuYhXYgOuasdfgioObdSM",
-    "event": "tag-pref",
-    "entityType": "user",
-    "entityId": "5470bff8ab14c4d4f5ef3154579c97ce",
-    "targetEntityType": "item",
-    "targetEntityId": "electronics",
-    "properties": {},
-    "eventTime": "2015-09-09T13:55:11.000-07:00",
-    "creationTime": "2015-09-09T21:59:52.979Z"
-}
+    {
+        "eventId": "AAI2Cci5tDlU1qo0ued2fQAAAU-z5AuYhXYgOuasdfgioObdSM",
+        "event": "tag-pref",
+        "entityType": "user",
+        "entityId": "5470bff8ab14c4d4f5ef3154579c97ce",
+        "targetEntityType": "item",
+        "targetEntityId": "electronics",
+        "properties": {},
+        "eventTime": "2015-09-09T13:55:11.000-07:00",
+        "creationTime": "2015-09-09T21:59:52.979Z"
+    }
 
 ###Property Setting Events
 
 When treating a property like "tags" as an attribute of an item they may be attached to an item using a special event called `$set` which adds new properties to items. These properties are used to bias recommendations, which means to boost recommendations containing some property or filter out all items that do not contain some property&mdash;see the Biases section below. 
 
-{
-    "eventId": "ACeznDIiGJ2hDjY0KJwTUQAAAU-idfoih0CFSohHqi",
-    "event": "$set",
-    "entityType": "item",
-    "entityId": "iphone",
-    "properties": {
-        "tags": [
-            "electronics",
-            "phones",
-            "mobile electronics"
-        ],
-        "product_model": [
-            "6s Plus"
-        ]
-    },
-    "eventTime": "2015-09-09T14:34:49.000-07:00",
-    "creationTime": "2015-09-09T21:35:25.275Z"
-}
+    {
+        "eventId": "ACeznDIiGJ2hDjY0KJwTUQAAAU-idfoih0CFSohHqi",
+        "event": "$set",
+        "entityType": "item",
+        "entityId": "iphone",
+        "properties": {
+            "tags": [
+                "electronics",
+                "phones",
+                "mobile electronics"
+            ],
+            "product_model": [
+                "6s Plus"
+            ]
+        },
+        "eventTime": "2015-09-09T14:34:49.000-07:00",
+        "creationTime": "2015-09-09T21:35:25.275Z"
+    }
 
 ###Biases
 
