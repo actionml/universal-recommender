@@ -34,6 +34,66 @@ The Universal Recommender (UR) will accept a range of data, auto correlate it, a
  * Makes recommendations based on realtime user history. Even anonymous users will get recommendations if they have recorded preference history and a user-id. There is no hard requirement to retrain the model to make this happen. 
 
 ##Configuration, Events, and Queries
+
+###Events
+
+Events are sent to the PredictionIO EventServer just as any other engine. With the Universal Recommender though the events may have several different names. These will correspond to values in the engine.json "eventNames" parameter. All usage events must have an "entityType of "user" and "targetEntityType" of "item". The target entity id may be a product id, category id, of any id that corresponds to the named event. 
+
+The following are examples of events as displayed from `pio export` These can be constructed and sent to the EventServer with any of the SDKs.
+
+###Simple Usage Event called "buy"
+
+{
+    "eventId": "AAI2Cci5tDlU1qo0ued2fQAAAU-z5AuYg1qNgNo",
+    "event": "buy",
+    "entityType": "user",
+    "entityId": "5470bff8ab1sdfssd4c4d4f5ef3154579c97ce",
+    "targetEntityType": "item",
+    "targetEntityId": "iphone",
+    "properties": {},
+    "eventTime": "2015-09-09T13:55:11.000-07:00",
+    "creationTime": "2015-09-09T21:59:52.986Z"
+}
+
+###Tag Preference Event
+
+When recording a user's preference for some tag. For example if the user "buy"s an item with this tag or clicks on a tag.
+
+{
+    "eventId": "AAI2Cci5tDlU1qo0ued2fQAAAU-z5AuYhXYgOuasdfgioObdSM",
+    "event": "tag-pref",
+    "entityType": "user",
+    "entityId": "5470bff8ab14c4d4f5ef3154579c97ce",
+    "targetEntityType": "item",
+    "targetEntityId": "electronics",
+    "properties": {},
+    "eventTime": "2015-09-09T13:55:11.000-07:00",
+    "creationTime": "2015-09-09T21:59:52.979Z"
+}
+
+###Property Setting Events
+
+When treating a property like "tags" as an attribute of an item they may be attached to an item using a special event called `$set` which adds new properties to items. These properties are used to bias recommendations, which means to boost recommendations containing some property or filter out all items that do not contain some property&mdash;see the Biases section below. 
+
+{
+    "eventId": "ACeznDIiGJ2hDjY0KJwTUQAAAU-idfoih0CFSohHqi",
+    "event": "$set",
+    "entityType": "item",
+    "entityId": "iphone",
+    "properties": {
+        "tags": [
+            "electronics",
+            "phones",
+            "mobile electronics"
+        ],
+        "product_model": [
+            "6s Plus"
+        ]
+    },
+    "eventTime": "2015-09-09T14:34:49.000-07:00",
+    "creationTime": "2015-09-09T21:35:25.275Z"
+}
+
 ###Biases
 
 These take the form of boosts and filters where a neutral bias is 1.0. The importance of some part of the query may be boosted by a positive non-zero float. If the bias is < 0 it is considered a filter&mdash;meaning no recommendation is made that lacks the filter value(s). One example of a filter is where it may make sense to show only "electronics" recommendations when the user is viewing an electronics product. Biases are often applied to a list of data, for instance the user is looking at a video page with a cast of actors. The "cast" list is metadata attached to items and a query can show "people who liked this, also liked these" type recs but also include the current cast boosted by 0.5. This can be seen as showing similar item recs but using the cast in the query in a way that will not overpower the similar items (since by default they have a neutral 1.0 boost).
