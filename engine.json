@@ -26,6 +26,7 @@
         "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
+        "num": 30,
         "eventNames": ["purchase", "view"]
       }
     }

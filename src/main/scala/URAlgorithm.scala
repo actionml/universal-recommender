@@ -104,6 +104,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     }
   }
 
+  /** Calculates recs model as well as popularity model */
   def calcAll(
     sc: SparkContext,
     data: PreparedData,
@@ -171,12 +172,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val popRDD = if (popModel.nonEmpty) {
       val model = popModel.get.map { case (item, rank)  =>
         val newPM = Map(backfillFieldName -> JDouble(rank))
-        (item, PropertyMap(newPM, DateTime.now, DateTime.now))// todo: Warning, this is WRONG, need to not upsert these dates
+        (item, PropertyMap(newPM, DateTime.now, DateTime.now))
       }
       Some(model)
     } else None
 
-    val propertiesRDD = if (popModel.nonEmpty) { // todo: Bad form! doing what URModel.save should do!!!!
+    val propertiesRDD = if (popModel.nonEmpty) {
       val currentMetadata = esClient.getRDD(sc, ap.indexName, ap.typeName)
       if (!currentMetadata.isEmpty()) { // may be an empty index so ignore
         Some(popModel.get.cogroup[collection.Map[String, AnyRef]](currentMetadata)
@@ -187,16 +188,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       } else None
     } else None
 
-    //now insert new popularity rank without changing the rest of the metadata so URModel.save can write new values
-/*
-    coocurrenceMatrices: Option[List[(String, IndexedDataset)]],
-    fieldsRDD: Option[RDD[(String, PropertyMap)]],
-    indexName: String,
-    dateNames: Option[List[String]] = None,
-    nullModel: Boolean = false,
-    propertiesRDD: Option[RDD[Map[String, Any]]] = None)
-
- */
+    // returns the existing model plus new popularity ranking
     new URModel(
       None,
       None,
@@ -223,9 +215,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *              "buy": ["0", "32"],
     *              "boost": 2
     *            }
+    *          },
+    *          { // categorical boosts
+    *            "terms": {
+    *              "category": ["cat1"],
+    *              "boost": 1.05
+    *            }
     *          }
     *        ],
-    *        "must": [
+    *        "must": [ // categorical filters
     *          {
     *            "terms": {
     *              "category": ["cat1"],
@@ -233,7 +231,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *            }
     *          },
     *         {
-    *           "constant_score": {
+    *        "must_not": [//blacklisted items
+    *          {
+    *            "ids": {
+    *              "values": ["items-id1", "item-id2", ...]
+    *            }
+    *          },
+    *         {
+    *           "constant_score": {// date in query must fall between the expire and avqilable dates of an item
     *             "filter": {
     *               "range": {
     *                 "availabledate": {
@@ -245,32 +250,25 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *           }
     *         },
     *         {
-    *           "constant_score": {
+    *           "constant_score": {// date range filter in query must be between these item property values
+    *             "filter": {
+    *               "range" : {
+    *                 "expiredate" : {
+    *                   "gte": "2015-08-15T11:28:45.114-07:00"
+    *                   "lt": "2015-08-20T11:28:45.114-07:00"
+    *                 }
+    *               }
+    *             }, "boost": 0
+    *           }
+    *         },
+    *         {
+    *           "constant_score": { // this orders popular items for backfill
     *              "filter": {
     *                 "match_all": {}
     *              },
     *              "boost": 0
     *           }
     *        }
-    *        "must": [
-    *          {
-    *            "terms": {
-    *              "category": ["cat1"]
-    *            }
-    *          },
-    *          {
-    *            "constant_score": {
-    *              "filter": {
-    *                "range" : {
-    *                  "expiredate" : {
-    *                    "gte": "2015-08-15T11:28:45.114-07:00"
-    *                    "lt": "2015-08-20T11:28:45.114-07:00"
-    *                  }
-    *                }
-    *              }, "boost": 0
-    *            }
-    *          }
-    *        ]
     *      }
     *    }
     *  }
@@ -286,7 +284,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val backfillFieldName = ap.backfillField.getOrElse(BackfillField()).name
     val queryAndBlacklist = buildQuery(ap, query, backfillFieldName)
     val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
-    removeBlacklisted(recs, query, queryAndBlacklist._2)
+    // should have all blacklisted items excluded removeBlacklisted(recs, query, queryAndBlacklist._2)
+    recs
   }
 
   /** take out any recs that have been blacklisted, perhaps because the user has seen them before or
@@ -392,57 +391,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
         render(("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> 0)))}.toList
       val must: List[JValue] = mustFields ::: filteringDateRange
 
-      /* Final form of query with all fields including popularity backfill
-      Todo: check that the query is pruned to minimum needed for the query data
-
-      GET /urindex/items/_search
-       {
-         "size": 10,
-         "query": {
-            "bool": {
-               "should": [
-                  {
-                     "terms": {
-                        "purchase": [
-                           "some item"
-                        ]
-                     }
-                  },
-                  {
-                     "constant_score": {
-                        "filter": {
-                           "match_all": {}
-                        },
-                        "boost": 0
-                     }
-                  }
-               ],
-               "must": [
-                  {
-                     "terms": {
-                        "category": [
-                           "phones"
-                        ]
-                     }
-                  }
-               ],
-               "minimum_should_match": 1
-            }
-         },
-         "sort": [
-            {
-               "_score": {
-                  "order": "desc"
-               }
-            },
-            {
-               "popRank": {
-                  "unmapped_type": "double"
-               }
-            }
-         ]
-      }
-      */
+      val mustNotFields: JValue = render(("ids" -> ("values" -> getExcludedItems (alluserEvents._2, query)) ~ ("boost" -> 0)))
+      val mustNot: JValue = mustNotFields
 
       val popQuery = if (ap.recsModel.getOrElse("all") == "all" ||
         ap.recsModel.getOrElse("all") == "backfill") {
@@ -458,6 +408,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
                |}""".stripMargin)))
       } else None
 
+
       val json =
         (
           ("size" -> numRecs) ~
@@ -465,6 +416,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
             ("bool"->
               ("should"-> should) ~
               ("must"-> must) ~
+              ("must_not"-> mustNot) ~
               ("minimum_should_match" -> 1))
           ) ~
           ("sort" -> popQuery))
@@ -475,6 +427,27 @@ class URAlgorithm(val ap: URAlgorithmParams)
       case e: IllegalArgumentException =>
         ("", List.empty[Event])
     }
+  }
+
+  /** Create a list of item ids that the user has interacted with or are not to be included in recommendations */
+  def getExcludedItems(userEvents: List[Event], query: Query): List[String] = {
+
+    val blacklistedItems = userEvents.filter { event =>
+      if (ap.blacklistEvents.nonEmpty) {
+        // either a list or an empty list of filtering events so honor them
+        if (ap.blacklistEvents.get == List.empty[String]) false // no filtering events so all are allowed
+        else if (ap.blacklistEvents.get.contains(event.event)) true else false // if its filtered remove it, else allow
+      } else if (ap.eventNames(0).equals(event.event)) true else false // remove the primary event if nothing specified
+    }.map (_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrElse(List.empty[String])
+    .distinct
+
+    // Now conditionally add the query item itself
+    val includeSelf = query.returnSelf.getOrElse(ap.returnSelf.getOrElse(false))
+    val allExcludedItems = if ( !includeSelf && query.item.nonEmpty )
+      blacklistedItems :+ query.item.get // add the query item to be excuded
+    else
+      blacklistedItems
+    allExcludedItems.distinct
   }
 
   /** Get similar items for an item, these are already in the action correlators in ES */

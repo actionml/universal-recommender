@@ -3,7 +3,7 @@ package org.template
 import java.util
 
 import grizzled.slf4j.Logger
-import io.prediction.data.storage.{StorageClientConfig, elasticsearch}
+import io.prediction.data.storage.{Storage, StorageClientConfig, elasticsearch}
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -12,8 +12,11 @@ import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.get.GetResponse
+import org.elasticsearch.client.transport.TransportClient
+import org.elasticsearch.common.settings.{Settings, ImmutableSettings}
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
+import org.elasticsearch.node.NodeBuilder._
 
 import scala.collection.immutable
 
@@ -29,11 +32,14 @@ import scala.collection.immutable
 object esClient {
   @transient lazy val logger = Logger[this.type]
 
-  private val esClient = new elasticsearch.StorageClient(StorageClientConfig())
+  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
+      new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
+    else
+      throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
+        "proper configuration settings")
+
+  // wrong way that uses only default settings, which will be a localhost ES sever.
   //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
-  //should be
-//private val client = Storage.getSource("ELASTICSEARCH").client
-  private val client = new elasticsearch.StorageClient(StorageClientConfig()).client
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
     * the changes will not be reflected.
@@ -42,6 +48,7 @@ object esClient {
     * @return true if all is well
     */
   def deleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
+    val debug = client.connectedNodes()
     if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists()) {
       val delete = client.admin().indices().delete(new DeleteIndexRequest(indexName)).actionGet()
       if (!delete.isAcknowledged) {
@@ -58,15 +65,11 @@ object esClient {
     }
   }
 
-  /** Creates a new empty index in Elasticsearch
-    *"properties": {
-                "type" : "string",
-                "index" : "not_analyzed",
-                "norms" : {
-                    "enabled" : false
-                }
-            }
+  /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
     * @param indexName elasticsearch name
+    * @param indexType names the type of index, usually use the item name
+    * @param fieldNames ES field names
+    * @param typeMappings indicates which ES fields are to be not_analyzed without norms
     * @param refresh should the index be refreshed so the create is committed
     * @return true if all is well
     */
@@ -109,10 +112,10 @@ object esClient {
       fieldNames.foreach { fieldName =>
         if (typeMappings.nonEmpty && typeMappings.get.contains(fieldName))
           mappings += (fieldName + mappingsField(typeMappings.get(fieldName)))
-        else
+        else // unspecified fields are treated as not_analyzed strings
           mappings += (fieldName + mappingsField("string"))
       }
-      mappings += mappingsTail
+      mappings += mappingsTail // any other string is not_analyzed
 
       val cir = new CreateIndexRequest(indexName).mapping("items",mappings)
       val create = client.admin().indices().create(cir).actionGet()
