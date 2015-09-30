@@ -26,8 +26,14 @@
         "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
-        "num": 30,
-        "eventNames": ["purchase", "view"]
+        "eventNames": ["purchase", "view"],
+        "backfillField": {
+          "name": "popRank",
+          "backfillType": "popular",
+          "comment": "StartDate used only for testing, remove for production",
+          "startDate": "2015-08-12T11:28:45.114-07:00",
+          "duration": 259200
+        }
       }
     }
   ]

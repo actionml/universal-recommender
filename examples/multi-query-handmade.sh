@@ -5,7 +5,7 @@ echo "'python examples/import_handmade_eventserver.py --accesskey <your-access-k
 echo "If run on other data the comments about what to expect may not apply, especailly for date range queries"
 
 echo ""
-echo "Recommendations for user: u1"
+echo "Recommendations for user: u1. galxy, nexus, surface"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -14,7 +14,7 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u2"
+echo "Recommendations for user: u2. iphone, ipad, surface"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u2"
@@ -23,7 +23,7 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u3"
+echo "Recommendations for user: u3. galaxy, ipad, iphone, nexus"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u3"
@@ -32,7 +32,7 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u4"
+echo "Recommendations for user: u4. ipad, nexus, surface"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u4"
@@ -41,10 +41,19 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u5"
+echo "Recommendations for user: u5. galaxy, iphone, nexus, surface, ipad"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u5"
+}' http://localhost:8000/queries.json
+echo ""
+#sleep 2
+
+echo ""
+echo "Recommendations for anonymous user: u10, all from popularity. iphone, nexus, galaxy, surface, ipad"
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u10"
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
@@ -140,7 +149,7 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u1 with a tablets boost, blacklist 'ipad'"
+echo "Recommendations for user: u1 with a tablets boost, blacklist 'nexus', should get only surface, galaxy"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -150,14 +159,14 @@ curl -H "Content-Type: application/json" -d '
         "values": ["tablets"],
         "bias": 2
     }],
-    "blacklistItems": ["ipad"]
+    "blacklistItems": ["nexus"]
 
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u1 with a phones boost, blacklist 'ipad'"
+echo "Recommendations for user: u1 with a phones boost, blacklist 'galaxy', should only get tablets"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -167,13 +176,13 @@ curl -H "Content-Type: application/json" -d '
         "values": ["phones"],
         "bias": 2
     }],
-    "blacklistItems": ["ipad"]
+    "blacklistItems": ["galaxy"]
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u1 with a tablets filter, blacklist 'ipad'"
+echo "Recommendations for user: u1 with a tablets filter, blacklist 'surface', should get only nexus"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -183,14 +192,14 @@ curl -H "Content-Type: application/json" -d '
         "values": ["tablets"],
         "bias": -2
     }],
-    "blacklistItems": ["ipad"]
+    "blacklistItems": ["surface"]
 
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u1 with a phones filter, blacklist 'ipad'"
+echo "Recommendations for user: u1 with a phones filter, blacklist 'galaxy', will get nothing since query is over-constrained"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -200,7 +209,7 @@ curl -H "Content-Type: application/json" -d '
         "values": ["phones"],
         "bias": -2
     }],
-    "blacklistItems": ["ipad"]
+    "blacklistItems": ["galaxy"]
 
 
 }' http://localhost:8000/queries.json
@@ -208,22 +217,22 @@ echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for user: u1, blacklist 'ipad'"
+echo "Recommendations for user: u1, blacklist 'galaxy', should get nexus, surface"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
-    "blacklistItems": ["ipad"]
+    "blacklistItems": ["nexus"]
 
 }' http://localhost:8000/queries.json
 echo ""
 #sleep 2
 
 echo ""
-echo "Recommendations for item: surface, should return none, blacklist 'ipad'"
+echo "Recommendations for item: surface, blacklist 'ipad', should get galaxy, iphone, nexus"
 curl -H "Content-Type: application/json" -d '
 {
     "item": "surface",
-    "num": 4,
+    "num": 5,
     "blacklistItems": ["ipad"]
 
 }' http://localhost:8000/queries.json
@@ -272,7 +281,7 @@ echo ""
 
 echo ""
 echo ""
-echo "Warning: for the date range queries to work you must substitude dates that fit in the range when the events were imported and this is fixed in examples/import_handmade_eventserver.py"
+echo "Warning: for the date range queries to work you must substitute dates that fit in the range when the events were imported and this is fixed in examples/import_handmade_eventserver.py"
 echo ""
 echo "Recommendations for user: u1, no date range"
 curl -H "Content-Type: application/json" -d '
@@ -282,19 +291,19 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1 after 8-12 so all"
+echo "Recommendations for user: u1 after 8-10 so galaxy, nexus, surface"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
     "dateRange":{
         "name": "date",
-        "after": "2015-08-12T11:28:45.114-07:00"
+        "after": "2015-08-10T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u1 before 10-01 so all"
+echo "Recommendations for user: u1 before 10-01 so galaxy, nexus, surface"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -306,20 +315,20 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, no filter, narrow date range before 8/31 and after 8/02"
+echo "Recommendations for user: u1, before 10/1 and after 8/10, galaxy, nexus, surface"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
     "dateRange":{
         "name": "date",
-        "before": "2015-08-31T11:28:45.114-07:00",
-        "after": "2015-09-02T11:28:45.114-07:00"
+        "before": "2015-10-01T11:28:45.114-07:00"
+        "after": "2015-08-10T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, 'tablets' filter, narrow date range before 8/31 and after 8/02"
+echo "Recommendations for user: u1, 'tablets' filter, before 10/1 and after 8/10"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
@@ -330,14 +339,14 @@ curl -H "Content-Type: application/json" -d '
     }],
     "dateRange":{
         "name": "date",
-        "before": "2015-08-31T11:28:45.114-07:00",
-        "after": "2015-09-02T11:28:45.114-07:00"
+        "before": "2015-10-01T11:28:45.114-07:00"
+        "after": "2015-08-10T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u3, 'phones' boost, wide date range before 9/05 and after 8/13"
+echo "Recommendations for user: u3, 'phones' boost, before 10/1 and after 8/10"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u3",
@@ -348,8 +357,8 @@ curl -H "Content-Type: application/json" -d '
     }],
     "dateRange":{
         "name": "date",
-        "before": "2015-09-05T11:28:45.114-07:00",
-        "after": "2015-08-13T11:28:45.114-07:00"
+        "before": "2015-10-01T11:28:45.114-07:00"
+        "after": "2015-08-10T11:28:45.114-07:00"
     }
 }' http://localhost:8000/queries.json
 echo ""
@@ -366,25 +375,14 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, should return nexus only. Note that items with a missing range in their properties will never be returned by this query"
+echo "Recommendations for user: u1, using currentDate type filter cannot work unless both avaiableDate and expireDate are set so will return nexus only"
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u1",
     "num": 10,
-    "currentDate": "2015-09-02T12:24:41-07:00"
+    "currentDate": "2015-08-12T12:24:41-07:00"
 }' http://localhost:8000/queries.json
 echo ""
-
-echo ""
-echo "Recommendations for user: u1, should return nexus only. Note that items with a missing range in their properties will never be returned by this query"
-curl -H "Content-Type: application/json" -d '
-{
-    "user": "u1",
-    "num": 10,
-    "currentDate": "2015-08-30T12:24:41-07:00"
-}' http://localhost:8000/queries.json
-echo ""
-
 
 echo ""
 echo "Recs that rely on popularity since the user has no usage data"
@@ -412,7 +410,7 @@ curl -H "Content-Type: application/json" -d '
     "fields": [{
         "name": "category",
         "values": ["tablets"],
-        "bias": 1.005
+        "bias": 10
     }]
 }' http://localhost:8000/queries.json
 echo ""
@@ -433,13 +431,13 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for non-existant user: u10, all from popularity, tablets filter and date filter, should be nexus only if the date fields is valid, otherewise none"
+echo "Recommendations for non-existant user: u10, all from popularity, tablets filter and date filter, should be nexus only"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
     "user": "u10",
     "num": 10,
-    "currentDate": "2015-09-02T12:24:41-07:00",
+    "currentDate": "2015-08-11T11:28:45.114-07:00",
     "fields": [{
         "name": "category",
         "values": ["tablets"],

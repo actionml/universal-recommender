@@ -42,8 +42,9 @@ object defaultURAlgorithmParams {
 
 case class BackfillField(
   name: String = "popRank",
-  backfillType: String = "popular",// trending, etc algo TBD
+  backfillType: String = "popular", // may be 'hot', or 'trending' also
   eventnames: Option[List[String]] = None, // None means use the algo eventnames list, otherwise a list of events
+  startDate: Option[String] = None, // used only for tests, specifies the start (oldest date) of the popModel's duration
   duration: Int = 259200) // number of seconds worth of events to use in calculation of backfill
 
 /** Instantiated from engine.json */
@@ -266,7 +267,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *              "filter": {
     *                 "match_all": {}
     *              },
-    *              "boost": 0
+    *              "boost": 0.000001 // must have as least a small number to be boostable
     *           }
     *        }
     *      }
@@ -380,7 +381,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
           |    "filter": {
           |      "match_all": {}
           |    },
-          |    "boost": 0
+          |    "boost": 0.000000001
           |  }
           |}
           |""".stripMargin))

@@ -138,6 +138,13 @@ object esClient {
     client.admin().indices().refresh(new RefreshRequest(indexName)).actionGet()
   }
 
+  /** Create new index and hot-swap the new after it's indexed and ready to take over, then delete the old */
+  def hotSwap(alias: String, indexRDD: RDD[Map[String, Any]]): Unit = {
+    // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
+    //val oldIndexURI =
+
+  }
+
   /** Performs a search using the JSON query String
     *
     * @param query the JSON query string parable by Elasticsearch

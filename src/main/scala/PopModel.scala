@@ -1,24 +1,42 @@
 package org.template
 
+import grizzled.slf4j.Logger
 import io.prediction.data.storage.Event
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import io.prediction.data.store.PEventStore
-import org.joda.time.{Duration, DateTime, Interval}
+import org.joda.time.format.ISODateTimeFormat
+import org.joda.time.{DateTime, Interval}
+
 
 object PopModel {
+
+  @transient lazy val logger = Logger[this.type]
+
   def calc (
     modelName: Option[String] = None,
     eventNames: List[String],
     appName: String,
-    duration: Int = 0 )(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
+    duration: Int = 0,
+    startDateOption: Option[String] = None)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
+
+    // startDate should always be 'now' except in unusual conditions like for testing
+    val startDate = if (startDateOption.isEmpty ) DateTime.now else {
+      try {
+        ISODateTimeFormat.dateTimeParser().parseDateTime(startDateOption.get)
+      } catch {
+        case e: IllegalArgumentException => e
+          logger.warn("Bad startDate for popModel: " + startDateOption.get + " using 'now'")
+          DateTime.now
+      }
+    }
 
     // based on type of popularity model return a set of (item-id, ranking-number) for all items
     modelName match {
-      case Some("popular") => calcPopular(appName, eventNames, new Interval(DateTime.now.minusSeconds(duration), DateTime.now))
-      case Some("trending") => calcTrending(appName, eventNames, new Interval(DateTime.now.minusSeconds(duration), DateTime.now))
-      case Some("hot") => calcHot(appName, eventNames, new Interval(DateTime.now.minusSeconds(duration), DateTime.now))
-      case _ => None // debatable, this is an error may want exception
+      case Some("popular") => calcPopular(appName, eventNames, new Interval(startDate.minusSeconds(duration), startDate))
+      case Some("trending") => calcTrending(appName, eventNames, new Interval(startDate.minusSeconds(duration), startDate))
+      case Some("hot") => calcHot(appName, eventNames, new Interval(startDate.minusSeconds(duration), startDate))
+      case _ => None // debatable, this is either an error or may need to default to popular, why call popModel otherwise
     }
   }
 
