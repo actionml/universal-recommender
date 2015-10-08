@@ -28,7 +28,8 @@
         "eventNames": ["purchase", "view"],
         "recsModel": "backfill",
         "backfillField": {
-          "backfillType": "popular"
+          "endDate": "2015-10-01T11:28:45.114-07:00",
+          "backfillType": "hot"
         }
       }
     }

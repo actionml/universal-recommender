@@ -7,6 +7,7 @@ import io.prediction.data.storage.{Storage, StorageClientConfig, elasticsearch}
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest
@@ -14,11 +15,13 @@ import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.get.GetResponse
 import org.elasticsearch.client.transport.TransportClient
 import org.elasticsearch.common.settings.{Settings, ImmutableSettings}
+import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
 import org.elasticsearch.node.NodeBuilder._
 
 import scala.collection.immutable
+import scala.collection.parallel.mutable
 
 /** Elasticsearch notes:
   * 1) every query clause wil laffect scores unless it has a constant_score and boost: 0
@@ -48,7 +51,7 @@ object esClient {
     * @return true if all is well
     */
   def deleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
-    val debug = client.connectedNodes()
+    //val debug = client.connectedNodes()
     if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists()) {
       val delete = client.admin().indices().delete(new DeleteIndexRequest(indexName)).actionGet()
       if (!delete.isAcknowledged) {
@@ -139,9 +142,43 @@ object esClient {
   }
 
   /** Create new index and hot-swap the new after it's indexed and ready to take over, then delete the old */
-  def hotSwap(alias: String, indexRDD: RDD[Map[String, Any]]): Unit = {
+  def hotSwap(alias: String, typeName: String = "items", indexRDD: RDD[scala.collection.Map[String,Any]]): Unit = {
+  //def hotSwap(alias: String, typeName: String = "items", indexRDD: RDD[Map[String, Any]]): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
-    //val oldIndexURI =
+    val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
+    val newIndex = alias + "_" + DateTime.now().getMillis.toString
+    val newIndexURI = "/" + newIndex + "/" + typeName
+    indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
+    //refreshIndex(newIndex)
+
+    if (!aliasMetadata.isEmpty
+    && aliasMetadata.get(alias) != null
+    && aliasMetadata.get(alias).get(0) != null) { // was alias so remove the old one
+      //append the DateTime to the alias to create an index name
+      val oldIndex = aliasMetadata.get(alias).get(0).getIndexRouting
+      client.admin().indices().prepareAliases()
+        .removeAlias(oldIndex, alias)
+        .addAlias(newIndex, alias)
+        .execute().actionGet()
+      deleteIndex(oldIndex) // now can safely delete the old one since it's not used
+    } else { // todo: could be more than one index with 'alias' so
+      // no alias so add one
+      //to clean up any indexes that exist with the alias name
+      val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
+      if (indices.contains(alias)) {
+        //refreshIndex(alias)
+        deleteIndex(alias) // index named like the new alias so delete it
+      }
+      // slight downtime, but only for one case of upgrading the UR engine from v0.1.x to v0.2.0+
+      client.admin().indices().prepareAliases()
+        .addAlias(newIndex, alias)
+        .execute().actionGet()
+    }
+    // clean out any old indexes that were the product of a failed train?
+    val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
+    indices.map{ index =>
+      if (index.contains(alias) && index != newIndex) deleteIndex(index) //clean out any old orphaned indexes
+    }
 
   }
 
@@ -179,7 +216,48 @@ object esClient {
       .actionGet().getSource
   }
 
-  def getRDD(sc: SparkContext, index: String, typeName: String): RDD[(String, collection.Map[String, AnyRef])] = {
-    sc.esRDD(index + "/" + typeName)
+  /*
+  public Set<String> getIndicesFromAliasName(String aliasName) {
+
+    IndicesAdminClient iac = client.admin().indices();
+    ImmutableOpenMap<String, List<AliasMetaData>> map = iac.getAliases(new GetAliasesRequest(aliasName))
+            .actionGet().getAliases();
+
+    final Set<String> allIndices = new HashSet<>();
+    map.keysIt().forEachRemaining(allIndices::add);
+    return allIndices;
+}
+   */
+  def getIndexName(alias: String): Option[String] = {
+
+    val allIndicesMap = client.admin().indices().getAliases(new GetAliasesRequest(alias)).actionGet().getAliases
+
+    if (allIndicesMap.size() == 1) { // must be a 1-1 mapping of alias <-> index
+      var  indexName: String = ""
+      var itr = allIndicesMap.keysIt()
+      while ( itr.hasNext )
+        indexName = itr.next()
+      Some(indexName) // the one index the alias points to
+    } else {
+      // delete all the indices that are pointed to by the alias, they can't be used
+      logger.warn("There is no 1-1 mapping of index to alias so deleting the old indexes that are referenced by the " +
+        "alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
+      val i = allIndicesMap.keys().toArray.asInstanceOf[Array[String]]
+      for ( indexName <- i ){
+        deleteIndex(indexName, true)
+      }
+
+      None // if more than one abort, need to clean up bad aliases
+    }
+  }
+
+  def getRDD(sc: SparkContext, alias: String, typeName: String):
+  Option[RDD[(String, collection.Map[String, AnyRef])]] = {
+    val index = getIndexName(alias)
+    if (index.nonEmpty) { // ensures there is a 1-1 mapping of alias to index
+      val indexAsRDD = sc.esRDD(alias + "/" + typeName)
+      //val debug = indexAsRDD.count()
+      Some(indexAsRDD)
+    } else None // error so no index for the alias
   }
 }

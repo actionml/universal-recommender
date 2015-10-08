@@ -44,7 +44,7 @@ case class BackfillField(
   name: String = "popRank",
   backfillType: String = "popular", // may be 'hot', or 'trending' also
   eventnames: Option[List[String]] = None, // None means use the algo eventnames list, otherwise a list of events
-  startDate: Option[String] = None, // used only for tests, specifies the start (oldest date) of the popModel's duration
+  endDate: Option[String] = None, // used only for tests, specifies the start (oldest date) of the popModel's duration
   duration: Int = 259200) // number of seconds worth of events to use in calculation of backfill
 
 /** Instantiated from engine.json */
@@ -98,7 +98,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     ap.recsModel.getOrElse(defaultURAlgorithmParams.DefaultRecsModel) match {
       case "all" => calcAll(sc, data, dateNames, backfillFieldName)
-      case "collabFiltering" => calcAll(sc, data, dateNames, backfillFieldName, popular = true )
+      case "collabFiltering" => calcAll(sc, data, dateNames, backfillFieldName, popular = false )
       case "backfill" => calcPop(sc, data, dateNames, backfillFieldName)
       // error, throw an exception
       case _ => throw new IllegalArgumentException("Bad recsModel in engine definition params, possibly a bad json value.")
@@ -132,9 +132,16 @@ class URAlgorithm(val ap: URAlgorithmParams)
       .map(_.asInstanceOf[IndexedDatasetSpark]) // strip action names
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
-    val duration = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
     val popModel = if (popular) {
+      val duration = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
       val backfillEvents = backfillParams.eventnames.getOrElse(List(ap.eventNames.head))
+      val start = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).endDate
+      PopModel.calc(
+        Some(backfillParams.backfillType),
+        backfillEvents,
+        ap.appName,
+        duration,
+        start)(sc)
       PopModel.calc(Some(backfillParams.backfillType), backfillEvents, ap.appName, duration)(sc)
     } else None
 
@@ -167,9 +174,16 @@ class URAlgorithm(val ap: URAlgorithmParams)
     data: PreparedData,
     dateNames: Option[List[String]] = None,
     backfillFieldName: String = ""): URModel = {
+    
     val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
     val backfillEvents = backfillParams.eventnames.getOrElse(List(ap.eventNames.head))//default to first/primary event
-    val popModel = PopModel.calc(Some(backfillParams.backfillType), backfillEvents, ap.appName, backfillParams.duration)(sc)
+    val start = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).endDate
+    val popModel = PopModel.calc(
+      Some(backfillParams.backfillType), 
+      backfillEvents, 
+      ap.appName, 
+      backfillParams.duration, 
+      start)(sc)
     val popRDD = if (popModel.nonEmpty) {
       val model = popModel.get.map { case (item, rank)  =>
         val newPM = Map(backfillFieldName -> JDouble(rank))
@@ -180,11 +194,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val propertiesRDD = if (popModel.nonEmpty) {
       val currentMetadata = esClient.getRDD(sc, ap.indexName, ap.typeName)
-      if (!currentMetadata.isEmpty()) { // may be an empty index so ignore
-        Some(popModel.get.cogroup[collection.Map[String, AnyRef]](currentMetadata)
+      if (currentMetadata.nonEmpty) { // may be an empty index so ignore
+        Some(popModel.get.cogroup[collection.Map[String, AnyRef]](currentMetadata.get)
         .map { case (item, (ranks, pms)) =>
-          val map = pms.head + (backfillFieldName -> ranks.head)
-          map
+          if (ranks.nonEmpty) pms.head + (backfillFieldName -> ranks.head)
+          else if (pms.nonEmpty) pms.head
+          else Map.empty[String, AnyRef] // could happen if only calculating popularity, which may leave out items with
+          // no events
         })
       } else None
     } else None
@@ -381,7 +397,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
           |    "filter": {
           |      "match_all": {}
           |    },
-          |    "boost": 0.000000001
+          |    "boost": 0
           |  }
           |}
           |""".stripMargin))

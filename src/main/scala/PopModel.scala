@@ -18,24 +18,24 @@ object PopModel {
     eventNames: List[String],
     appName: String,
     duration: Int = 0,
-    startDateOption: Option[String] = None)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
+    endDateOption: Option[String] = None)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
 
     // startDate should always be 'now' except in unusual conditions like for testing
-    val startDate = if (startDateOption.isEmpty ) DateTime.now else {
+    val endDate = if (endDateOption.isEmpty ) DateTime.now else {
       try {
-        ISODateTimeFormat.dateTimeParser().parseDateTime(startDateOption.get)
+        ISODateTimeFormat.dateTimeParser().parseDateTime(endDateOption.get)
       } catch {
         case e: IllegalArgumentException => e
-          logger.warn("Bad startDate for popModel: " + startDateOption.get + " using 'now'")
+          logger.warn("Bad endDate for popModel: " + endDateOption.get + " using 'now'")
           DateTime.now
       }
     }
 
     // based on type of popularity model return a set of (item-id, ranking-number) for all items
     modelName match {
-      case Some("popular") => calcPopular(appName, eventNames, new Interval(startDate.minusSeconds(duration), startDate))
-      case Some("trending") => calcTrending(appName, eventNames, new Interval(startDate.minusSeconds(duration), startDate))
-      case Some("hot") => calcHot(appName, eventNames, new Interval(startDate.minusSeconds(duration), startDate))
+      case Some("popular") => calcPopular(appName, eventNames, new Interval(endDate.minusSeconds(duration), endDate))
+      case Some("trending") => calcTrending(appName, eventNames, new Interval(endDate.minusSeconds(duration), endDate))
+      case Some("hot") => calcHot(appName, eventNames, new Interval(endDate.minusSeconds(duration), endDate))
       case _ => None // debatable, this is either an error or may need to default to popular, why call popModel otherwise
     }
   }
@@ -89,11 +89,14 @@ object PopModel {
     val newerInterval = new Interval(middleInterval.getEnd, interval.getEnd)
 
     val olderPopRDD = calcPopular(appName, eventNames, olderInterval)
-    if (olderPopRDD.nonEmpty){
+    if (olderPopRDD.nonEmpty){ // todo: may want to allow an interval with no events, give them 0 counts
+      //val debug = olderPopRDD.get.count()
       val middlePopRDD = calcPopular(appName, eventNames, middleInterval)
       if (middlePopRDD.nonEmpty){
+        //val debug = middlePopRDD.get.count()
         val newerPopRDD = calcPopular(appName, eventNames, newerInterval)
         if (newerPopRDD.nonEmpty){
+          //val debug = newerPopRDD.get.count()
           val newVelocityRDD = newerPopRDD.get.join(middlePopRDD.get).map { case( item, (newerScore, olderScore)) =>
             val velocity = (newerScore - olderScore)
             (item, velocity)

@@ -27,13 +27,6 @@
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase", "view"],
-        "backfillField": {
-          "name": "popRank",
-          "backfillType": "popular",
-          "comment": "StartDate used only for testing, remove for production",
-          "startDate": "2015-08-12T11:28:45.114-07:00",
-          "duration": 259200
-        }
       }
     }
   ]

@@ -115,27 +115,37 @@ class URModel(
       logger.info("Grouping all correlators into doc + fields for writing to index")
       val esRDDs: List[RDD[(String, Map[String, Any])]] =
         (correlators ::: properties).filterNot(c => c.isEmpty())
-      val esFields = groupAll(esRDDs).map { case (item, map) =>
-        // todo: every map's items must be checked for value type and converted before writing to ES
-        val esMap = map + ("id" -> item)
-        esMap
-      }
+      if (esRDDs.nonEmpty) {
+        val esFields = groupAll(esRDDs).map { case (item, map) =>
+          // todo: every map's items must be checked for value type and converted before writing to ES
+          val esMap = map + ("id" -> item)
+          esMap
+        }
+        // create a new index then hot-swap the new index by re-aliasing to it then delete old index
+        logger.info("New data to index, performing a hot swap of the index.")
+        esClient.hotSwap(params.indexName, params.typeName, esFields.asInstanceOf[RDD[scala.collection.Map[String,Any]]])
+      } else logger.warn("No data to write. May have been caused by a failed or stopped `pio train`, " +
+        "try running it again")
 
-      logger.info(s"Deleting index: ${esIndexURI}")
-      esClient.deleteIndex(params.indexName)
-      logger.info(s"Creating new index: ${esIndexURI}")
-      esClient.createIndex(params.indexName, params.typeName, allFields, typeMappings = typeMappings)
+      //logger.info(s"Deleting index: ${esIndexURI}")
+      //esClient.deleteIndex(params.indexName)
+      //logger.info(s"Creating new index: ${esIndexURI}")
+      //esClient.createIndex(params.indexName, params.typeName, allFields, typeMappings = typeMappings)
 
       // es.mapping.id needed to get ES's doc id out of each rdd's Map("id")
-      logger.info(s"Writing new ES style rdd to index: ${esIndexURI}")
-      esFields.saveToEs(esIndexURI, Map("es.mapping.id" -> "id"))
+      //logger.info(s"Writing new ES style rdd to index: ${esIndexURI}")
+      //esFields.saveToEs(esIndexURI, Map("es.mapping.id" -> "id"))
       // todo: check to see if a flush or refresh is needed after writing all new data to the index
       // esClient.admin().indices().flush(new FlushRequest(params.indexName)).actionGet()
-      logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
+      //logger.info(s"Finished writing to index: /${params.indexName}/${params.typeName}")
+
     } else {
       // this happens when updating only the popularity backfill model, it will write out the existing
       // index with upserted popularity ranking numbers. Seems draconian but the index should handle this
-      propertiesRDD.get.saveToEs(esIndexURI, Map("es.mapping.id" -> "id"))
+      //propertiesRDD.get.saveToEs(esIndexURI, Map("es.mapping.id" -> "id"))
+
+      // create a new index then hot-swap the new index by re-aliasing to it then delete old index
+      esClient.hotSwap(params.indexName, params.typeName, propertiesRDD.get)
     }
     true
   }
