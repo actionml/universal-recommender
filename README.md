@@ -20,6 +20,7 @@ Check the prerequisites below before setup, it will inform choices made.
 
 ##Important Notes for the Impatient
 
+ - The Universal Recommender v0.2.0+ requires PredictionIO v0.9.5+
  - When sending events through the SDK, REST API, or importing it is required that all usage/preference events are named in the engine.json and **there must be data for the first named event** otherwise there will be **no model created** and errors will occur during traing.
  - When sending usage events it is required that the entityType is "user" and targetEntityType is "item". The type of the item is inferred from the event names, which must be one of the eventNames in the engine.json.
  - **Elasticsearch**: The UR **requires Eleasticsearch** since it performs the last step in the algorithm. It will store the model created at `pio train` time.
