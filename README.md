@@ -9,7 +9,7 @@ Check the prerequisites below before setup, it will inform choices made.
  2. Make sure the PIO console and services are running, check with `pio status`
  3. [Install this template](https://docs.prediction.io/start/download/) with `pio template get PredictionIO/template-scala-parallel-universal-recommendation`
  
-**To import and experiment with the simple example data**
+###Import Sample Data
 
 1. Create a new app name, change `appName` in `engine.json`
 2. Run `pio app new **your-new-app-name**`
@@ -22,8 +22,8 @@ Check the prerequisites below before setup, it will inform choices made.
 
  - When sending events through the SDK, REST API, or importing it is required that all usage/preference events are named in the engine.json and **there must be data for the first named event** otherwise there will be **no model created** and errors will occur during traing.
  - When sending usage events it is required that the entityType is "user" and targetEntityType is "item". The type of the item is inferred from the event names, which must be one of the eventNames in the engine.json.
- - **Elasticsearch**: The UR **requires Eleasticsearch** since it performs the last step in the algorithm and also serves recommendations. It will contain the model created at `pio train` time.
-- **EventStore**: The UR only supports Hbase + Elasticsearch. And requires that there be a localhost Elasticsearch instance running at all times. Using Postgres, MySQL, and other stores is not currently supported. This restriction will be removed in PIO v0.9.5 but Elasticsearch will still be required but you will be able to replace Hbase with Postgres, MySQL, or other JDBC Database.
+ - **Elasticsearch**: The UR **requires Eleasticsearch** since it performs the last step in the algorithm. It will store the model created at `pio train` time.
+ - **EventStore**: The EventServer may use another DB than HBase but has been most heavilty tested with HBase.
  
 ##What is a Universal Recommender
 
@@ -93,6 +93,7 @@ This file allows the user to describe and set parameters that control the engine
             "appName": "URApp",
             "indexName": "urindex",
             "typeName": "items",
+            "comment": "Some data for first/primary event *must* exist."
             "eventNames": ["buy"]
           }
         }
@@ -101,7 +102,9 @@ This file allows the user to describe and set parameters that control the engine
 
 ####Complete Parameter Set
 
-A full list of tuning and config parameters is below. See the field description for specific meaning. Some of the parameters work as defaults values for every query and can be overridden or added to in the query.
+A full list of tuning and config parameters is below. See the field description for specific meaning. Some of the parameters work as defaults values for every query and can be overridden or added to in the query. 
+
+**Note:** It is strongly advised that you try the default/simple settings first before changing them. The possible exception is adding secondary events in the `eventNames` array. 
 
     {
       "id": "default",
@@ -110,7 +113,7 @@ A full list of tuning and config parameters is below. See the field description 
       "engineFactory": "org.template.RecommendationEngine",
       "datasource": {
         "params" : {
-          "name": "sample-movielens",
+          "name": "some-data",
           "appName": "URApp1",
           "eventNames": ["buy", "view"]
         }
@@ -138,12 +141,12 @@ A full list of tuning and config parameters is below. See the field description 
             "maxQueryEvents": 500,
             "num": 20,
             "seed": 3,
-            "recsModel": all
+            "recsModel": "hot",
 			"backfillField": {
   				"backfillType": "popular",
   				"eventnames": ["buy", "view"],
   				"duration": 259200
-  			}	
+  			},
             "expireDateName": "expireDateFieldName",
             "availableDateName": "availableDateFieldName",
             "dateName": "dateFieldName",
@@ -152,9 +155,9 @@ A full list of tuning and config parameters is below. See the field description 
             "returnSelf": true | false,
             “fields”: [
               {
-                “name”: ”fieldname”
+                “name”: ”fieldname”,
                 “values”: [“fieldValue1”, ...],
-                “bias”: -maxFloat..maxFloat
+                “bias”: -maxFloat..maxFloat,
               },...
             ]
           }
@@ -165,25 +168,43 @@ A full list of tuning and config parameters is below. See the field description 
 The “params” section controls most of the features of the UR. Possible values are:
 
 * **appName**: required string describing the app using the engine. Must be the same as is seen with `pio app list`
-* **indexName**: required string describing the index for all correlators, something like "urindex". The Elasticsearch URI for its REST interface is `http:/**your-master-machine**/indexName/typeName/...` You can access ES through its REST interface here.
-* **typeName**: required string describing the type in Elasticsearch terminology, something like "items". This has no important meaning but must be part of the Elastic search URI for queries.
-* **eventNames**: required array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”. or “device” can be considered actions and used in recommendations. The first action is to be considered primary, the others secondary for cooccurrence and cross-cooccurrence calculations. 
-* **maxEventsPerEventType** optional, default = 500. Amount of usage history to keep use in model calculation.
-* **maxCorrelatorsPerEventType**: optional, default = 50. An integer that controls how many of the strongest correlators are created for every event type named in `eventNames`.
-* **maxQueryEvents**: optional, default = 100. An integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
+* **indexName**: required string describing the index for all correlators, something like "urindex". The Elasticsearch URI for its REST interface is `http:/**elasticsearch-machine**/indexName/typeName/...` You can access ES through its REST interface here.
+* **typeName**: required string describing the type in Elasticsearch terminology, something like "items". This has no important meaning but must be part of the Elasticsearch URI for queries.
+* **eventNames**: required array of string identifiers describing action events recorded for users, things like “purchase”, “watch”, “add-to-cart”, even “location”, or “device” can be considered actions and used in recommendations. The first action is to be considered the primary action because it **must** exist in the data and is considered the strongest indication of user preference for items, the others are secondary for cooccurrence and cross-cooccurrence calculations. The Secondary actions/events may or may not have target entites that are not items to be recommended, like category-ids, device-ids, location-ids... For example: a category-pref event would have a category-id and the target entity but a view would have an item-id. Both work fine as long as all events are tied to users. 
+* **maxEventsPerEventType** optional (use with great care), default = 500. Amount of usage history to keep use in model calculation.
+* **maxCorrelatorsPerEventType**: optional (use with great care), default = 50. An integer that controls how many of the strongest correlators are created for every event type named in `eventNames`.
+* **maxQueryEvents**: optional (use with great care), default = 100. An integer specifying the number of most recent primary actions used to make recommendations for an individual. More implies some will be less recent actions. Theoretically using the right number will capture the user’s current interests.
 * **num**: optional, default = 20. An integer telling the engine the maximum number of recommendations to return per query but less may be returned if the query produces less results or post recommendations filters like blacklists remove some.
 * **blacklistEvents**: optional, default = the primary action. An array of strings corresponding to the actions taken on items, which will cause them to be removed from recommendations. These will have the same values as some user actions - so “purchase” might be best for an ecom application since there is often little need to recommend something the user has already bought. If this is not specified then the primary event is assumed. To blacklist no event, specify an empty array. Note that not all actions are taken on the same items being recommended. For instance every time a user goes to a category page this could be recorded as a category preference so if this event is used in a blacklist it will have no effect, the category and item ids should never match. If you want to filter certain categories, use a field filter and specify all categories allowed.
 * **fields**: optional, default = none. An array of default field based query boosts and filters applied to every query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = and array of one or more values to use in any query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
-* **userBias**: optional, default = none. Amount to favor user history in creating recommendations, 1 is neutral, and negative number means to use as a filter so the user history must be used in recommendations, any positive number greater than one will boost the importance of user history in recommendations.
-* **itemBias**: optional, default = none. Same as userbias but applied to similar items to the item supplied in the query.
+* **userBias**: optional (use with great care), default = none. Amount to favor user history in creating recommendations, 1 is neutral, and negative number means to use as a filter so the user history must be used in recommendations, any positive number greater than one will boost the importance of user history in recommendations.
+* **itemBias**: optional (use with great care), default = none. Same as userbias but applied to similar items to the item supplied in the query.
 * **expireDateName** optional, name of the item properties field that contains the date the item expires or is unavailable to recommend.
 * **availableDateName** optional, name of the item properties field that contains the date the item is available to recommend. 
 * **dateName** optional, a date or timestamp used in a `dateRange` recommendations filter.
 * **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
 * **recsModel** optional, default = "all", which means  collaborative filtering with popular items returned when no other recommendations can be made. Otherwise: "all", "collabFiltering", "backfill". If only "backfill" is specified then the train will create only some backfill type like popular. If only "collabFiltering" then no backfill will be included when there are no other recommendations.
-* **backfillField** optional, default: backfillType = popular, eventNames = only the first event, corresponding to the primary action, duration = 259200, which is the number of seconds in a 3 days. **Care** should be taken overriding the events used for popularity. The primary/first event used for recommendations is always is attached to items you wish to recommend, the other events are not neccessarily attached to the same items. If events like "category-preference" are used then popular categories will be calculated and this is probably not what you want for backfill. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce expected results. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and "trending" splits the event in two. So choose the duration accordingly.  
+* **backfillField** optional (use with great care), default: backfillType = popular, eventNames = only the first/primary event in `eventNames`, corresponding to the primary action, duration = 259200, which is the number of seconds in a 3 days. The primary/first event used for recommendations is always attached to items you wish to recommend, the other events are not neccessarily attached to the same items. If events like "category-preference" are used then popular categories will be calculated and this will have no effect for backfill. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly.  
 
 ###Queries
+
+####Simple Personalized Query
+
+	{
+	  “user”: “xyz”
+	}
+	
+This gets all default values from the engine.json and uses only action correlators for the types specified there.
+
+####Simple Similar Items Query
+
+	{
+	  “item”: “53454543513”   
+	}
+	
+This returns items that are similar to the query item, and blacklist and backfill are defaulted to what is in the engine.json
+
+####Full Query Parameters
 
 Query fields determine what data is used to match when returning recommendations. Some fields have default values in engine.json and so may never be needed in individual queries. On the other hand all values from engine.json may be overridden or added to in an individual query. The only requirement is that there must be a user or item in every query.
 
@@ -211,9 +232,9 @@ Query fields determine what data is used to match when returning recommendations
     }
 
 * **user**: optional, contains a unique id for the user. This may be a user not in the **training**: data, so a new or anonymous user who has an anonymous id. All user history captured in near realtime can be used to influence recommendations, there is no need to retrain to enable this.
-* **userBias**: optional, the amount to favor the user's history in making recommendations. The user may be anonymous as long as the id is unique from any authenticated user. This tells the recommender to return recommendations based on the user’s event history. Used for personalized recommendations. Overrides and bias in engine.json
+* **userBias**: optional (use with great care), the amount to favor the user's history in making recommendations. The user may be anonymous as long as the id is unique from any authenticated user. This tells the recommender to return recommendations based on the user’s event history. Used for personalized recommendations. Overrides and bias in engine.json.
 * **item**: optional, contains the unique item identifier
-* **itemBias**: optional, the amount to favor similar items in making recommendations. This tells the recommender to return items similar to this the item specified. Use for “people who liked this also liked these”. Overrides any bias in engine.json
+* **itemBias**: optional (use with great care), the amount to favor similar items in making recommendations. This tells the recommender to return items similar to this the item specified. Use for “people who liked this also liked these”. Overrides any bias in engine.json
 * **fields**: optional, array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
 * **num**: optional max number of recommendations to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recommendations.
 * **blacklistItems**: optional. Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recommendations. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
@@ -224,22 +245,6 @@ Query fields determine what data is used to match when returning recommendations
 All query params are optional, the only rule is that there must be an item or user specified. Defaults are either noted or taken from algorithm values, which themselves may have defaults. This allows very simple queries for the simple, most used cases.
  
 The query returns personalized recommendations, similar items, or a mix including backfill. The query itself determines this by supplying item, user or both. Some examples are:
-
-###Simple Non-contextual Personalized
-
-	{
-	  “user”: “xyz”
-	}
-	
-This gets all default values from the engine.json and uses only action correlators for the types specified there.
-
-###Simple Non-contextual Similar Items
-
-	{
-	  “item”: “53454543513”   
-	}
-	
-This returns items that are similar to the query item, and blacklist and backfill are defaulted to what is in the engine.json
 
 ###Contextual Personalized
 
@@ -328,14 +333,65 @@ This returns items based on user xyz history or similar to item 53454543513 but 
 
 **Note**:This query should be considered **experimental**. mixing user history with item similarity is possible but may have unexpected results.
 
-##Creating New Model with New Event Types
+##Events
+The Universal takes in potentially many events. These should be seen as a primary evnet, which is a very clear indication of a user preference and secondary events that we think may tell us something about user "taste" in some way. The Universal Recommender is built on a distributed Correlation Engine so it will test that these secondary events actually relate to the primary one and those that do not correlate will have little or no effect on recommendations (though they will make it longer to train and get query results). It is recommended that you start with one ot two events and increase the number as you see how these events effect results and timing.
 
-To begin using on new data with an engine that has been used with sample data or using different events follow these steps:
+###Usage Events
 
-1. Create a new app name, change `appName` in `engine.json`
+Events in PredicitonIO are sent to the EventSever in the following form:
+
+	{
+		"event" : "purchase",
+		"entityType" : "user",
+		"entityId" : "1243617",
+		"targetEntityType" : "item",
+		"targetEntityId" : "iPad",
+		"properties" : {},
+		"eventTime" : "2015-10-05T21:02:49.228Z"
+	}
+	
+This is what a "purchase" event looks like. Note that a usage event **always** is from a user and has a user id. Also the "targetEntityType" is always "item". The actual target entity is implied by the event name. So to create a "category-preference" event you would send something like this:
+
+	{
+		"event" : "category-preference",
+		"entityType" : "user",
+		"entityId" : "1243617",
+		"targetEntityType" : "item",
+		"targetEntityId" : "electronics",
+		"properties" : {},
+		"eventTime" : "2015-10-05T21:02:49.228Z"
+	}
+	
+This event would be sent when the user clicked on the "electonics" category or perhaps purchased an item that was in the "electronics" category. Note that the "targetEntityType" is always "item".
+
+###Property Change Events
+
+To attach properties to items use a $set event like this:
+
+	{
+		"event" : "$set",
+		"entityType" : "item",
+		"entityId" : "ipad",
+		"properties" : {
+			"category": ["electronics", "mobile-phones"]
+			"expireDate": "2016-10-05T21:02:49.228Z"
+		},
+		"eventTime" : "2015-10-05T21:02:49.228Z"
+	}
+
+Unless a property has a special meaning specified in the engine.json, like date values, the property is assumed to be an array of strings, which act as categorical tags. You can add things like "premium" to the "tier" property then later if the user is a subscriber you can set a filter that allows recommendations from `"tier": ["free", "premium"]` where a non subscriber might only get recommendations for `"tier": ["free"]`. These are passed in to the query using the `"fields"` parameter (see Contextual queries above).
+
+Using properties is how boosts and filters are applied to recommended items. It may seem odd to treat a category as a filter **and** as a secondary event (category-preference) but the two pieces of data are used in quite different ways. As properties they bias the recommendations, when they are events they add to user data that returns recommendations. In other words as properties they work with boost and filter business rules as secondary usage events they show something about user taste to make recommendations better.
+
+
+##Creating a New Model or Adding Event Types
+
+To begin using new data with an engine that has been used with sample data or using different events follow these steps:
+
+1. Create a new app name, backup your old `engine.json` and change `appName` in the new `engine.json`
 2. Run `pio app new **your-new-app-name**`
 3. Make any changes to `engine.json` to specify new event names and config values. Make sure `"eventNames": ["**your-primary-event**", "**a-secondary-event**", "**another-secondary-event**", ...]` contains the exact string used for your events and that the primary one is first in the list.
-4. Import new events or allow enough to accumulate into the EventStore. If you are using sample events from a file run `python data/**your-python-import-script**.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
+4. Import new events or allow enough to accumulate into the EventStore. If you are using sample events from a file run `python examples/**your-python-import-script**.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
 5. Perform `pio build`, `pio train`, and `pio deploy`
 6. Copy and edit the sample query script to match your new data. For new user ids pick a user that exists in the events, same for metadata `fields`, and items.
 7. Run your edited query script and check the recommendations.
@@ -345,8 +401,11 @@ To begin using on new data with an engine that has been used with sample data or
 ### v0.2.0
 
  - date range filters implemented
- - trending/popularity used for backfill when no other recommendations are returned by the query
+ - hot/trending/popular used for backfill and when no other recommendations are returned by the query
  - filters/bias < 0 caused scores to be altered in v0.1.1 fixed in this version so filters have no effect on scoring.
+ - the model is now hot-swapped in Elasticsearch so no downtime should be seen, in fact there is no need to run `pio deploy` to make the new model active.
+ - it is now possible to have an engine.json (call it something else) dedicated to recalculating the popularity model. This allows fast updates to poularity without recalculating the collaborative filtering model.
+ - Elasticsearch can now be in cluster mode
 
 ### v0.1.1
 
@@ -362,10 +421,8 @@ To begin using on new data with an engine that has been used with sample data or
 
 ### Known issues
 
-  - currently we require a localhost version of Elasticsearch to be running continuously. Clusters are not supported (should be fixed by release)
-  - every ES index update should be a hot swap using an alias, this is not don currently.
-  - index dropped then refreshed in `pio train` so no need to redeploy if the server is running. This violates conventions for other templates but is actually good. It means we have a hot-swapped model. If there are server timeouts during train, for the refresh response or for ongoing queries, we may need to find optimizations.
-
+ - see the github [issues list](https://github.com/PredictionIO/template-scala-parallel-universal-recommendation/issues)
+ 
 ## References
 
  * Other documentation of the algorithm is [here](http://mahout.apache.org/users/algorithms/intro-cooccurrence-spark.html)
