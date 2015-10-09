@@ -142,7 +142,7 @@ A full list of tuning and config parameters is below. See the field description 
             "maxQueryEvents": 500,
             "num": 20,
             "seed": 3,
-            "recsModel": "hot",
+            "recsModel": "all",
 			"backfillField": {
   				"backfillType": "popular",
   				"eventnames": ["buy", "view"],
