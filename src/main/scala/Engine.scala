@@ -1,5 +1,7 @@
 package org.template
 
+import java.util.Date
+
 import io.prediction.controller.{EngineFactory, Engine}
 
 /** This file contains case classes that are used with reflection to specify how query and config
@@ -15,6 +17,9 @@ case class Query(
     item: Option[String] = None, // must be a user or item id
     itemBias: Option[Float] = None, // default: whatever is in algorithm params or 1
     fields: Option[List[Field]] = None, // default: whatever is in algorithm params or None
+    currentDate: Option[String] = None, // if used will override dateRange filter, currentDate must lie between the item's
+    // expireDateName value and availableDateName value, all are ISO 8601 dates
+    dateRange: Option[DateRange] = None, // optional before and after filter applied to a date field
     blacklistItems: Option[List[String]] = None, // default: whatever is in algorithm params or None
     returnSelf: Option[Boolean] = None,// means for an item query should the item itself be returned, defaults
                                        // to what is in the algorithm params or false
@@ -25,8 +30,15 @@ case class Query(
 case class Field( // no optional values for fields, whne specified
     name: String, // name of metadata field
     values: Array[String], // fields can have multiple values like tags of a single value as when using hierarchical
-                           // taxonomies
-    bias: Float) // any positive value is a boost, negative is a filter
+    // taxonomies
+    bias: Float)// any positive value is a boost, negative is a filter
+  extends Serializable
+
+/** Used to specify the date range for a query */
+case class DateRange(
+    name: String, // name of item property for the date comparison
+    before: Option[String], // empty strings means no filter
+    after: Option[String]) // both empty should be ignored
   extends Serializable
 
 /** results of a MMRAlgoritm.predict */
@@ -44,7 +56,7 @@ object RecommendationEngine extends EngineFactory {
     new Engine(
       classOf[DataSource],
       classOf[Preparator],
-      Map("ur" -> classOf[URAlgorithm]), // IMPORTANT: "mmr" must be the "name" of the parameter set in engine.json
+      Map("ur" -> classOf[URAlgorithm]), // IMPORTANT: "ur" must be the "name" of the parameter set in engine.json
       classOf[Serving])
   }
 }

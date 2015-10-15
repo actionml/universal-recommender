@@ -1,6 +1,5 @@
 {
-  "comment":" This config file uses default settings for all but the required values see README.md for docs",
-  "id": "default",
+  "id": "popularity-only",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
@@ -27,6 +26,11 @@
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase", "view"],
+        "recsModel": "backfill",
+        "backfillField": {
+          "endDate": "2015-10-01T11:28:45.114-07:00",
+          "backfillType": "hot"
+        }
       }
     }
   ]

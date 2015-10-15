@@ -1,0 +1,22 @@
+Event: purchase entity_id: u1 target_entity_id: iphone
+Event: purchase entity_id: u1 target_entity_id: ipad
+Event: purchase entity_id: u2 target_entity_id: nexus
+Event: purchase entity_id: u2 target_entity_id: galaxy
+Event: purchase entity_id: u3 target_entity_id: surface
+Event: purchase entity_id: u4 target_entity_id: iphone
+Event: purchase entity_id: u4 target_entity_id: galaxy
+Event: view entity_id: u1 target_entity_id: phones
+Event: view entity_id: u1 target_entity_id: mobile_acc
+Event: view entity_id: u2 target_entity_id: phones
+Event: view entity_id: u2 target_entity_id: tablets
+Event: view entity_id: u2 target_entity_id: mobile_acc
+Event: view entity_id: u3 target_entity_id: mobile_acc
+Event: view entity_id: u4 target_entity_id: phones
+Event: view entity_id: u4 target_entity_id: tablets
+Event: view entity_id: u4 target_entity_id: soap
+Event: view entity_id: u5 target_entity_id: soap
+Event: $set entity_id: iphone properties/catagory: phones properties/date: 2015-08-30T12:24:41 properties/expiredate: 2015-09-01T12:24:41
+Event: $set entity_id: ipad properties/catagory: tablets properties/availabledate: 2015-08-29T12:24:41 properties/date: 2015-08-31T12:24:41 properties/expiredate: 2015-09-02T12:24:41
+Event: $set entity_id: nexus properties/catagory: tablets properties/availabledate: 2015-08-30T12:24:41 properties/date: 2015-09-01T12:24:41 properties/expiredate: 2015-09-03T12:24:41
+Event: $set entity_id: galaxy properties/catagory: phones properties/date: 2015-09-02T12:24:41 properties/expiredate: 2015-09-04T12:24:41
+Event: $set entity_id: surface properties/catagory: tablets properties/availabledate: 2015-09-01T12:24:41 properties/date: 2015-09-03T12:24:41

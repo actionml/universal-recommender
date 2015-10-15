@@ -17,7 +17,7 @@ def import_events(client, file):
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
     # For demonstration purpose, randomly mix in some buy events
-    # For the MMR add some item metadata
+    # For the UR add some item metadata
     if (random.randint(0, 1) == 1):
       client.create_event(
         event="rate",

@@ -1,6 +1,5 @@
 {
-  "comment":" This config file uses default settings for all but the required values see README.md for docs",
-  "id": "default",
+  "id": "handmade",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
@@ -27,6 +26,13 @@
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase", "view"],
+        "expireDateName": "expiredate",
+        "availableDateName": "availabledate",
+        "dateName": "date",
+        "backfillField": {
+          "backfillType": "hot",
+          "duration": 864000
+        }
       }
     }
   ]
