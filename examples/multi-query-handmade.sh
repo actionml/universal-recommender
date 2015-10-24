@@ -378,7 +378,7 @@ echo ""
 echo ""
 echo "=========================================================================================================="
 echo "Recs that rely on popularity since the user has no usage data"
-echo "Popularity is unreliable in test data unless you explicitly set the `endTime` to match the last"
+echo "Popularity is unreliable in test data unless you explicitly set the endTime to match the last"
 echo "eventTime in the imported data. In live/real world data popularity is caclulated based on an endTime = now"
 
 echo ""

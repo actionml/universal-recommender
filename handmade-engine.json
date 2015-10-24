@@ -26,13 +26,8 @@
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase", "view"],
-        "expireDateName": "expiredate",
         "availableDateName": "availabledate",
-        "dateName": "date",
-        "backfillField": {
-          "backfillType": "hot",
-          "duration": 864000
-        }
+        "expireDateName": "expiredate"
       }
     }
   ]
