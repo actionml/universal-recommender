@@ -577,9 +577,11 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     var json: List[JValue] = List.empty[JValue]
     // currentDate in the query overrides the dateRange in the same query so ignore daterange if both
-    if (query.currentDate.nonEmpty && ap.expireDateName.nonEmpty) {
+    val currentDate = query.currentDate.getOrElse(DateTime.now().toDateTimeISO.toString)
+
+    if (ap.availableDateName.nonEmpty && ap.expireDateName.nonEmpty) {// use the query date or system date
       val availableDate = ap.availableDateName.get // never None
-      val currentDate = query.currentDate.get
+      val expireDate = ap.expireDateName.get
 
       val available = s"""
         |{
@@ -597,11 +599,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
         """.stripMargin
 
       json = json :+ parse(available)
-    }
-
-    if (query.currentDate.nonEmpty && ap.expireDateName.nonEmpty){
-      val expireDate = ap.expireDateName.get
-      val currentDate = query.currentDate.get
       val expire = s"""
         |{
         |  "constant_score": {
@@ -616,11 +613,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
         |  }
         |}
         """.stripMargin
-
       json = json :+ parse(expire)
-    }
-
-    if (query.currentDate.isEmpty && query.dateRange.nonEmpty &&
+    } else if (query.dateRange.nonEmpty &&
       (query.dateRange.get.after.nonEmpty || query.dateRange.get.before.nonEmpty)) {
       val name = query.dateRange.get.name
       val before = query.dateRange.get.before.getOrElse("")
@@ -659,6 +653,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
       range += rangeEnd
 
       json = json :+ parse(range)
+    } else {
+      logger.info("Misconfigured date information, either your engine.json date settings or your query's dateRange is incorrect.\nIngoring date information for this query.")
     }
     json
   }

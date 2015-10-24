@@ -1,5 +1,6 @@
 {
-  "id": "popularity-only",
+  "comment":" This config file uses default settings for all but the required values see README.md for docs",
+  "id": "default",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
@@ -14,23 +15,20 @@
     "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
     "spark.kryo.referenceTracking": "false",
     "spark.kryoserializer.buffer.mb": "300",
+    "spark.kryoserializer.buffer": "300",
     "spark.executor.memory": "4g",
     "es.index.auto.create": "true"
   },
   "algorithms": [
     {
-      "comment": "setup to only calculate a popularity model for *hot* and add it to the existing model for backfill",
+      "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
       "name": "ur",
       "params": {
         "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
-        "eventNames": ["purchase", "view"],
-        "comment": "this will overwrite any existing popularity model, default is *popular* so add this to engine.json if you want *hot* to be always refreshed during train",
-        "recsModel": "backfill",
-        "backfillField": {
-          "backfillType": "hot"
-        }
+        "comment": "must have data for the first event or the model will not build, other events are optional"
+        "eventNames": ["purchase", "view"]
       }
     }
   ]

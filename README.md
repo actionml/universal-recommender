@@ -56,10 +56,10 @@ These take the form of boosts and filters where a neutral bias is 1.0. The impor
 
 ###Dates
 
-Dates can be used to filter recommendations in one of two ways. The methods allow the date range to be attahed to every item and checked against the current date or allow an item's date to be checked to be within a range specified in the query. One or the other of these methods can be employed in a recommendations query as long as the correct item properties have been set.
+Dates can be used to filter recommendations in one of two ways, where the data range is attached to items or is specified in the query:
 
- 1. The recommendations query can specific a `dateRange` that must encompass a date property for all values. If an item has no date property it will not be returned as a recommendation. The date field name is specified in the engine.json `date` option. The fields should contain an ISO 8601 formatted date string.
- 2. The items may contain an `expireDate` field and an `availableDate` field. Their names are specified in the engine.json. Then when a query contains a field called `currentDate` no recommendations will be returned which have expired or are not yet available. **Note**: both dates must be attached to items or they will not be recommended. To have one-sided filter make the avialable date some time far in the past and/or the expire date some time far in the future.
+ 1. The date range can be attahed to every item and checked against the current date. The current date can be in the query or defaults to the current prediction server date. This mode requires that all items have a upper and lower date attached to them as a property. It is designed to be something like an "available after" and "expired after". The default check against server date is triggered when the expireDateName and availableDateName are both specified but no date is passed in with the query. **Note**: Both dates must be attached to items or they will not be recommended. To have one-sided filter make the avialable date some time far in the past and/or the expire date some time far in the future.
+ 2. A "dateRange" can be specified in the query and the recommended items will have a date that lies between the range dates.
  
 ###Engine.json
 
@@ -67,39 +67,42 @@ This file allows the user to describe and set parameters that control the engine
 
 ####Simple Default Values
     {
-      "id": "default",
-      "description": "Default settings",
-      "comment": "replace this with your JVM package prefix, like org.apache",
-      "engineFactory": "org.template.RecommendationEngine",
-      "datasource": {
-        "params" : {
-          "name": "some-data",
-          "appName": "URApp",
-          "eventNames": ["buy"]
-        }
-      },
-      “comment”: “This is for Mahout and Elasticsearch, the values are minimums and should not be removed”,
-      "sparkConf": {
-        "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
-        "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
-        "spark.kryo.referenceTracking": "false",
-        "spark.kryoserializer.buffer.mb": "200",
-        "spark.executor.memory": "4g",
-        "es.index.auto.create": "true"
-      },
-      "algorithms": [
-        {
-          "name": "ur",
-          "params": {
-            "appName": "URApp",
-            "indexName": "urindex",
-            "typeName": "items",
-            "comment": "Some data for first/primary event *must* exist."
-            "eventNames": ["buy"]
-          }
-        }
-      ]
-    }
+	  "comment":" This config file uses default settings for all but the required values see README.md for docs",
+	  "id": "default",
+	  "description": "Default settings",
+	  "engineFactory": "org.template.RecommendationEngine",
+	  "datasource": {
+	    "params" : {
+	      "name": "sample-handmade-data.txt",
+	      "appName": "handmade",
+	      "eventNames": ["purchase", "view"]
+	    }
+	  },
+	  "sparkConf": {
+	    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+	    "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
+	    "spark.kryo.referenceTracking": "false",
+	    "spark.kryoserializer.buffer.mb": "300",
+	    "spark.kryoserializer.buffer": "300",
+	    "spark.executor.memory": "4g",
+	    "es.index.auto.create": "true"
+	  },
+	  "algorithms": [
+	    {
+	      "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
+	      "name": "ur",
+	      "params": {
+	        "appName": "handmade",
+	        "indexName": "urindex",
+	        "typeName": "items",
+	        "comment": "must have data for the first event or the model will not build, other events are optional"
+	        "eventNames": ["purchase", "view"]
+	      }
+	    }
+	  ]
+	}
+	
+
 
 ####Complete Parameter Set
 
@@ -398,6 +401,10 @@ To begin using new data with an engine that has been used with sample data or us
 7. Run your edited query script and check the recommendations.
 
 ## Versions
+
+### v0.2.1
+
+ - date ranges attached to items will be compared to the prediction servers current data if no date is provided in the query. 
 
 ### v0.2.0
 
