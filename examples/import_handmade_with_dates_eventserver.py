@@ -22,9 +22,9 @@ def import_events(client, file):
   # These date values are chosen to match the multi-query-handmade.sh queries for testing purposes
   num_samples = 50
   num_usage_event_lines = 17
-  start_date = dateutil.parser.parse("2015-08-12T11:28:45.114-07:00")
+  start_date = dateutil.parser.parse("2015-08-12T:00:00.000Z")
   item_date = start_date
-  end_date = dateutil.parser.parse("2015-10-01T11:28:45.114-07:00")
+  end_date = dateutil.parser.parse("2015-10-01T:00:00.000Z")
   date_increment = (end_date - start_date) / (num_usage_event_lines * num_samples)
   event_date = item_date
   print "Date increment: " + str(date_increment)

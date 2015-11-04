@@ -12,18 +12,54 @@ curl -H "Content-Type: application/json" -d '
     "user": "u1"
 }' http://localhost:8000/queries.json
 echo ""
-#2015-10-22T10:58:07.708-07:00
+
 
 echo ""
-echo "Recommendations for non-existant user: u10, all from popularity, tablets filter and date filter, will be empty unless you change the date to match when it was imported"
+echo "Recommendations for item: iphone 4"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u10",
-    "currentDate": "2015-10-28T10:58:07.708-07:00",
+    "item": "Iphone 4"
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for item: ipad-retina"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "item": "Ipad-retina"
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "query with no item or user id, order inserted into index"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+}' http://localhost:8000/queries.json
+echo ""
+
+
+echo ""
+echo "Recommendations for non-existant user: xyz, all from popularity"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "xyz"
+}' http://localhost:8000/queries.json
+echo ""
+
+
+echo ""
+echo "Recommendations for non-existant user: xyz, all from popularity, tablets filter"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "item": "xyz",
     "fields": [{
         "name": "category",
-        "values": ["tablets"],
+        "values": ["Tablets"],
         "bias": -1
     }]
 }' http://localhost:8000/queries.json
@@ -31,15 +67,24 @@ echo ""
 
 
 echo ""
-echo "Recommendations for user: u3, 'phones' boost, before 10/26 and after 10/22"
+echo "Recommendations for no user no item, all from popularity"
+echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u10",
-    "dateRange":{
-        "name": "date",
-        "before": "2015-10-26T10:58:07.708-07:00"
-        "after": "2015-10-22T11:28:45.114-07:00"
-    }
+}' http://localhost:8000/queries.json
+echo ""
+
+
+echo ""
+echo "Recommendations for no user no item, all from popularity, tablets filter"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "fields": [{
+        "name": "category",
+        "values": ["Tablets"],
+        "bias": -1
+    }]
 }' http://localhost:8000/queries.json
 echo ""
 

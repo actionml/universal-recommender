@@ -9,6 +9,7 @@ import datetime
 import pytz
 
 RATE_ACTIONS_DELIMITER = ","
+PROPERTIES_DELIMITER = ":"
 SEED = 1
 
 
@@ -48,17 +49,18 @@ def import_events(client, file):
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2]
     elif (data[1] == "$set"):  # must be a set event
+      properties = data[2].split(PROPERTIES_DELIMITER)
       client.create_event(
         event=data[1],
         entity_type="item",
         entity_id=data[0],
-        properties={"category": [data[2]], "expiredate": expire_date.isoformat(),
-                    "availabledate": available_date.isoformat(), "date": event_date.isoformat()}
+        properties={"category": properties, "expireDate": expire_date.isoformat(),
+                    "availableDate": available_date.isoformat(), "date": event_date.isoformat()}
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/catagory: " + data[2] + \
-            " properties/availabledate: " + available_date.isoformat() + \
+      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/category: " + str(properties) + \
+            " properties/availableDate: " + available_date.isoformat() + \
             " properties/date: " + event_date.isoformat() + \
-            " properties/expiredate: " + expire_date.isoformat()
+            " properties/expireDate: " + expire_date.isoformat()
       expire_date += date_increment
       event_date += date_increment
       available_date += date_increment

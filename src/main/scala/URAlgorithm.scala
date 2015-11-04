@@ -343,8 +343,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
   /** Build a query from default algorithms params and the query itself taking into account defaults */
   def buildQuery(ap: URAlgorithmParams, query: Query, backfillFieldName: String = ""): (String, List[Event]) = {
 
-    try{ // require the minimum of a user or item, if not then return nothing
-      require( query.item.nonEmpty || query.user.nonEmpty, "Warning: a query must include either a user or item id")
+    try{ // require the minimum of a user or item, if not then return popular if any
+      //require( query.item.nonEmpty || query.user.nonEmpty, "Warning: a query must include either a user or item id")
 
       // create a list of all query correlators that can have a bias (boost or filter) attached
       val alluserEvents = getBiasedRecentUserActions(query)
@@ -388,8 +388,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
       val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultURAlgorithmParams.DefaultNum))
 
-      val shouldFields: List[JValue] = allBoostedCorrelators.map { i =>
-        render(("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost)))}.toList
+      val shouldFields: Option[List[JValue]] = if (allBoostedCorrelators.isEmpty) None
+      else {
+        Some(allBoostedCorrelators.map { i =>
+          render(("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost)))
+        }.toList)
+      }
       val popModelSort = List(parse(
         """
           |{
@@ -401,7 +405,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
           |  }
           |}
           |""".stripMargin))
-      val should: List[JValue] = shouldFields ::: popModelSort
+
+      val should: List[JValue] = if (shouldFields.isEmpty) popModelSort else shouldFields.get ::: popModelSort
 
 
       val mustFields: List[JValue] = allFilteringCorrelators.map { i =>
