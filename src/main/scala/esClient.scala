@@ -142,11 +142,17 @@ object esClient {
   }
 
   /** Create new index and hot-swap the new after it's indexed and ready to take over, then delete the old */
-  def hotSwap(alias: String, typeName: String = "items", indexRDD: RDD[scala.collection.Map[String,Any]]): Unit = {
-  //def hotSwap(alias: String, typeName: String = "items", indexRDD: RDD[Map[String, Any]]): Unit = {
+  def hotSwap(
+    alias: String,
+    typeName: String = "items",
+    indexRDD: RDD[scala.collection.Map[String,Any]],
+    fieldNames: List[String],
+    typeMappings: Option[Map[String, String]] = None): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
+    createIndex(newIndex, typeName, fieldNames, typeMappings)
+
     val newIndexURI = "/" + newIndex + "/" + typeName
     indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
     //refreshIndex(newIndex)

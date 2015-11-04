@@ -1,13 +1,12 @@
 {
-  "comment":" This config file uses default settings for all but the required values see README.md for docs",
-  "id": "default",
+  "id": "fox",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
       "name": "sample-handmade-data.txt",
-      "appName": "handmade",
-      "eventNames": ["purchase", "view"]
+      "appName": "development",
+      "eventNames": ["video_watch95"]
     }
   },
   "sparkConf": {
@@ -15,20 +14,18 @@
     "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
     "spark.kryo.referenceTracking": "false",
     "spark.kryoserializer.buffer.mb": "300",
-    "spark.kryoserializer.buffer": "300",
     "spark.executor.memory": "4g",
     "es.index.auto.create": "true"
   },
   "algorithms": [
     {
-      "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
+      "comment": "setup for example 'handmade' data, make sure to change for your needs",
       "name": "ur",
       "params": {
-        "appName": "handmade",
+        "appName": "development",
         "indexName": "urindex",
         "typeName": "items",
-        "comment": "must have data for the first event or the model will not build, other events are optional",
-        "eventNames": ["purchase", "view"]
+        "eventNames": ["video_watch95"],
       }
     }
   ]

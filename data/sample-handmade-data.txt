@@ -1,22 +1,23 @@
-u1,purchase,iphone
-u1,purchase,ipad
-u2,purchase,nexus
-u2,purchase,galaxy
-u3,purchase,surface
-u4,purchase,iphone
-u4,purchase,galaxy
-u1,view,phones
-u1,view,mobile_acc
-u2,view,phones
-u2,view,tablets
-u2,view,mobile_acc
-u3,view,mobile_acc
-u4,view,phones
-u4,view,tablets
-u4,view,soap
-u5,view,soap
-iphone,$set,phones
-ipad,$set,tablets
-nexus,$set,tablets
-galaxy,$set,phones
-surface,$set,tablets
+u1,purchase,Iphone 4
+u1,purchase,Ipad-retina
+u 2,purchase,Nexus
+u 2,purchase,Galaxy
+u-3,purchase,Surface
+u-4,purchase,Iphone 4
+u-4,purchase,Galaxy
+u1,view,Phones
+u1,view,Mobile-acc
+u 2,view,Phones
+u 2,view,Tablets
+u 2,view,Mobile-acc
+u-3,view,Mobile-acc
+u-4,view,Phones
+u-4,view,Tablets
+u-4,view,Soap
+u5,view,Soap
+Iphone 4,$set,Phones:Electronics:Apple
+Ipad-retina,$set,Tablets:Electronics:Apple
+Nexus,$set,Tablets:Electronics:Google
+Galaxy,$set,Phones:Electronics:Samsung
+Surface,$set,Tablets:Electronics:Microsoft
+
