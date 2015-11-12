@@ -202,3 +202,17 @@ curl -H "Content-Type: application/json" -d "
     }
 }" http://localhost:8000/queries.json
 echo ""
+
+echo ""
+echo "============ query with item and user *EXPERIMENTAL* ============"
+# This is experimental, use at your own risk, not well founded in theory
+echo ""
+echo "Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u1",
+    "item": "Iphone 4"
+}' http://localhost:8000/queries.json
+echo ""
+

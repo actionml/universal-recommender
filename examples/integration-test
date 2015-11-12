@@ -65,14 +65,13 @@ echo ""
 echo "Running test query."
 ./examples/multi-query-handmade.sh > test.out
 
+echo ""
+echo "Restoring engine.json"
+mv user-engine.json engine.json
 
 echo ""
 echo "Differences between expected and actual results, none is a passing test:"
 diff data/integration-test-expected.txt test.out
-
-echo ""
-echo "Restoring engine.json"
-mv user-engine.json engine.json
 
 echo ""
 echo "Note that the engine is still deployed until killed or this shell exists."
