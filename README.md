@@ -262,7 +262,7 @@ The query returns personalized recommendations, similar items, or a mix includin
 	    },{
 	      “name”: “genre”,
 	      “values”: [“sci-fi”, “detective”]
-	      “bias”: 0.2 // boost/favor recommendations with the `genre’ = `sci-fi` or ‘detective’
+	      “bias”: 1.02 // boost/favor recommendations with the `genre’ = `sci-fi` or ‘detective’
 	    }
 	  ]
 	}
@@ -282,7 +282,7 @@ When the a date is stored in the items properties it can be used in a date range
 	    },{
 	      “name”: “genre”,
 	      “values”: [“sci-fi”, “detective”]
-	      “bias”: 0.2 // boost/favor recommendations with the `genre’ = `sci-fi` or ‘detective’
+	      “bias”: 1.02 // boost/favor recommendations with the `genre’ = `sci-fi` or ‘detective’
 	    }
 	  ],
       "dateRange": {
@@ -308,8 +308,7 @@ When setting an available date and expire date on items, the current date can be
 	    },{
 	      “name”: “genre”,
 	      “values”: [“sci-fi”, “detective”]
-	      “bias”: 0.2 // boost/favor recommendations with the `genre’ = `sci-fi` or ‘detective’
-	    }
+	      “bias”: 1.02	    }
 	  ],
       "currentDate": "2015-08-15T11:28:45.114-07:00"  
 	}
@@ -328,14 +327,22 @@ When setting an available date and expire date on items, the current date can be
 	    },{
 	      “name”: “genre”,
 	      “values”: [“sci-fi”, “detective”]
-	      “bias”: 0.2 // boost/favor recommendations with the `genre’ = `sci-fi` or ‘detective’
+	      “bias”: 1.02 // boost/favor recommendations with the `genre’ = `sci-fi` or ‘detective’
 	    }
 	  ]
 	}
 
 This returns items based on user xyz history or similar to item 53454543513 but favoring user history recommendations. These are filtered by categories and boosted to favor more genre specific items. 
 
-**Note**:This query should be considered **experimental**. mixing user history with item similarity is possible but may have unexpected results.
+**Note**:This query should be considered **experimental**. mixing user history with item similarity is possible but may have unexpected results. If you use this you should realize that user and item recommendations may be quite divergent and so mixing the them in query may produce nonsense. Use this only with the engine.json settings for "userbias" and "itembias" to favor one over the other.
+
+
+###Popular Items
+
+	{
+	}
+
+This is a simple way to get popular items. All returned scores will be 0 but the order will be based on relative popularity. Field-based biases for boosts and filters can also be applied.
 
 ##Events
 The Universal takes in potentially many events. These should be seen as a primary evnet, which is a very clear indication of a user preference and secondary events that we think may tell us something about user "taste" in some way. The Universal Recommender is built on a distributed Correlation Engine so it will test that these secondary events actually relate to the primary one and those that do not correlate will have little or no effect on recommendations (though they will make it longer to train and get query results). It is recommended that you start with one ot two events and increase the number as you see how these events effect results and timing.
@@ -401,6 +408,13 @@ To begin using new data with an engine that has been used with sample data or us
 7. Run your edited query script and check the recommendations.
 
 ## Versions
+
+### v0.2.2
+
+ - a query with no item or user will get recommendations based on popularity
+ - a new integration test has been added
+ - a regression bug where some ids were being tokenized by Elasticsearch, leading to incorrect results, was fixed. **NOTE: for users with complex ids containing dashes or spaces this is an important fix.**
+ - a dateRange in the query now takes precidence to the item attached expiration and avaiable dates. 
 
 ### v0.2.1
 

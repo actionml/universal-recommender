@@ -1,0 +1,91 @@
+
+Queries to illustrate many use cases on a small standard dataset and for an automated integration test.
+
+WARNING: for this to produce the correct result you must:
+     $ python examples/import_handmade.py --access_key <your-app-accesskey>
+  2. Copy handmade-engine.json to engine.json.
+  3. Run 'pio build', 'pio train', and 'pio deploy'
+  4. The queries must be run the same day as the import was done because date filters are part of the test.
+NOTE: due to available and expire dates you should never see the Iphone 5 or Iphone 6.
+
+============ simple user recs ============
+
+Recommendations for user: u1
+
+{"itemScores":[{"item":"Galaxy","score":0.8880454897880554},{"item":"Nexus","score":0.288095086812973},{"item":"Surface","score":0.05261862277984619}]}
+
+Recommendations for user: U 2
+
+{"itemScores":[{"item":"Iphone 4","score":0.9535322189331055},{"item":"Ipad-retina","score":0.05624813959002495},{"item":"Surface","score":0.029876574873924255}]}
+
+Recommendations for user: u-3
+
+{"itemScores":[{"item":"Iphone 4","score":0.18315871059894562},{"item":"Galaxy","score":0.18315871059894562},{"item":"Nexus","score":0.18315871059894562},{"item":"Ipad-retina","score":0.07201286405324936}]}
+
+Recommendations for user: u-4
+
+{"itemScores":[{"item":"Galaxy","score":0.8880454897880554},{"item":"Nexus","score":0.288095086812973},{"item":"Surface","score":0.05261862277984619}]}
+
+Recommendations for user: u5
+
+{"itemScores":[{"item":"Iphone 4","score":0.800000011920929},{"item":"Galaxy","score":0.800000011920929},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
+
+============ simple similar item recs ============
+
+Recommendations for item: Iphone 4
+
+{"itemScores":[{"item":"Galaxy","score":0.6802681088447571},{"item":"Nexus","score":0.3414953947067261},{"item":"Ipad-retina","score":0.06429719924926758},{"item":"Surface","score":0.013116735965013504}]}
+
+Recommendations for item: Ipad-retina
+
+{"itemScores":[{"item":"Iphone 4","score":0.8768638968467712},{"item":"Galaxy","score":0.8768638968467712},{"item":"Nexus","score":0.23742027580738068},{"item":"Surface","score":0.04049335792660713}]}
+
+Recommendations for item: Nexus
+
+{"itemScores":[{"item":"Iphone 4","score":1.1343861818313599},{"item":"Galaxy","score":0.5476991534233093},{"item":"Ipad-retina","score":0.04849598929286003},{"item":"Surface","score":0.02529095485806465}]}
+
+Recommendations for item: Galaxy
+
+{"itemScores":[{"item":"Iphone 4","score":0.7461300492286682},{"item":"Nexus","score":0.23864313960075378},{"item":"Ipad-retina","score":0.08540179580450058},{"item":"Surface","score":0.014605122618377209}]}
+
+Recommendations for item: Surface
+
+{"itemScores":[{"item":"Iphone 4","score":0.4070388376712799},{"item":"Galaxy","score":0.4070388376712799},{"item":"Nexus","score":0.4070388376712799},{"item":"Ipad-retina","score":0.17534448206424713}]}
+
+============ popular item recs only ============
+
+query with no item or user id, ordered by popularity
+
+{"itemScores":[{"item":"Iphone 4","score":0.0},{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
+
+Recommendations for non-existant user: xyz, all from popularity
+
+{"itemScores":[{"item":"Iphone 4","score":0.0},{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
+
+Recommendations for non-existant item: xyz, all from popularity
+
+{"itemScores":[{"item":"Iphone 4","score":0.0},{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
+
+Recommendations for no user no item, all from popularity, Tablets filter
+
+{"itemScores":[{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0},{"item":"Surface","score":0.0}]}
+
+Recommendations for no user no item, all from popularity, Tablets boost
+
+{"itemScores":[{"item":"Nexus","score":0.9369767904281616},{"item":"Surface","score":0.6666666865348816},{"item":"Ipad-retina","score":0.204568549990654},{"item":"Iphone 4","score":0.0}]}
+
+Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter
+
+{"itemScores":[{"item":"Ipad-retina","score":0.21918058395385742},{"item":"Iphone 4","score":0.0}]}
+
+============ dateRange filter ============
+
+Recommendations for user: u1
+
+{"itemScores":[{"item":"Surface","score":0.049329958856105804}]}
+
+============ query with item and user *EXPERIMENTAL* ============
+
+Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter
+
+{"itemScores":[{"item":"Galaxy","score":1.3019405603408813},{"item":"Nexus","score":0.5091257691383362},{"item":"Surface","score":0.04033438116312027}]}
