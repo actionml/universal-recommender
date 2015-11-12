@@ -32,8 +32,8 @@ object defaultURAlgorithmParams {
   val DefaultMaxCorrelatorsPerEventType = 50
   val DefaultMaxQueryEvents = 100 // default number of user history events to use in recs query
 
-  val DefaultExpireDateName = "expiredate" // default name for the expire date property of an item
-  val DefaultAvailableDateName = "availabledate" //defualt name for and item's available after date
+  val DefaultExpireDateName = "expireDate" // default name for the expire date property of an item
+  val DefaultAvailableDateName = "availableDate" //defualt name for and item's available after date
   val DefaultDateName = "date" // when using a date range in the query this is the name of the item's date
   val DefaultRecsModel = "all" // use CF + backfill
   val DefaultBackfillParams = BackfillField()
@@ -302,6 +302,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val queryAndBlacklist = buildQuery(ap, query, backfillFieldName)
     val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
     // should have all blacklisted items excluded removeBlacklisted(recs, query, queryAndBlacklist._2)
+    // todo: need to add dithering, mean, sigma, seed required, make a seed that only changes on some fixed time
+    // preiod do the recs ordering stays fixed for that time period.
     recs
   }
 
@@ -309,7 +311,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     * because they are already shown on an app screen/page.
     * @param recs recs to be filtered
     * @param query query for
-    * @param userActions
+    * @param userActions last n events by the user in the query
     * @return
     */
   def removeBlacklisted(recs: PredictedResult, query: Query, userActions: List[Event] ): PredictedResult = {
@@ -584,42 +586,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     // currentDate in the query overrides the dateRange in the same query so ignore daterange if both
     val currentDate = query.currentDate.getOrElse(DateTime.now().toDateTimeISO.toString)
 
-    if (ap.availableDateName.nonEmpty && ap.expireDateName.nonEmpty) {// use the query date or system date
-      val availableDate = ap.availableDateName.get // never None
-      val expireDate = ap.expireDateName.get
-
-      val available = s"""
-        |{
-        |  "constant_score": {
-        |    "filter": {
-        |      "range": {
-        |        "${availableDate}": {
-        |          "lte": "${currentDate}"
-        |        }
-        |      }
-        |    },
-        |    "boost": 0
-        |  }
-        |}
-        """.stripMargin
-
-      json = json :+ parse(available)
-      val expire = s"""
-        |{
-        |  "constant_score": {
-        |    "filter": {
-        |      "range": {
-        |        "${expireDate}": {
-        |          "gt": "${currentDate}"
-        |        }
-        |      }
-        |    },
-        |    "boost": 0
-        |  }
-        |}
-        """.stripMargin
-      json = json :+ parse(expire)
-    } else if (query.dateRange.nonEmpty &&
+    if (query.dateRange.nonEmpty &&
       (query.dateRange.get.after.nonEmpty || query.dateRange.get.before.nonEmpty)) {
       val name = query.dateRange.get.name
       val before = query.dateRange.get.before.getOrElse("")
@@ -658,6 +625,41 @@ class URAlgorithm(val ap: URAlgorithmParams)
       range += rangeEnd
 
       json = json :+ parse(range)
+    } else if (ap.availableDateName.nonEmpty && ap.expireDateName.nonEmpty) {// use the query date or system date
+      val availableDate = ap.availableDateName.get // never None
+      val expireDate = ap.expireDateName.get
+
+      val available = s"""
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "${availableDate}": {
+        |          "lte": "${currentDate}"
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
+        """.stripMargin
+
+      json = json :+ parse(available)
+      val expire = s"""
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "${expireDate}": {
+        |          "gt": "${currentDate}"
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
+        """.stripMargin
+      json = json :+ parse(expire)
     } else {
       logger.info("Misconfigured date information, either your engine.json date settings or your query's dateRange is incorrect.\nIngoring date information for this query.")
     }
