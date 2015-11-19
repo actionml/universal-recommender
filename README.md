@@ -83,7 +83,7 @@ This file allows the user to describe and set parameters that control the engine
 	    "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
 	    "spark.kryo.referenceTracking": "false",
 	    "spark.kryoserializer.buffer.mb": "300",
-	    "spark.kryoserializer.buffer": "300",
+	    "spark.kryoserializer.buffer": "300m",
 	    "spark.executor.memory": "4g",
 	    "es.index.auto.create": "true"
 	  },
@@ -95,7 +95,7 @@ This file allows the user to describe and set parameters that control the engine
 	        "appName": "handmade",
 	        "indexName": "urindex",
 	        "typeName": "items",
-	        "comment": "must have data for the first event or the model will not build, other events are optional"
+	        "comment": "must have data for the first event or the model will not build, other events are optional",
 	        "eventNames": ["purchase", "view"]
 	      }
 	    }
