@@ -23,7 +23,8 @@ case class Query(
     blacklistItems: Option[List[String]] = None, // default: whatever is in algorithm params or None
     returnSelf: Option[Boolean] = None,// means for an item query should the item itself be returned, defaults
                                        // to what is in the algorithm params or false
-    num: Option[Int] = None) // default: whatever is in algorithm params, which itself has a default--probably 20
+    num: Option[Int] = None, // default: whatever is in algorithm params, which itself has a default--probably 20
+    eventNames: Option[List[String]]) // names used to ID all user actions
   extends Serializable
 
 /** Used to specify how Fields are represented in engine.json */
