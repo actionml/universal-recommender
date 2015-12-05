@@ -259,7 +259,7 @@ The query returns personalized recommendations, similar items, or a mix includin
 	    {
 	      “name”: “categories”
 	      “values”: [“series”, “mini-series”],
-	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
+	      “bias”: -1 // filter out all except ‘series’ or ‘mini-series’
 	    },{
 	      “name”: “genre”,
 	      “values”: [“sci-fi”, “detective”]
@@ -407,6 +407,24 @@ To begin using new data with an engine that has been used with sample data or us
 5. Perform `pio build`, `pio train`, and `pio deploy`
 6. Copy and edit the sample query script to match your new data. For new user ids pick a user that exists in the events, same for metadata `fields`, and items.
 7. Run your edited query script and check the recommendations.
+
+##Tests
+**Integration test**: Once PIO and all servcies are running but before any model is deployed, run `./examples/integration-test` This will print a list of differences in the actual results from the expected results, none means the test passed. Not that the model will remain deployed and will have to be deployed over or killed by pid.
+
+**Event name restricted query test**: this is for the feature that allows event names to be specified in the query. It restricts the user history that is used to create recommendations and is primarily for use with the MAP@k cross-validation test. The engine config removes the blacklisting of items so it must be used when doing MAP@k calculations. This test uses the simple sample data. Steps to try the test are: 
+
+1. start pio and all services 
+2. `pio app new handmade` 
+3. `python examples/import_handmade.py --access_key <key-from-app-new>` 
+4. `cp engine.json engine.json.orig` 
+5. `cp event-names-test=engine.json engine.json`
+5. `pio train`
+6. `pio deploy` 
+5. `./examples/single-eventNames-query.sh`
+6. restore engine.json
+7. kill the deployed prediction server
+
+**MAP@k**: This tests the predictive power of each usage event/indicator. All eventNames used in queries must be removed from the blacklisted events in the engine.json used for a particular dataset. So if `"eventNames": ["purchase","view"]` is in the engine.json for the dataset, these events must be removed from the blacklist with `"blacklist": []`, which tells the engine to not blacklist items with `eventNames` for a user. Allowing blacklisting will artificially lower MAP@k and so not give the desired result.
 
 ## Versions
 

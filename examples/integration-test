@@ -57,8 +57,9 @@ echo ""
 echo "Building and delpoying model"
 pio build
 pio train
-pio deploy &
-echo "Waiting 12 seconds for the server to start"
+echo "Model will remain deployed after this test"
+nohup pio deploy > deploy.out &
+echo "Waiting 20 seconds for the server to start"
 sleep 20
 
 echo ""
