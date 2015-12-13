@@ -1,3 +1,20 @@
+/*
+ * Licensed to ActionML, LLC under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.template
 
 import java.util.Date
@@ -113,8 +130,12 @@ class URModel(
     if (propertiesRDD.isEmpty) {
       // Elasticsearch takes a Map with all fields, not a tuple
       logger.info("Grouping all correlators into doc + fields for writing to index")
+      logger.info(s"Finding non-empty RDDs from a list of ${correlators.length} correlators and " +
+        s"${properties.length} properties")
       val esRDDs: List[RDD[(String, Map[String, Any])]] =
-        (correlators ::: properties).filterNot(c => c.isEmpty())
+        //(correlators ::: properties).filterNot(c => c.isEmpty())// for some reason way too slow
+        (correlators ::: properties)
+          //c.take(1).length == 0
       if (esRDDs.nonEmpty) {
         val esFields = groupAll(esRDDs).map { case (item, map) =>
           // todo: every map's items must be checked for value type and converted before writing to ES
@@ -144,7 +165,8 @@ class URModel(
   }
   
   def groupAll( fields: Seq[RDD[(String, (Map[String, Any]))]]): RDD[(String, (Map[String, Any]))] = {
-    if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
+    //if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
+    if (fields.size > 1) {
       fields.head.cogroup[Map[String, Any]](groupAll(fields.drop(1))).map { case (key, pairMapSeqs) =>
         // to be safe merge all maps but should only be one per rdd element
         val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Any])(_ ++ _)
