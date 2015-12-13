@@ -117,14 +117,12 @@ object PopModel {
   def eventsRDD(appName: String, eventNames: List[String], interval: Interval)
     (implicit sc: SparkContext): RDD[Event] = {
 
-    val retval = PEventStore.find(
+    PEventStore.find(
       appName = appName,
       startTime = Some(interval.getStart),
       untilTime = Some(interval.getEnd),
       eventNames = Some(eventNames)
     )(sc)
-    val debug = retval.collect()
-    retval
   }
 
 }
