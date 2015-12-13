@@ -1,3 +1,20 @@
+/*
+ * Copyright ActionML, LLC under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * ActionML licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.template
 
 import java.util.Date
@@ -23,7 +40,8 @@ case class Query(
     blacklistItems: Option[List[String]] = None, // default: whatever is in algorithm params or None
     returnSelf: Option[Boolean] = None,// means for an item query should the item itself be returned, defaults
                                        // to what is in the algorithm params or false
-    num: Option[Int] = None) // default: whatever is in algorithm params, which itself has a default--probably 20
+    num: Option[Int] = None, // default: whatever is in algorithm params, which itself has a default--probably 20
+    eventNames: Option[List[String]]) // names used to ID all user actions
   extends Serializable
 
 /** Used to specify how Fields are represented in engine.json */

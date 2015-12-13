@@ -83,7 +83,7 @@ This file allows the user to describe and set parameters that control the engine
 	    "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
 	    "spark.kryo.referenceTracking": "false",
 	    "spark.kryoserializer.buffer.mb": "300",
-	    "spark.kryoserializer.buffer": "300",
+	    "spark.kryoserializer.buffer": "300m",
 	    "spark.executor.memory": "4g",
 	    "es.index.auto.create": "true"
 	  },
@@ -95,7 +95,7 @@ This file allows the user to describe and set parameters that control the engine
 	        "appName": "handmade",
 	        "indexName": "urindex",
 	        "typeName": "items",
-	        "comment": "must have data for the first event or the model will not build, other events are optional"
+	        "comment": "must have data for the first event or the model will not build, other events are optional",
 	        "eventNames": ["purchase", "view"]
 	      }
 	    }
@@ -188,7 +188,8 @@ The “params” section controls most of the features of the UR. Possible value
 * **dateName** optional, a date or timestamp used in a `dateRange` recommendations filter.
 * **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
 * **recsModel** optional, default = "all", which means  collaborative filtering with popular items returned when no other recommendations can be made. Otherwise: "all", "collabFiltering", "backfill". If only "backfill" is specified then the train will create only some backfill type like popular. If only "collabFiltering" then no backfill will be included when there are no other recommendations.
-* **backfillField** optional (use with great care), default: backfillType = popular, eventNames = only the first/primary event in `eventNames`, corresponding to the primary action, duration = 259200, which is the number of seconds in a 3 days. The primary/first event used for recommendations is always attached to items you wish to recommend, the other events are not neccessarily attached to the same items. If events like "category-preference" are used then popular categories will be calculated and this will have no effect for backfill. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly.  
+* **backfillField** optional (use with great care), default: backfillType = popular, eventNames = only the first/primary event in `eventNames`, corresponding to the primary action, duration = 259200, which is the number of seconds in a 3 days. The primary/first event used for recommendations is always attached to items you wish to recommend, the other events are not neccessarily attached to the same items. If events like "category-preference" are used then popular categories will be calculated and this will have no effect for backfill. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly. 
+* **seed** Set this if you want repeatable downsampling for some offline tests. This can be ignored and shouldn't be set in production. 
 
 ###Queries
 
@@ -258,7 +259,7 @@ The query returns personalized recommendations, similar items, or a mix includin
 	    {
 	      “name”: “categories”
 	      “values”: [“series”, “mini-series”],
-	      “bias”: -1 }// filter out all except ‘series’ or ‘mini-series’
+	      “bias”: -1 // filter out all except ‘series’ or ‘mini-series’
 	    },{
 	      “name”: “genre”,
 	      “values”: [“sci-fi”, “detective”]
@@ -407,8 +408,30 @@ To begin using new data with an engine that has been used with sample data or us
 6. Copy and edit the sample query script to match your new data. For new user ids pick a user that exists in the events, same for metadata `fields`, and items.
 7. Run your edited query script and check the recommendations.
 
+##Tests
+**Integration test**: Once PIO and all servcies are running but before any model is deployed, run `./examples/integration-test` This will print a list of differences in the actual results from the expected results, none means the test passed. Not that the model will remain deployed and will have to be deployed over or killed by pid.
+
+**Event name restricted query test**: this is for the feature that allows event names to be specified in the query. It restricts the user history that is used to create recommendations and is primarily for use with the MAP@k cross-validation test. The engine config removes the blacklisting of items so it must be used when doing MAP@k calculations. This test uses the simple sample data. Steps to try the test are: 
+
+1. start pio and all services 
+2. `pio app new handmade` 
+3. `python examples/import_handmade.py --access_key <key-from-app-new>` 
+4. `cp engine.json engine.json.orig` 
+5. `cp event-names-test=engine.json engine.json`
+5. `pio train`
+6. `pio deploy` 
+5. `./examples/single-eventNames-query.sh`
+6. restore engine.json
+7. kill the deployed prediction server
+
+**MAP@k**: This tests the predictive power of each usage event/indicator. All eventNames used in queries must be removed from the blacklisted events in the engine.json used for a particular dataset. So if `"eventNames": ["purchase","view"]` is in the engine.json for the dataset, these events must be removed from the blacklist with `"blacklist": []`, which tells the engine to not blacklist items with `eventNames` for a user. Allowing blacklisting will artificially lower MAP@k and so not give the desired result.
+
 ## Versions
 
+### v0.2.3
+
+ - removed isEmpty calls that were taking an extremely long time to execute, results in considerable speedup. Now the vast majority of `pio train` time is taken up by writing to Elasticsearch. This can be optimized by creating and ES cluster or giving ES lots of memory.
+ 
 ### v0.2.2
 
  - a query with no item or user will get recommendations based on popularity
@@ -452,3 +475,6 @@ To begin using new data with an engine that has been used with sample data or us
  * A slide deck, which talks about mixing actions and other correlator types, including content-based ones: [Creating a Unified Recommender](http://www.slideshare.net/pferrel/unified-recommender-39986309?ref=http://occamsmachete.com/ml/)
  * Two blog posts: What's New in Recommenders: part [#1](http://occamsmachete.com/ml/2014/08/11/mahout-on-spark-whats-new-in-recommenders/) [#2](http://occamsmachete.com/ml/2014/09/09/mahout-on-spark-whats-new-in-recommenders-part-2/)
  * A post describing the log-likelihood ratio: [Surprise and Coincidence](http://tdunning.blogspot.com/2008/03/surprise-and-coincidence.html) LLR is used to reduce noise in the data while keeping the calculations O(n) complexity.
+ 
+#License
+This Software is licensed under the Apache Software Foundation version 2 licence found here: http://www.apache.org/licenses/LICENSE-2.0

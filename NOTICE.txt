@@ -1,0 +1,16 @@
+==============================================================
+ ActionML LLC
+ Copyright 2015 and onwards ActionML LLC
+==============================================================
+
+This product includes software developed by
+ActionML (http://actionml.com/).
+
+It includes software from other Apache Software Foundation projects,
+including, but not limited to:
+  - Elasticsearch (Apache 2 license)
+  - Apache Hadoop
+  - Apache Spark
+  - Apache Spark
+  - Apache Mahout
+

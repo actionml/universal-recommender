@@ -1,3 +1,20 @@
+/*
+ * Copyright ActionML, LLC under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * ActionML licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.template
 
 import java.util
@@ -136,12 +153,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val duration = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
       val backfillEvents = backfillParams.eventnames.getOrElse(List(ap.eventNames.head))
       val start = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).endDate
-      PopModel.calc(
-        Some(backfillParams.backfillType),
-        backfillEvents,
-        ap.appName,
-        duration,
-        start)(sc)
       PopModel.calc(Some(backfillParams.backfillType), backfillEvents, ap.appName, duration)(sc)
     } else None
 
@@ -214,6 +225,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
       propertiesRDD = propertiesRDD,
       typeMappings = Some(Map(backfillFieldName -> "float")))
   }
+
+  var queryEventNames = List.empty[String] // if passed in with the query overrides the engine.json list--used in MAP@k
+  //testing, this only effects which events are used in queries.
 
   /** Return a list of items recommended for a user identified in the query
     * The ES json query looks like this:
@@ -298,48 +312,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
   def predict(model: URModel, query: Query): PredictedResult = {
     logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
 
+    queryEventNames = query.eventNames.getOrElse(ap.eventNames) // eventNames in query take precedence for the query
+    // part of their use
     val backfillFieldName = ap.backfillField.getOrElse(BackfillField()).name
     val queryAndBlacklist = buildQuery(ap, query, backfillFieldName)
     val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
-    // should have all blacklisted items excluded removeBlacklisted(recs, query, queryAndBlacklist._2)
+    // should have all blacklisted items excluded
     // todo: need to add dithering, mean, sigma, seed required, make a seed that only changes on some fixed time
-    // preiod do the recs ordering stays fixed for that time period.
+    // period so the recs ordering stays fixed for that time period.
     recs
-  }
-
-  /** take out any recs that have been blacklisted, perhaps because the user has seen them before or
-    * because they are already shown on an app screen/page.
-    * @param recs recs to be filtered
-    * @param query query for
-    * @param userActions last n events by the user in the query
-    * @return
-    */
-  def removeBlacklisted(recs: PredictedResult, query: Query, userActions: List[Event] ): PredictedResult = {
-
-    // First remove any events that have targets not allowed
-    val disallowedEvents = userActions.filter { event =>
-      if (ap.blacklistEvents.nonEmpty) {
-        // either a list or an empty list of filtering events so honor them
-        if (ap.blacklistEvents.get == List.empty[String]) false // no filtering events so all are allowed
-        else if (ap.blacklistEvents.get.contains(event.event)) true else false // if its filtered remove it, else allow
-      } else if (ap.eventNames(0).equals(event.event)) true else false // remove the primary event if nothing specified
-    }
-
-    val allowedItemScores = recs.itemScores.filter { itemScore =>
-      !disallowedEvents.exists ( event => itemScore.item.equals(event.targetEntityId.getOrElse("")))
-    }
-
-    // Now remove any items disallowed in query
-    val queryFilteredItemScores = allowedItemScores.filterNot { itemScore =>
-      query.blacklistItems.getOrElse(List.empty[String]).contains(itemScore.item)
-    } //if some rec id == something blacklisted in query then don't return the itemScore
-
-    // Now conditionally filter the query item itself
-    val includeSelf = query.returnSelf.getOrElse(ap.returnSelf.getOrElse(false))
-    val selfFilteredItemScores = if ( !includeSelf ) queryFilteredItemScores.filterNot { itemScore =>
-      query.item.getOrElse("").equals(itemScore.item)
-    } else queryFilteredItemScores //don't filter out the query item
-    PredictedResult(selfFilteredItemScores)
   }
 
   /** Build a query from default algorithms params and the query itself taking into account defaults */
@@ -460,8 +441,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
       if (ap.blacklistEvents.nonEmpty) {
         // either a list or an empty list of filtering events so honor them
         if (ap.blacklistEvents.get == List.empty[String]) false // no filtering events so all are allowed
-        else if (ap.blacklistEvents.get.contains(event.event)) true else false // if its filtered remove it, else allow
-      } else if (ap.eventNames(0).equals(event.event)) true else false // remove the primary event if nothing specified
+        else ap.blacklistEvents.get.contains(event.event) // if its filtered remove it, else allow
+      } else ap.eventNames(0).equals(event.event) // remove the primary event if nothing specified
     }.map (_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrElse(List.empty[String])
     .distinct
 
@@ -512,6 +493,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         entityId = query.user.get,
         // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
         //eventNames = Some(Seq(action)),// get all and separate later
+        eventNames = Some(queryEventNames),// get all and separate later
         targetEntityType = None,
         // limit = Some(maxQueryEvents), // this will get all history then each action can be limited before using in
         // the query
@@ -534,7 +516,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val userEventBias = query.userBias.getOrElse(ap.userBias.getOrElse(1f))
     val userEventsBoost = if (userEventBias > 0 && userEventBias != 1) Some(userEventBias) else None
-    val rActions = ap.eventNames.map { action =>
+    //val rActions = ap.eventNames.map { action =>
+    val rActions = queryEventNames.map { action =>
       var items = List[String]()
 
       for ( event <- recentEvents )

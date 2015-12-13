@@ -187,8 +187,13 @@ echo ""
 echo ""
 echo "============ dateRange filter ============"
 echo ""
-BEFORE=`date -v +1d +"%Y-%m-%dT%H:%M:%SZ"`
-AFTER=`date -v -1d +"%Y-%m-%dT%H:%M:%SZ"`
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  BEFORE=`date --date="tomorrow" --iso-8601=seconds`
+  AFTER=`date --date="1 day ago" --iso-8601=seconds`
+else
+  BEFORE=`date -v +1d +"%Y-%m-%dT%H:%M:%SZ"`
+  AFTER=`date -v -1d +"%Y-%m-%dT%H:%M:%SZ"`
+fi
 #echo "before: $BEFORE after: $AFTER"
 echo "Recommendations for user: u1"
 echo ""
