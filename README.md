@@ -428,6 +428,10 @@ To begin using new data with an engine that has been used with sample data or us
 
 ## Versions
 
+### v0.2.3
+
+ - removed isEmpty calls that were taking an extremely long time to execute, results in considerable speedup. Now the vast majority of `pio train` time is taken up by writing to Elasticsearch. This can be optimized by creating and ES cluster or giving ES lots of memory.
+ 
 ### v0.2.2
 
  - a query with no item or user will get recommendations based on popularity

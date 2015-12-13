@@ -153,12 +153,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val duration = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
       val backfillEvents = backfillParams.eventnames.getOrElse(List(ap.eventNames.head))
       val start = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).endDate
-      PopModel.calc(
-        Some(backfillParams.backfillType),
-        backfillEvents,
-        ap.appName,
-        duration,
-        start)(sc)
       PopModel.calc(Some(backfillParams.backfillType), backfillEvents, ap.appName, duration)(sc)
     } else None
 
