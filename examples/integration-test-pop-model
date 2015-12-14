@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+# exit on any error
+set -e
+
+echo ""
+echo "Integration test for The Universal Recommender."
+echo "If some step fails check that your engine.json file has been restored"
+echo "or look for it in 'user-engine.json'"
+echo ""
+
+echo "Checking for needed files"
+if [ ! -f hot-3-day-engine.json ]; then
+    echo "File not found: hot-3-day-engine.json"
+    exit 1
+fi
+
+if [ ! -f trend-2-day-engine.json ]; then
+    echo "File not found: trend-2-day-engine.json"
+    exit 1
+fi
+
+if [ ! -f pop-1-day-engine.json ]; then
+    echo "File not found: pop-1-day-engine.json"
+    exit 1
+fi
+
+if [ ! -f examples/pop-test-query.sh ]; then
+    echo "File not found: examples/pop-test-query.sh"
+    exit 1
+fi
+
+if [ ! -f examples/import_handmade_pop_test.py ]; then
+    echo "File not found: examples/import_handmade_pop_test.py"
+    exit 1
+fi
+
+if [ -f user-engine.json ]; then
+    echo "File user-engine.json found, this may be an error so we cannot replace engine.json"
+    exit 1
+fi
+
+if [ ! -f data/integration-test-expected-pop-model.txt ]; then
+    echo "File not found: data/integration-test-expected-pop-model.txt"
+#    exit 1
+fi
+
+echo ""
+echo "Checking status, should exit if pio is not running."
+pio status
+
+echo ""
+echo "Checking to see if handmade app exists, should exit if not."
+pio app show handmade
+
+echo ""
+echo "Deleting handmade app data since the test is date dependent"
+pio app data-delete handmade
+
+echo ""
+echo "Importing data for integration test"
+# get the access_key from pio app list
+ACCESS_KEY=`pio app show handmade | grep Key | cut -f 7 -d ' '`
+echo -n "Access key: "
+echo $ACCESS_KEY
+python examples/import_handmade_pop_test.py --access_key $ACCESS_KEY
+
+echo ""
+echo "Moving engine.json to user-engine.json"
+cp -n engine.json user-engine.json
+
+echo ""
+echo "Popularity model integration test."
+cp hot-3-day-engine.json engine.json
+
+echo ""
+echo "=============== Building and delpoying 'hot' model"
+pio build
+pio train  -- --driver-memory 2g
+nohup pio deploy > deploy.out &
+echo "Waiting 20 seconds for the server to start"
+sleep 20
+
+echo ""
+echo "Running test query."
+./examples/pop-test-query.sh > test.out
+
+echo ""
+cp trend-2-day-engine.json engine.json
+
+echo ""
+echo "=============== Building and delpoying 'trending' model"
+pio build
+pio train  -- --driver-memory 2g
+nohup pio deploy > deploy.out &
+echo "Waiting 20 seconds for the server to start"
+sleep 20
+
+echo ""
+echo "Running test query."
+./examples/pop-test-query.sh >> test.out
+
+echo ""
+cp pop-1-day-engine.json engine.json
+
+echo ""
+echo "=============== Building and delpoying 'popular' model"
+pio build
+pio train  -- --driver-memory 2g
+nohup pio deploy > deploy.out &
+echo "Waiting 20 seconds for the server to start"
+sleep 20
+
+echo ""
+echo "Running test query."
+./examples/pop-test-query.sh >> test.out
+
+echo ""
+echo "Restoring engine.json"
+mv user-engine.json engine.json
+
+echo ""
+echo "Differences between expected and actual results, none is a passing test:"
+diff data/integration-test-expected-pop-model.txt test.out
+
+echo ""
+echo "Note that the engine is still deployed until killed."

@@ -15,6 +15,11 @@ if [ ! -f handmade-engine.json ]; then
     exit 1
 fi
 
+if [ ! -f data/sample-handmade-data.txt ]; then
+    echo "File not found: data/sample-handmade-data.txt"
+    exit 1
+fi
+
 if [ -f user-engine.json ]; then
     echo "File user-engine.json found, this may be an error so we cannot replace engine.json"
     exit 1
