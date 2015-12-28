@@ -332,18 +332,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
       // create a list of all query correlators that can have a bias (boost or filter) attached
       val alluserEvents = getBiasedRecentUserActions(query)
 
-      // create a list of all boosted query correlators
-      val recentUserHistory = if ( ap.userBias.getOrElse(1f) >= 0f )
-        alluserEvents._1.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
-      else List.empty[BoostableCorrelators]
-
       val similarItems = if ( ap.itemBias.getOrElse(1f) >= 0f )
         getBiasedSimilarItems(query)
       else List.empty[BoostableCorrelators]
 
       val boostedMetadata = getBoostedMetadata(query)
 
-      val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata
+      val allBoostedCorrelators = alluserEvents._1 ++ similarItems ++ boostedMetadata
 
       // create a lsit of all query correlators that are to be used to filter results
       val recentUserHistoryFilter = if ( ap.userBias.getOrElse(1f) < 0f ) {
