@@ -22,7 +22,7 @@ libraryDependencies ++= Seq(
   // other external libs
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
-  "org.elasticsearch" % "elasticsearch-spark_2.10" % "1.4.4"
+  "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.2"
     exclude("org.apache.spark", "spark-catalyst_2.10")
     exclude("org.apache.spark", "spark-sql_2.10"),
   "org.json4s" %% "json4s-native" % "3.2.11"
