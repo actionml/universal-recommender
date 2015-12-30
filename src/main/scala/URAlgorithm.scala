@@ -340,12 +340,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
       val allBoostedCorrelators = alluserEvents._1 ++ similarItems ++ boostedMetadata
 
-      // create a lsit of all query correlators that are to be used to filter results
+      // create a lt of all query correlators that are to be used to filter results
       val recentUserHistoryFilter = if ( ap.userBias.getOrElse(1f) < 0f ) {
         // strip any boosts
         alluserEvents._1.map { i =>
           FilterCorrelators(i.actionName, i.itemIDs)
-        }.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
+        }
       } else List.empty[FilterCorrelators]
 
       val similarItemsFilter = if ( ap.itemBias.getOrElse(1f) < 0f ) {
