@@ -1,6 +1,6 @@
 name := "template-scala-parallel-universal-recommendation"
 
-version := "0.3.0"
+version := "0.3.0-snapshot"
 
 organization := "io.prediction"
 
