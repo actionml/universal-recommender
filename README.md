@@ -148,8 +148,9 @@ A full list of tuning and config parameters is below. See the field description 
             "recsModel": "all",
 			"backfillField": {
   				"backfillType": "popular",
-  				"eventnames": ["buy", "view"],
-  				"duration": 259200
+  				"eventNames": ["buy", "view"],
+  				"duration": 259200,
+  				"offsetDate": "ISO8601-date" //most recent date to end the duration
   			},
             "expireDateName": "expireDateFieldName",
             "availableDateName": "availableDateFieldName",

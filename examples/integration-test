@@ -10,8 +10,8 @@ echo "or look for it in 'user-engine.json'"
 echo ""
 
 echo "Checking for needed files"
-if [ ! -f handmade-engine.json ]; then
-    echo "File not found: handmade-engine.json"
+if [ ! -f examples/handmade-engine.json ]; then
+    echo "File not found: examples/handmade-engine.json"
     exit 1
 fi
 
@@ -43,8 +43,8 @@ echo "Moving engine.json to user-engine.json"
 cp -n engine.json user-engine.json
 
 echo ""
-echo "Moving handmade-engine.json to engine.json for integration test."
-cp handmade-engine.json engine.json
+echo "Moving examples/handmade-engine.json to engine.json for integration test."
+cp examples/handmade-engine.json engine.json
 
 echo ""
 echo "Deleting handmade app data since the test is date dependent"

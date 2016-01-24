@@ -1,6 +1,5 @@
 {
-  "comment":" This config file uses default settings for all but the required values see README.md for docs",
-  "id": "default",
+  "id": "popularity-only",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
@@ -21,18 +20,22 @@
   },
   "algorithms": [
     {
-      "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
+      "comment": "setup to only calculate a popularity model for *hot* and add it to the existing model for backfill",
       "name": "ur",
       "params": {
         "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
-        "comment": "must have data for the first event or the model will not build, other events are optional",
         "eventNames": ["purchase", "view"],
-        "availableDateName": "available",
-        "expireDateName": "expires",
-        "dateName": "date",
-        "num": 4
+        "recsModel": "backfill",
+        "backfillField": {
+          "name": "trendRank",
+          "backfillType": "trending",
+          "eventNames": ["purchase", "view"],
+          "duration": 259200,
+          "comment": "VERY IMPORTANT that the line below be set to today - 4 days for integration-test-pop-model",
+          "offsetDate": "2016-01-19T11:55:07Z"
+        }
       }
     }
   ]
