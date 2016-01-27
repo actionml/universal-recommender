@@ -56,10 +56,10 @@ These take the form of boosts and filters where a neutral bias is 1.0. The impor
 
 ###Dates
 
-Dates can be used to filter recommendations in one of two ways, where the data range is attached to items or is specified in the query:
+Dates are only used for filters but apply in all recommendation modes including popularity quereies. Dates can be used to filter recommendations in one of two ways, where the date range is attached to items or is specified in the query:
 
- 1. The date range can be attahed to every item and checked against the current date. The current date can be in the query or defaults to the current prediction server date. This mode requires that all items have a upper and lower date attached to them as a property. It is designed to be something like an "available after" and "expired after". The default check against server date is triggered when the expireDateName and availableDateName are both specified but no date is passed in with the query. **Note**: Both dates must be attached to items or they will not be recommended. To have one-sided filter make the avialable date some time far in the past and/or the expire date some time far in the future.
- 2. A "dateRange" can be specified in the query and the recommended items will have a date that lies between the range dates.
+ 1. The date range can be attahed to every item and checked against the current date or a date passed in with the query. If not in the query the date to check against the item's range is the predoiction server date. This mode requires that all items have a upper and lower dates attached to them as a property. It is designed to be something like an "available after" and "expired after". **Note**: Both dates must be attached to items or they will not be recommended. To have one-sided filter make the avialable date some time far in the past and/or the expire date some time in the far future.
+ 2. A "dateRange" can be specified in the query and the recommended items must have a date that lies between the range dates. If items do not have a date property attached to them they will never be returned by a dateRange filtered query.
  
 ###Engine.json
 
@@ -147,10 +147,11 @@ A full list of tuning and config parameters is below. See the field description 
             "seed": 3,
             "recsModel": "all",
 			"backfillField": {
+				"name": "popRank"
   				"backfillType": "popular",
   				"eventNames": ["buy", "view"],
   				"duration": 259200,
-  				"offsetDate": "ISO8601-date" //most recent date to end the duration
+  				"endDate": "ISO8601-date" //most recent date to end the duration
   			},
             "expireDateName": "expireDateFieldName",
             "availableDateName": "availableDateFieldName",
@@ -189,7 +190,7 @@ The “params” section controls most of the features of the UR. Possible value
 * **dateName** optional, a date or timestamp used in a `dateRange` recommendations filter.
 * **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
 * **recsModel** optional, default = "all", which means  collaborative filtering with popular items returned when no other recommendations can be made. Otherwise: "all", "collabFiltering", "backfill". If only "backfill" is specified then the train will create only some backfill type like popular. If only "collabFiltering" then no backfill will be included when there are no other recommendations.
-* **backfillField** optional (use with great care), default: backfillType = popular, eventNames = only the first/primary event in `eventNames`, corresponding to the primary action, duration = 259200, which is the number of seconds in a 3 days. The primary/first event used for recommendations is always attached to items you wish to recommend, the other events are not neccessarily attached to the same items. If events like "category-preference" are used then popular categories will be calculated and this will have no effect for backfill. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly. 
+* **backfillField** optional (use with great care), default: name = "popRank" and refers to the field name in Elsaticsearch, backfillType = popular, eventNames = only the first/primary event in `eventNames`, corresponding to the primary action, duration = 259200, which is the number of seconds in a 3 days. The primary/first event used for recommendations is always attached to items you wish to recommend, the other events are not neccessarily attached to the same items. If events like "category-preference" are used then popular categories will be calculated and this will have no effect for backfill. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly. 
 * **seed** Set this if you want repeatable downsampling for some offline tests. This can be ignored and shouldn't be set in production. 
 
 ###Queries
@@ -298,7 +299,9 @@ When the a date is stored in the items properties it can be used in a date range
 Items are assumed to have a field of the same `name` that has a date associated with it using a `$set` event. The query will return only those recommendations where the date field is in reange. Either date bound can be omitted for a on-sided range. The range applies to all returned recommendations, even those for popular items. 	
 
 ###Current Date as a query filter
-When setting an available date and expire date on items, the current date can be used as a filter, the UR will check that the current date is before the expire date, and after or equal to the available date. You can use either expire date or available date or both. The names of these item fields is specified in the engin.json.
+When setting an available date and expire date on **items** you will set the name of the fields to be used in the engine.json `expireDateName` and `availableDateName` params, the current date can be used as a filter, the UR will check that the current date is before the expire date, and after or equal to the available date. If the above fields are defined in engne.json a date must accompany any query since all items are assumed to have this property. When setting these values for item propoerties both must be specified so if a one-sided query is desires set the available date to some time in the past and/or the expire date to sometime far in the future, this guarantees that the item will not be filtered out from one or the other limit. If the available and expire fields are named in the engine.json then the date can be passed in with the query or, if it is absent the current PredictionServer date will be used. 
+
+**Note:** a somewhat hidden effect of this is that if these fields are specified in the engine.json the current date type range filter will apply to **every query made**. It is an easy modification to only apply them to queries that contain the `currentDate` as shown below so ask us if you need it.
 
     {
 	  “user”: “xyz”, 
@@ -386,11 +389,25 @@ To attach properties to items use a $set event like this:
 		"entityType" : "item",
 		"entityId" : "ipad",
 		"properties" : {
-			"category": ["electronics", "mobile-phones"]
+			"category": ["electronics", "mobile-phones"],
 			"expireDate": "2016-10-05T21:02:49.228Z"
 		},
 		"eventTime" : "2015-10-05T21:02:49.228Z"
 	}
+
+	{
+		"event":"$set",
+		"entityType":"item",
+		"entityId":"tweek_",
+		"properties": {
+			"content-type":["tv_show"],
+			"genres":["10751","16"],
+			"actor":["1513229","89756","215384","120310"],
+			"keywords":["409"],
+			"first_air_at":["1960"]
+		}
+	}
+
 
 Unless a property has a special meaning specified in the engine.json, like date values, the property is assumed to be an array of strings, which act as categorical tags. You can add things like "premium" to the "tier" property then later if the user is a subscriber you can set a filter that allows recommendations from `"tier": ["free", "premium"]` where a non subscriber might only get recommendations for `"tier": ["free"]`. These are passed in to the query using the `"fields"` parameter (see Contextual queries above).
 
