@@ -144,7 +144,7 @@ class URModel(
         }
         // create a new index then hot-swap the new index by re-aliasing to it then delete old index
         logger.info("New data to index, performing a hot swap of the index.")
-        esClient.hotSwap(
+        EsClient.hotSwap(
           params.indexName,
           params.typeName,
           esFields.asInstanceOf[RDD[scala.collection.Map[String,Any]]],
@@ -158,7 +158,7 @@ class URModel(
       // entire index
 
       // create a new index then hot-swap the new index by re-aliasing to it then delete old index
-      esClient.hotSwap(params.indexName, params.typeName, propertiesRDD.get, allFields,
+      EsClient.hotSwap(params.indexName, params.typeName, propertiesRDD.get, allFields,
         typeMappings)
     }
     true

@@ -216,7 +216,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } else None
 
     val propertiesRDD = if (popModel.nonEmpty) {
-      val currentMetadata = esClient.getRDD(sc, ap.indexName, ap.typeName)
+      val currentMetadata = EsClient.getRDD(sc, ap.indexName, ap.typeName)
       if (currentMetadata.nonEmpty) { // may be an empty index so ignore
         Some(popModel.get.cogroup[collection.Map[String, AnyRef]](currentMetadata.get)
           .map { case (item, (ranks, pms)) =>
@@ -330,7 +330,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val backfillFieldName = ap.backfillField.getOrElse(BackfillField()).name
     logger.info(s"PopModel using fieldName: ${backfillFieldName}")
     val queryAndBlacklist = buildQuery(ap, query, backfillFieldName.getOrElse(defaultURAlgorithmParams.DefaultBackfillFieldName))
-    val recs = esClient.search(queryAndBlacklist._1, ap.indexName)
+    val recs = EsClient.search(queryAndBlacklist._1, ap.indexName)
     // should have all blacklisted items excluded
     // todo: need to add dithering, mean, sigma, seed required, make a seed that only changes on some fixed time
     // period so the recs ordering stays fixed for that time period.
@@ -472,7 +472,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   /** Get similar items for an item, these are already in the action correlators in ES */
   def getBiasedSimilarItems(query: Query): Seq[BoostableCorrelators] = {
     if (query.item.nonEmpty) {
-      val m = esClient.getSource(ap.indexName, ap.typeName, query.item.get)
+      val m = EsClient.getSource(ap.indexName, ap.typeName, query.item.get)
 
       if (m != null) {
         val itemEventBias = query.itemBias.getOrElse(ap.itemBias.getOrElse(1f))
