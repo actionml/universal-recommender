@@ -1,13 +1,28 @@
-# Universal Recommendation Template
+#The Universal Recommender
 
-The Universal Recommender (UR) is a Cooccurrence type that creates correlators from several user actions, events, or profile information and performs the recommendations query with a Search Engine. It also supports item properties for filtering and boosting recommendations. This allows users to make use of any part of their user's clickstream or even profile and context information in making recommendations. TBD: several forms of popularity type backfill and content-based correlators for content based recommendations. Also filters on property date ranges. With these additions it will more closely live up to the name "Universal"
+The Universal Recommender (UR) is a new type of collaborative filtering recommender that creates correlators from any number of user actions, events, profile information, or context and serves results in a fast and scalable way. It also supports item properties for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender. 
+
+The use of multiple **types** of data fundamentally changes that way a recommender is used and provides a significant increase in precision vs. using only one user event. Most recommenders, for instance, can only use "purchase" events, all of the popular Spark MLlib recommenders for instance. Using all we know about a user and their context allows us to much better predict their desires.
 
 ##Quick Start
 Check the prerequisites below before setup, it will inform choices made.
 
  1. [Install the PredictionIO framework](https://docs.prediction.io/install/) **be sure to choose HBase and Elasticsearch** for storage. This template requires Elasticsearch.
  2. Make sure the PIO console and services are running, check with `pio status`
- 3. [Install this template](https://docs.prediction.io/start/download/) with `pio template get PredictionIO/template-scala-parallel-universal-recommendation`
+ 3. Install the Universal Recommender as a PredictionIO Template with git. If you have git installed do the following:
+ 
+ 	```
+ 	$ git clone https://github.com/actionml/template-scala-parallel-universal-recommendation.git universal
+ 	```
+ 	
+ 	This will put the Universal Recommender code in `~/universal` With pio installed and running (make sure `pio status` looks good) perform the integration test with the following:
+ 	
+ 	```
+ 	pio app new handmade
+ 	$ ./examples/integration-test
+ 	```
+ 	
+ 	This will import data into pio, build the Universal Recommender code, train on the data, deploy the UR server, make sample queries, compare them with expected results, and restore the config to the original, leaving you ready to create your own app with tested config and code.
  
 ###Import Sample Data
 
@@ -444,7 +459,17 @@ To begin using new data with an engine that has been used with sample data or us
 
 **MAP@k**: This tests the predictive power of each usage event/indicator. All eventNames used in queries must be removed from the blacklisted events in the engine.json used for a particular dataset. So if `"eventNames": ["purchase","view"]` is in the engine.json for the dataset, these events must be removed from the blacklist with `"blacklist": []`, which tells the engine to not blacklist items with `eventNames` for a user. Allowing blacklisting will artificially lower MAP@k and so not give the desired result.
 
+##More Links
+
+ - For a step-by-step for setting up a cluster see this [guide](https://github.com/actionml/cluster-setup)
+ - For Scaling and Architecture see [these docs](https://github.com/actionml/cluster-setup/blob/master/architecture-and-scaling.md)
+
 ## Versions
+
+### v0.3.0
+
+ - fixed a bug which requires that in the engine.json the `typeName` is required to be `"items"`, with this release the type can be more descriptive.
+ - Now supports the `CleanedDataSource` trait. Adding params to the `DataSource` part of `engine.json` allows control of de-duplication, property event compaction, and a time window of event. The time window is used to age out the oldest events. Note: this only works with the ActionML fork of PredictionIO found in the [ActionML github repository here](https://github.com/actionml/PredictionIO).
 
 ### v0.2.3
 
