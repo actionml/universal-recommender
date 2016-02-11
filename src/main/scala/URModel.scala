@@ -21,7 +21,6 @@ import java.util.Date
 
 import grizzled.slf4j.Logger
 
-import io.prediction.controller.{PersistentModelLoader, PersistentModel}
 import io.prediction.data.storage.PropertyMap
 import org.apache.mahout.math.indexeddataset.IndexedDataset
 import org.apache.spark.rdd.RDD
@@ -43,9 +42,7 @@ class URModel(
     nullModel: Boolean = false,
     typeMappings: Option[Map[String, String]] = None, // maps fieldname that need type mapping in Elasticsearch
     propertiesRDD: Option[RDD[collection.Map[String, Any]]] = None)
-    // a little hack to allow a dummy model used to save but not
-    // retrieve (see companion object's apply)
-  extends PersistentModel[URAlgorithmParams] {
+     {
   @transient lazy val logger = Logger[this.type]
 
   /** Save all fields to be indexed by Elasticsearch and queried for recs
@@ -53,12 +50,10 @@ class URModel(
     * cooccurrence and cross-cooccurrence correlators and metadata for each item. Metadata fields are
     * limited to text term collections so vector types. Scalar values can be used but depend on
     * Elasticsearch's support. One exception is the Data scalar, which is also supported
-    * @param id
     * @param params from engine.json, algorithm control params
-    * @param sc The spark constext already created for execution
     * @return always returns true since most other reasons to not save cause exceptions
     */
-  def save(id: String, params: URAlgorithmParams, sc: SparkContext): Boolean = {
+  def save( params: URAlgorithmParams): Boolean = {
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
@@ -184,8 +179,7 @@ class URModel(
 
 }
 
-object URModel
-  extends PersistentModelLoader[URAlgorithmParams, URModel] {
+object URModel {
   @transient lazy val logger = Logger[this.type]
 
   /** This is actually only used to read saved values and since they are in Elasticsearch we don't need to read
