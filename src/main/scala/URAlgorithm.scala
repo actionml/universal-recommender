@@ -59,6 +59,8 @@ object defaultURAlgorithmParams {
   val DefaultBackfillDuration = 259200
 }
 
+case class NullModel()
+
 case class BackfillField(
   name: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
   backfillType: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillType), // may be 'hot', or 'trending' also
@@ -104,14 +106,14 @@ case class URAlgorithmParams(
   * @param ap taken from engine.json to describe limits and event types
   */
 class URAlgorithm(val ap: URAlgorithmParams)
-  extends P2LAlgorithm[PreparedData, URModel, Query, PredictedResult] {
+  extends P2LAlgorithm[PreparedData, NullModel, Query, PredictedResult] {
 
   case class BoostableCorrelators(actionName: String, itemIDs: Seq[String], boost: Option[Float])
   case class FilterCorrelators(actionName: String, itemIDs: Seq[String])
 
   @transient lazy val logger = Logger[this.type]
 
-  def train(sc: SparkContext, data: PreparedData): URModel = {
+  def train(sc: SparkContext, data: PreparedData): NullModel = {
 
     val dateNames = Some(List(ap.dateName.getOrElse(""), ap.availableDateName.getOrElse(""),
       ap.expireDateName.getOrElse(""))) // todo: return None if all are empty?
@@ -135,7 +137,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     dateNames: Option[List[String]] = None,
     backfillFieldName: String,
     popular: Boolean = true):
-  URModel = {
+  NullModel = {
 
     // No one likes empty training data.
     require(data.actions.take(1).nonEmpty,
@@ -180,12 +182,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } else data.fieldsRDD
 
     logger.info("Correlators created now putting into URModel")
-    new URModel(
+    val model = new URModel(
       Some(cooccurrenceCorrelators),
       Some(allPropertiesRDD),
       ap.indexName,
       dateNames,
       typeMappings = Some(nonDefaultMappings))
+    model.save(ap)
+    new NullModel
   }
 
   /** This function creates a URModel from an existing index in Elasticsearch + new popularity ranking
@@ -196,7 +200,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     sc: SparkContext,
     data: PreparedData,
     dateNames: Option[List[String]] = None,
-    backfillFieldName: String = ""): URModel = {
+    backfillFieldName: String = ""): NullModel = {
 
     val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
     val backfillEvents = backfillParams.eventNames.getOrElse(List(ap.eventNames.head))//default to first/primary event
@@ -229,13 +233,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } else None
 
     // returns the existing model plus new popularity ranking
-    new URModel(
+    val model = new URModel(
       None,
       None,
       ap.indexName,
       None,
       propertiesRDD = propertiesRDD,
       typeMappings = Some(Map(backfillFieldName -> "float")))
+    model.save(ap)
+    new NullModel
   }
 
   var queryEventNames = List.empty[String] // if passed in with the query overrides the engine.json list--used in MAP@k
@@ -321,7 +327,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     * @todo Need to prune that query to minimum required for data include, for instance no need for the popularity
     *       ranking if no PopModel is being used, same for "must" clause and dates.
     */
-  def predict(model: URModel, query: Query): PredictedResult = {
+  def predict(model: NullModel, query: Query): PredictedResult = {
     //logger.info(s"Query received, user id: ${query.user}, item id: ${query.item}")
     logger.info(s"Query BackFillField: ${ap.backfillField}")
 
