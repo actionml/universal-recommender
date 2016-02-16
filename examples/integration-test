@@ -48,7 +48,7 @@ cp examples/handmade-engine.json engine.json
 
 echo ""
 echo "Deleting handmade app data since the test is date dependent"
-pio app data-delete handmade
+pio app data-delete handmade -f
 
 echo ""
 echo "Importing data for integration test"
@@ -65,11 +65,11 @@ pio train  -- --driver-memory 2g
 echo "Model will remain deployed after this test"
 nohup pio deploy > deploy.out &
 echo "Waiting 20 seconds for the server to start"
-sleep 20
+sleep 49
 
-echo ""
-echo "Running test query."
-./examples/multi-query-handmade.sh > test.out
+#echo ""
+#echo "Running test query."
+#./examples/multi-query-handmade.sh > test.out
 
 #this is due bug where first query had bad results
 #TODO: Investigate and squash
@@ -84,5 +84,9 @@ echo ""
 echo "Differences between expected and actual results, none is a passing test:"
 diff data/integration-test-expected.txt test.out
 
-echo ""
-echo "Note that the engine is still deployed until killed or this shell exists."
+deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
+echo "Killing the deployed test PredictionServer"
+kill "$deploy_pid"
+
+
+
