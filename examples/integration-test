@@ -33,6 +33,7 @@ fi
 echo ""
 echo "Checking status, should exit if pio is not running."
 pio status
+pio app new handmade || true
 
 echo ""
 echo "Checking to see if handmade app exists, should exit if not."
