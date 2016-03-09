@@ -6,7 +6,7 @@
   "datasource": {
     "params" : {
       "name": "sample-handmade-data.txt",
-      "appName": "handmade",
+      "appName": "handmade-1",
       "eventNames": ["purchase", "view"]
     }
   },
@@ -23,13 +23,11 @@
       "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
       "name": "ur",
       "params": {
-        "appName": "handmade",
-        "indexName": "urindex",
+        "appName": "handmade-1",
+        "indexName": "urindex-mt-1",
         "typeName": "items",
-        "comment": "must have data for the first event or the model will not build, other events are optional",
         "eventNames": ["purchase", "view"]
       }
     }
   ]
 }
-
