@@ -21,7 +21,7 @@ import java.util
 import io.prediction.controller.P2LAlgorithm
 import io.prediction.controller.Params
 import io.prediction.data
-import io.prediction.data.storage.{PropertyMap, Event}
+import io.prediction.data.storage.{NullModel, PropertyMap, Event}
 import io.prediction.data.store.LEventStore
 import org.apache.mahout.math.cf.SimilarityAnalysis
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
@@ -59,8 +59,7 @@ object defaultURAlgorithmParams {
   val DefaultBackfillDuration = 259200
 }
 
-case class NullModel()
-
+/* default values must be set in code not the case class declaration
 case class BackfillField(
   name: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
   backfillType: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillType), // may be 'hot', or 'trending' also
@@ -70,7 +69,6 @@ case class BackfillField(
   duration: Option[Int] = Some(defaultURAlgorithmParams.DefaultBackfillDuration)) // number of seconds worth of events
   // to use in calculation of backfill
 
-/** Instantiated from engine.json */
 case class URAlgorithmParams(
   appName: String, // filled in from engine.json
   indexName: String, // can optionally be used to specify the elasticsearch index name
@@ -95,6 +93,43 @@ case class URAlgorithmParams(
   expireDateName: Option[String] = Some(defaultURAlgorithmParams.DefaultExpireDateName),
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = Some(defaultURAlgorithmParams.DefaultDateName),
+  seed: Option[Long] = None) // seed is not used presently
+  extends Params //fixed default make it reproducible unless supplied
+  */
+
+case class BackfillField(
+  name: Option[String] = None,
+  backfillType: Option[String] = None, // may be 'hot', or 'trending' also
+  eventNames: Option[List[String]] = None, // None means use the algo eventNames list, otherwise a list of events
+  offsetDate: Option[String] = None, // used only for tests, specifies the offset date to start the duration so the most
+  // recent date for events going back by from the more recent offsetDate - duration
+  duration: Option[Int] = None) // number of seconds worth of events
+  // to use in calculation of backfill
+
+case class URAlgorithmParams(
+  appName: String, // filled in from engine.json
+  indexName: String, // can optionally be used to specify the elasticsearch index name
+  typeName: String, // can optionally be used to specify the elasticsearch type name
+  recsModel: Option[String] = None, // "all", "collabFiltering", "backfill"
+  eventNames: List[String], // names used to ID all user actions
+  blacklistEvents: Option[List[String]] = None,// None means use the primary event, empty array means no filter
+  // number of events in user-based recs query
+  maxQueryEvents: Option[Int] = None,
+  maxEventsPerEventType: Option[Int] = None,
+  maxCorrelatorsPerEventType: Option[Int] = None,
+  num: Option[Int] = None, // default max # of recs requested
+  userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
+  itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
+  returnSelf: Option[Boolean] = None, // query building logic defaults this to false
+  fields: Option[List[Field]] = None, //defaults to no fields
+  // leave out for default or popular
+  backfillField: Option[BackfillField] = None,
+  // name of date property field for when the item is avalable
+  availableDateName: Option[String] = None,
+  // name of date property field for when an item is no longer available
+  expireDateName: Option[String] = None,
+  // used as the subject of a dateRange in queries, specifies the name of the item property
+  dateName: Option[String] = None,
   seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducible unless supplied
 

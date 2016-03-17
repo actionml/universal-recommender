@@ -48,7 +48,7 @@ echo "Recommendations for user: u-4"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u-4"
+    "user": "u1"
 }' http://localhost:8000/queries.json
 echo ""
 
