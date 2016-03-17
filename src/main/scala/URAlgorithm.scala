@@ -59,7 +59,7 @@ object defaultURAlgorithmParams {
   val DefaultBackfillDuration = 259200
 }
 
-/** default values must be set in code not the case class declaration
+/* default values must be set in code not the case class declaration
 case class BackfillField(
   name: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
   backfillType: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillType), // may be 'hot', or 'trending' also
