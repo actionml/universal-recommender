@@ -23,6 +23,7 @@ import _root_.io.prediction.controller.EmptyActualResult
 import _root_.io.prediction.controller.Params
 import _root_.io.prediction.data.storage.{PropertyMap, Event}
 import _root_.io.prediction.data.store.PEventStore
+import io.prediction.core.SelfCleaningDataSource
 import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -45,7 +46,7 @@ case class DataSourceParams(
   */
 class DataSource(val dsp: DataSourceParams)
   extends PDataSource[TrainingData,
-      EmptyEvaluationInfo, Query, EmptyActualResult] {
+      EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
 
   @transient lazy val logger = Logger[this.type]
 
@@ -54,6 +55,8 @@ class DataSource(val dsp: DataSourceParams)
   def readTraining(sc: SparkContext): TrainingData = {
 
     val eventNames = dsp.eventNames
+
+    cleanPersistedPEvents(sc)
 
     val eventsRDD = PEventStore.find(
       appName = dsp.appName,
