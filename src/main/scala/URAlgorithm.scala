@@ -39,6 +39,7 @@ import org.json4s.jackson.JsonMethods._
 import scala.collection.convert.wrapAsScala._
 import grizzled.slf4j.Logger
 import org.elasticsearch.spark._
+import scala.concurrent.duration.Duration
 
 /** Setting the option in the params case class doesn't work as expected when the param is missing from
   * engine.json so set these for use in the algorithm when they are not present in the engine.json
@@ -56,7 +57,7 @@ object defaultURAlgorithmParams {
   val DefaultBackfillParams = BackfillField()
   val DefaultBackfillFieldName = "popRank"
   val DefaultBackfillType = "popular"
-  val DefaultBackfillDuration = 259200
+  val DefaultBackfillDuration = "3650 days" // for all time
 }
 
 /* default values must be set in code not the case class declaration
@@ -66,7 +67,7 @@ case class BackfillField(
   eventNames: Option[List[String]] = None, // None means use the algo eventNames list, otherwise a list of events
   offsetDate: Option[String] = None, // used only for tests, specifies the offset date to start the duration so the most
   // recent date for events going back by from the more recent offsetDate - duration
-  duration: Option[Int] = Some(defaultURAlgorithmParams.DefaultBackfillDuration)) // number of seconds worth of events
+  duration: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillDuration)) // duration worth of events
   // to use in calculation of backfill
 
 case class URAlgorithmParams(
@@ -103,7 +104,7 @@ case class BackfillField(
   eventNames: Option[List[String]] = None, // None means use the algo eventNames list, otherwise a list of events
   offsetDate: Option[String] = None, // used only for tests, specifies the offset date to start the duration so the most
   // recent date for events going back by from the more recent offsetDate - duration
-  duration: Option[Int] = None) // number of seconds worth of events
+  duration: Option[String] = None) // duration worth of events
   // to use in calculation of backfill
 
 case class URAlgorithmParams(
@@ -193,7 +194,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     val popModel = if (popular) {
-      val duration = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
+      val durationString = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
+        .getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration)
+      val duration = Duration(durationString).toSeconds.toInt
       val backfillEvents = backfillParams.eventNames.getOrElse(List(ap.eventNames.head))
       val end = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
         .offsetDate
@@ -201,7 +204,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         Some(backfillParams.backfillType.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)),
         backfillEvents,
         ap.appName,
-        duration.getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration),
+        duration,
         end)(sc)
     } else None
 
@@ -239,12 +242,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
     val backfillEvents = backfillParams.eventNames.getOrElse(List(ap.eventNames.head))//default to first/primary event
+    val durationString = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
+        .getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration)
+    val duration = Duration(durationString).toSeconds.toInt
     val end = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).offsetDate
     val popModel = PopModel.calc(
       Some(backfillParams.backfillType.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)),
       backfillEvents,
       ap.appName,
-      backfillParams.duration.getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration),
+      duration,
       end)(sc)
     val popRDD = if (popModel.nonEmpty) {
       val model = popModel.get.map { case (item, rank)  =>

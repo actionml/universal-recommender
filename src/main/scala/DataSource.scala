@@ -23,7 +23,7 @@ import _root_.io.prediction.controller.EmptyActualResult
 import _root_.io.prediction.controller.Params
 import _root_.io.prediction.data.storage.{PropertyMap, Event}
 import _root_.io.prediction.data.store.PEventStore
-import io.prediction.core.SelfCleaningDataSource
+import io.prediction.core.{EventWindow, SelfCleaningDataSource}
 import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -37,18 +37,21 @@ import grizzled.slf4j.Logger
   */
 case class DataSourceParams(
    appName: String,
-   eventNames: List[String]) // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
-  extends Params
+   eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
+   eventWindow: Option[EventWindow])
+extends Params
 
 /** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
   * are sent to the Preparator for further processing.
   * @param dsp parameters taken from engine.json
   */
 class DataSource(val dsp: DataSourceParams)
-  extends PDataSource[TrainingData,
-      EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
+  extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
 
   @transient lazy val logger = Logger[this.type]
+
+  override def appName = dsp.appName
+  override def eventWindow = dsp.eventWindow
 
   /** Reads events from PEventStore and create and RDD for each */
   override

@@ -144,6 +144,11 @@ A full list of tuning and config parameters is below. See the field description 
           "name": "some-data",
           "appName": "URApp1",
           "eventNames": ["buy", "view"]
+          "eventWindow": {
+	        "duration": "3 days",
+            "removeDuplicates":true,
+            "compressProperties":true
+	      } 
         }
       },
       “comment”: “This is for Mahout and Elasticsearch, the values are minimums and should not be removed”,
@@ -174,7 +179,7 @@ A full list of tuning and config parameters is below. See the field description 
 				"name": "popRank"
   				"backfillType": "popular",
   				"eventNames": ["buy", "view"],
-  				"duration": 259200,
+  				"duration": "3 days",
   				"endDate": "ISO8601-date" //most recent date to end the duration
   			},
             "expireDateName": "expireDateFieldName",
@@ -194,8 +199,20 @@ A full list of tuning and config parameters is below. See the field description 
         }
       ]
     }
+    
+####Datasource Parameters
 
-The “params” section controls most of the features of the UR. Possible values are:
+The `datasource: params:` section controls input data. This section is Algorithm independent and is meant to manage the size of data in the EventServer and do compaction. Is changes the persisted state of data. A fixed `timeWindow: duration:` will have the effect of making the UR calculate a model in a fixed amount of time as long as soon as there are enough events to start dropping old ones.
+
+ - **eventNames**: enumerates the event types to be used, the first of which is the primary event.
+ - **timeWindow**: This is optional and controls how much of the data in the EventServer to keep and how to compress events. The default it to not have a time window and do no compression. This will compact and drop old events from the EventServer permanently in the persisted data&mdash;so make sure to have some other archive of events it you are playing with the `timeWindow: duration:`.
+	 - **duration**: This is parsed in the expected ways and becomes a Scala `Duration` object defining the time from now backward to the point where older events will be dropped. $set property change event are never dropped.
+	 - **removeDuplicates** a boolean telling the Datasource to de-duplicate non$set type events, defaults to `false`.
+	 - **compressProperties**: a boolean telling the Datasource to compress property change event into one event expressing the current state of all properties, defaults to `false`.
+
+####Algorithm Parameters
+
+The `Algorithm: params:` section controls most of the features of the UR. Possible values are:
 
 * **appName**: required string describing the app using the engine. Must be the same as is seen with `pio app list`
 * **indexName**: required string describing the index for all correlators, something like "urindex". The Elasticsearch URI for its REST interface is `http:/**elasticsearch-machine**/indexName/typeName/...` You can access ES through its REST interface here.
@@ -214,7 +231,12 @@ The “params” section controls most of the features of the UR. Possible value
 * **dateName** optional, a date or timestamp used in a `dateRange` recommendations filter.
 * **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
 * **recsModel** optional, default = "all", which means  collaborative filtering with popular items returned when no other recommendations can be made. Otherwise: "all", "collabFiltering", "backfill". If only "backfill" is specified then the train will create only some backfill type like popular. If only "collabFiltering" then no backfill will be included when there are no other recommendations.
-* **backfillField** optional (use with great care), default: name = "popRank" and refers to the field name in Elsaticsearch, backfillType = popular, eventNames = only the first/primary event in `eventNames`, corresponding to the primary action, duration = 259200, which is the number of seconds in a 3 days. The primary/first event used for recommendations is always attached to items you wish to recommend, the other events are not neccessarily attached to the same items. If events like "category-preference" are used then popular categories will be calculated and this will have no effect for backfill. Possible backfillTypes are "popular", "trending", and "hot", which correspond to the number of events in the duration, the average event velocity or the average event acceleration over the time indicated. This is calculated for every event and is used to rank them and so can be used with biasing metadata so you can get, for instance, hot items in some category. **Note**: when using "hot" the algorithm divides the events into three periods and since event tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly. 
+* **backfillField** optional (use with great care), this set of parameters defines the calculation of the popularity model that ranks all items by their events in one of three different ways corresponding to: event counts (popular), change in event counts over time (trending), and change in trending over time (hot). If there are not enough recommendations to return teh number asked for, popular items will fill in the remaining recommendations asked for&mdash;hence the term "backfill". Purely popular items may be requested in the query by specifying no user of item.
+	* **name** give the field a name in the model and defaults to "popRank"
+	* **backfillType**  "popular", "trending", and "hot". These are event counts, velocity of change in event counts, or the acceleration of event counts. **Note**: when using "hot" the algorithm divides the events into three periods and since events tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly. 
+	* **eventNames** an array of eventNames to use in calculating the popularity model, this defaults to the single primary events&mdash;the first in the `algorithm: eventNames:` 
+	* **duration** a duration like "3 days" (which is the default), which defines the time from now back to the last event to count in the popularity calculation.
+	* **endDate** an ISO8601-date string to use to start the duration&mdash;the first event to count. This is almost never used live system but may be used in tests on batch imported events.
 * **seed** Set this if you want repeatable downsampling for some offline tests. This can be ignored and shouldn't be set in production. 
 
 ###Queries
@@ -266,16 +288,19 @@ Query fields determine what data is used to match when returning recommendations
 * **userBias**: optional (use with great care), the amount to favor the user's history in making recommendations. The user may be anonymous as long as the id is unique from any authenticated user. This tells the recommender to return recommendations based on the user’s event history. Used for personalized recommendations. Overrides and bias in engine.json.
 * **item**: optional, contains the unique item identifier
 * **itemBias**: optional (use with great care), the amount to favor similar items in making recommendations. This tells the recommender to return items similar to this the item specified. Use for “people who liked this also liked these”. Overrides any bias in engine.json
-* **fields**: optional, array of fields values and biases to use in this query. The name = type or field name for metadata stored in the EventStore with $set and $unset events. Values = an array on one or more values to use in this query. The values will be looked for in the field name. Bias will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name.
+* **fields**: optional, array of fields values and biases to use in this query. 
+	* **name** field name for metadata stored in the EventStore with $set and $unset events.
+	* **values** an array on one or more values to use in this query. The values will be looked for in the field name. 
+	* **bias** will either boost the importance of this part of the query or use it as a filter. Positive biases are boosts any negative number will filter out any results that do not contain the values in the field name. See **Biases** above.
 * **num**: optional max number of recommendations to return. There is no guarantee that this number will be returned for every query. Adding backfill in the engine.json will make it much more likely to return this number of recommendations.
 * **blacklistItems**: optional. Unlike the engine.json, which specifies event types this part of the query specifies individual items to remove from returned recommendations. It can be used to remove duplicates when items are already shown in a specific context. This is called anti-flood in recommender use.
 * **dateRange** optional, default is not range filter. One of the bound can be omitted but not both. Values for the `beforeDate` and `afterDate` are strings in ISO 8601 format. A date range is ignored if **currentDate** is also specified in the query.
 * **currentDate** optional, must be specified if used. Overrides the **dateRange** is both are in the query.
 * **returnSelf**: optional boolean asking to include the item that was part of the query (if there was one) as part of the results. Defaults to false.
  
-All query params are optional, the only rule is that there must be an item or user specified. Defaults are either noted or taken from algorithm values, which themselves may have defaults. This allows very simple queries for the simple, most used cases.
+Defaults are either noted or taken from algorithm values, which themselves may have defaults. This allows very simple queries for the simple, most used cases.
  
-The query returns personalized recommendations, similar items, or a mix including backfill. The query itself determines this by supplying item, user or both. Some examples are:
+The query returns personalized recommendations, similar items, or a mix including backfill. The query itself determines this by supplying item, user, both, or neither. Some examples are:
 
 ###Contextual Personalized
 
@@ -371,10 +396,10 @@ This returns items based on user xyz history or similar to item 53454543513 but 
 	{
 	}
 
-This is a simple way to get popular items. All returned scores will be 0 but the order will be based on relative popularity. Field-based biases for boosts and filters can also be applied.
+This returns only popular items. All returned scores will be 0 but the order will be based on relative popularity. Property-based biases for boosts and filters can also be applied as with any other query. See `algorithm: backfillField:` parameters for a discussion of how the ranking of all items is calculated.
 
 ##Events
-The Universal takes in potentially many events. These should be seen as a primary evnet, which is a very clear indication of a user preference and secondary events that we think may tell us something about user "taste" in some way. The Universal Recommender is built on a distributed Correlation Engine so it will test that these secondary events actually relate to the primary one and those that do not correlate will have little or no effect on recommendations (though they will make it longer to train and get query results). It is recommended that you start with one ot two events and increase the number as you see how these events effect results and timing.
+The Universal takes in potentially many events. These should be seen as a primary event, which is a very clear indication of a user preference and secondary events that we think may tell us something about user "taste" in some way. The Universal Recommender is built on a distributed Correlated Cross-Occurrence (CCO) Engine, which basically means that it will test every secondary event to make sure that it actually corelates to the primary one and those that do not correlate will have little or no effect on recommendations (though they will make it longer to train and get query results). See ActionML's Analysis Tools for methods to test event predictiveness.
 
 ###Usage Events
 
