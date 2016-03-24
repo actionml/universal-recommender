@@ -48,7 +48,7 @@ extends Params
 class DataSource(val dsp: DataSourceParams)
   extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
 
-  @transient lazy val logger = Logger[this.type]
+  @transient override lazy val logger = Logger[this.type]
 
   override def appName = dsp.appName
   override def eventWindow = dsp.eventWindow
