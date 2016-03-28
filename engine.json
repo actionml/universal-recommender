@@ -5,8 +5,9 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "appName": "ksrec",
-      "eventNames": ["play"]
+      "name": "sample-handmade-data.txt",
+      "appName": "handmade",
+      "eventNames": ["purchase", "view"]
     }
   },
   "sparkConf": {
@@ -14,7 +15,7 @@
     "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
     "spark.kryo.referenceTracking": "false",
     "spark.kryoserializer.buffer": "300m",
-    "spark.executor.memory": "8g",
+    "spark.executor.memory": "4g",
     "es.index.auto.create": "true"
   },
   "algorithms": [
@@ -22,11 +23,11 @@
       "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
       "name": "ur",
       "params": {
-        "appName": "ksrec",
+        "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
         "comment": "must have data for the first event or the model will not build, other events are optional",
-        "eventNames": ["play"]
+        "eventNames": ["purchase", "view"]
       }
     }
   ]
