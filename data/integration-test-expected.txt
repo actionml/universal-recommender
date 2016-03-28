@@ -82,7 +82,7 @@ Recommendations for no user no item, all from popularity, Tablets boost, Estados
 
 Recommendations for user: u1
 
-{"itemScores":[{"item":"Surface","score":0.049329958856105804}]}
+{"itemScores":[{"item":"Nexus","score":0.27008914947509766},{"item":"Surface","score":0.049329958856105804}]}
 
 ============ query with item and user *EXPERIMENTAL* ============
 

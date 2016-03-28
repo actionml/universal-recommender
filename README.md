@@ -145,10 +145,10 @@ A full list of tuning and config parameters is below. See the field description 
           "appName": "URApp1",
           "eventNames": ["buy", "view"]
           "eventWindow": {
-	        "duration": "3 days",
-            "removeDuplicates":true,
-            "compressProperties":true
-	      } 
+	        "duration": "3650 days",
+            "removeDuplicates": false,
+            "compressProperties": false
+	      }
         }
       },
       “comment”: “This is for Mahout and Elasticsearch, the values are minimums and should not be removed”,
@@ -206,7 +206,7 @@ The `datasource: params:` section controls input data. This section is Algorithm
 
  - **eventNames**: enumerates the event types to be used, the first of which is the primary event.
  - **timeWindow**: This is optional and controls how much of the data in the EventServer to keep and how to compress events. The default it to not have a time window and do no compression. This will compact and drop old events from the EventServer permanently in the persisted data&mdash;so make sure to have some other archive of events it you are playing with the `timeWindow: duration:`.
-	 - **duration**: This is parsed in the expected ways and becomes a Scala `Duration` object defining the time from now backward to the point where older events will be dropped. $set property change event are never dropped.
+	 - **duration**: This is parsed for "days", "hours", "minutes", or smaller periods and becomes a Scala `Duration` object defining the time from now backward to the point where older events will be dropped. $set property change event are never dropped.
 	 - **removeDuplicates** a boolean telling the Datasource to de-duplicate non$set type events, defaults to `false`.
 	 - **compressProperties**: a boolean telling the Datasource to compress property change event into one event expressing the current state of all properties, defaults to `false`.
 
