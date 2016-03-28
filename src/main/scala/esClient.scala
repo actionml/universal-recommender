@@ -49,7 +49,7 @@ import scala.collection.parallel.mutable
   */
 
 /** Defines methods to use on Elasticsearch. */
-object esClient {
+object EsClient {
   @transient lazy val logger = Logger[this.type]
 
   private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
@@ -95,7 +95,7 @@ object esClient {
     */
   def createIndex(
     indexName: String,
-    indexType: String = "items",
+    indexType: String,
     fieldNames: List[String],
     typeMappings: Option[Map[String, String]] = None,
     refresh: Boolean = false): Boolean = {
@@ -137,7 +137,7 @@ object esClient {
       }
       mappings += mappingsTail // any other string is not_analyzed
 
-      val cir = new CreateIndexRequest(indexName).mapping("items",mappings)
+      val cir = new CreateIndexRequest(indexName).mapping(indexType,mappings)
       val create = client.admin().indices().create(cir).actionGet()
       if (!create.isAcknowledged) {
         logger.info(s"Index ${indexName} wasn't created, but may have quietly failed.")
@@ -161,7 +161,7 @@ object esClient {
   /** Create new index and hot-swap the new after it's indexed and ready to take over, then delete the old */
   def hotSwap(
     alias: String,
-    typeName: String = "items",
+    typeName: String,
     indexRDD: RDD[scala.collection.Map[String,Any]],
     fieldNames: List[String],
     typeMappings: Option[Map[String, String]] = None): Unit = {

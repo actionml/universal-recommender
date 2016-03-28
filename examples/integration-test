@@ -10,8 +10,13 @@ echo "or look for it in 'user-engine.json'"
 echo ""
 
 echo "Checking for needed files"
-if [ ! -f handmade-engine.json ]; then
-    echo "File not found: handmade-engine.json"
+if [ ! -f examples/handmade-engine.json ]; then
+    echo "File not found: examples/handmade-engine.json"
+    exit 1
+fi
+
+if [ ! -f data/sample-handmade-data.txt ]; then
+    echo "File not found: data/sample-handmade-data.txt"
     exit 1
 fi
 
@@ -28,6 +33,7 @@ fi
 echo ""
 echo "Checking status, should exit if pio is not running."
 pio status
+pio app new handmade || true
 
 echo ""
 echo "Checking to see if handmade app exists, should exit if not."
@@ -38,12 +44,12 @@ echo "Moving engine.json to user-engine.json"
 cp -n engine.json user-engine.json
 
 echo ""
-echo "Moving handmade-engine.json to engine.json for integration test."
-cp handmade-engine.json engine.json
+echo "Moving examples/handmade-engine.json to engine.json for integration test."
+cp examples/handmade-engine.json engine.json
 
 echo ""
 echo "Deleting handmade app data since the test is date dependent"
-pio app data-delete handmade
+pio app data-delete handmade -f
 
 echo ""
 echo "Importing data for integration test"
@@ -59,11 +65,16 @@ pio build
 pio train  -- --driver-memory 2g
 echo "Model will remain deployed after this test"
 nohup pio deploy > deploy.out &
-echo "Waiting 20 seconds for the server to start"
-sleep 20
+echo "Waiting 30 seconds for the server to start"
+sleep 30
 
-echo ""
-echo "Running test query."
+#echo ""
+#echo "Running test query."
+#./examples/multi-query-handmade.sh > test.out
+
+#this is due bug where first query had bad results
+#TODO: Investigate and squash
+
 ./examples/multi-query-handmade.sh > test.out
 
 echo ""
@@ -71,8 +82,13 @@ echo "Restoring engine.json"
 mv user-engine.json engine.json
 
 echo ""
-echo "Differences between expected and actual results, none is a passing test:"
+echo "Differences between expected and actual results, none is a passing test."
+echo "Note: differences in ordering of results with the same score is allowed."
 diff data/integration-test-expected.txt test.out
 
-echo ""
-echo "Note that the engine is still deployed until killed or this shell exists."
+deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
+echo "Killing the deployed test PredictionServer"
+kill "$deploy_pid"
+
+
+

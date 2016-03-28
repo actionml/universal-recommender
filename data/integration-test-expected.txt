@@ -24,7 +24,7 @@ Recommendations for user: u-3
 
 Recommendations for user: u-4
 
-{"itemScores":[{"item":"Galaxy","score":0.8880454897880554},{"item":"Nexus","score":0.288095086812973},{"item":"Surface","score":0.05261862277984619}]}
+{"itemScores":[{"item":"Nexus","score":0.41261428594589233},{"item":"Ipad-retina","score":0.08661800622940063},{"item":"Surface","score":0.0}]}
 
 Recommendations for user: u5
 
@@ -82,7 +82,7 @@ Recommendations for no user no item, all from popularity, Tablets boost, Estados
 
 Recommendations for user: u1
 
-{"itemScores":[{"item":"Surface","score":0.049329958856105804}]}
+{"itemScores":[{"item":"Nexus","score":0.27008914947509766},{"item":"Surface","score":0.049329958856105804}]}
 
 ============ query with item and user *EXPERIMENTAL* ============
 

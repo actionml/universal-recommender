@@ -1,0 +1,21 @@
+u1,purchase,Iphone 6
+u1,purchase,Iphone 5
+u2,purchase,Iphone 5
+u3,purchase,Iphone 5
+u4,purchase,Iphone 5
+u5,purchase,Iphone 5
+u6,purchase,Iphone 5
+u1,purchase,Iphone 4
+u1,purchase,Ipad-retina
+u2,purchase,Ipad-retina
+u3,purchase,Ipad-retina
+u4,purchase,Ipad-retina
+u5,purchase,Ipad-retina
+u6,purchase,Ipad-retina
+u1,purchase,Nexus
+u2,purchase,Nexus
+u3,purchase,Nexus
+u4,purchase,Nexus
+u5,purchase,Nexus
+u6,purchase,Nexus
+u7,purchase,Nexus

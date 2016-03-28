@@ -35,24 +35,26 @@ object PopModel {
     eventNames: List[String],
     appName: String,
     duration: Int = 0,
-    endDateOption: Option[String] = None)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
+    offsetDate: Option[String] = None)(implicit sc: SparkContext): Option[RDD[(String, Float)]] = {
 
-    // startDate should always be 'now' except in unusual conditions like for testing
-    val endDate = if (endDateOption.isEmpty ) DateTime.now else {
+    // todo: make end manditory and fill it with "now" upstream if not specified, will simplify logic here
+    // end should always be 'now' except in unusual conditions like for testing
+    val end = if (offsetDate.isEmpty ) DateTime.now else {
       try {
-        ISODateTimeFormat.dateTimeParser().parseDateTime(endDateOption.get)
+        ISODateTimeFormat.dateTimeParser().parseDateTime(offsetDate.get)
       } catch {
         case e: IllegalArgumentException => e
-          logger.warn("Bad endDate for popModel: " + endDateOption.get + " using 'now'")
+          logger.warn("Bad end for popModel: " + offsetDate.get + " using 'now'")
           DateTime.now
       }
     }
 
     // based on type of popularity model return a set of (item-id, ranking-number) for all items
+    logger.info(s"PopModel ${modelName} using end: ${end}, and duration: ${duration} ")
     modelName match {
-      case Some("popular") => calcPopular(appName, eventNames, new Interval(endDate.minusSeconds(duration), endDate))
-      case Some("trending") => calcTrending(appName, eventNames, new Interval(endDate.minusSeconds(duration), endDate))
-      case Some("hot") => calcHot(appName, eventNames, new Interval(endDate.minusSeconds(duration), endDate))
+      case Some("popular") => calcPopular(appName, eventNames, new Interval(end.minusSeconds(duration), end))
+      case Some("trending") => calcTrending(appName, eventNames, new Interval(end.minusSeconds(duration), end))
+      case Some("hot") => calcHot(appName, eventNames, new Interval(end.minusSeconds(duration), end))
       case _ => None // debatable, this is either an error or may need to default to popular, why call popModel otherwise
     }
   }
@@ -134,6 +136,7 @@ object PopModel {
   def eventsRDD(appName: String, eventNames: List[String], interval: Interval)
     (implicit sc: SparkContext): RDD[Event] = {
 
+    //logger.info(s"PopModel getting eventsRDD for startTime: ${interval.getStart} and endTime ${interval.getEnd}")
     PEventStore.find(
       appName = appName,
       startTime = Some(interval.getStart),
