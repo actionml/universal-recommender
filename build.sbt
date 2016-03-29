@@ -26,7 +26,7 @@ libraryDependencies ++= Seq(
     exclude("org.apache.spark", "spark-catalyst_2.10")
     exclude("org.apache.spark", "spark-sql_2.10"),
   "org.json4s" %% "json4s-native" % "3.2.10"
-)
+).map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
 resolvers += Resolver.mavenLocal
 
