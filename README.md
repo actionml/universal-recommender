@@ -502,8 +502,11 @@ To begin using new data with an engine that has been used with sample data or us
 
 ### v0.3.0
 
+ - **WARNING**: This version require PredictionIO v0.9.6 **from the ActionML repo here: [https://github.com/actionml/PredictionIO/tree/master](https://github.com/actionml/PredictionIO/tree/master)**
+ - Now supports the `SelfCleanedDataSource` trait. Adding params to the `DataSource` part of `engine.json` allows control of de-duplication, property event compaction, and a time window of event. The time window is used to age out the oldest events. Note: this only works with the ActionML fork of PredictionIO found in the repo mentioned above.
+ - changed `backfillField: duration` to accept Scala Duration strings. This will require changes to all engine.json files that were using the older # of seconds duration.
+ - added support for indicator predictiveness testing with the MAP@k tool
  - fixed a bug which requires that in the engine.json the `typeName` is required to be `"items"`, with this release the type can be more descriptive.
- - Now supports the `SelfCleanedDataSource` trait. Adding params to the `DataSource` part of `engine.json` allows control of de-duplication, property event compaction, and a time window of event. The time window is used to age out the oldest events. Note: this only works with the ActionML fork of PredictionIO found in the [ActionML github repository here](https://github.com/actionml/PredictionIO).
 
 ### v0.2.3
 
