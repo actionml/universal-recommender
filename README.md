@@ -503,7 +503,7 @@ To begin using new data with an engine that has been used with sample data or us
 ### v0.3.0
 
  - fixed a bug which requires that in the engine.json the `typeName` is required to be `"items"`, with this release the type can be more descriptive.
- - Now supports the `CleanedDataSource` trait. Adding params to the `DataSource` part of `engine.json` allows control of de-duplication, property event compaction, and a time window of event. The time window is used to age out the oldest events. Note: this only works with the ActionML fork of PredictionIO found in the [ActionML github repository here](https://github.com/actionml/PredictionIO).
+ - Now supports the `SelfCleanedDataSource` trait. Adding params to the `DataSource` part of `engine.json` allows control of de-duplication, property event compaction, and a time window of event. The time window is used to age out the oldest events. Note: this only works with the ActionML fork of PredictionIO found in the [ActionML github repository here](https://github.com/actionml/PredictionIO).
 
 ### v0.2.3
 
