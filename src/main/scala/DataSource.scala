@@ -65,7 +65,7 @@ class DataSource(val dsp: DataSourceParams)
       appName = dsp.appName,
       entityType = Some("user"),
       eventNames = Some(eventNames),
-      targetEntityType = Some(Some("item")))(sc)
+      targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
 
     // now separate the events by event name
     val actionRDDs = eventNames.map { eventName =>
