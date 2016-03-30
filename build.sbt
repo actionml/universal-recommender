@@ -1,10 +1,10 @@
 name := "template-scala-parallel-universal-recommendation"
 
-version := "0.3.0-snapshot"
+version := "0.3.0"
 
 organization := "io.prediction"
 
-val mahoutVersion = "0.11.1"
+val mahoutVersion = "0.11.2"
 
 libraryDependencies ++= Seq(
   "io.prediction"    %% "core" % pioVersion.value % "provided",
