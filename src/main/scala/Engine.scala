@@ -59,7 +59,7 @@ case class DateRange(
     after: Option[String]) // both empty should be ignored
   extends Serializable
 
-/** results of a MMRAlgoritm.predict */
+/** results of a URAlgoritm.predict */
 case class PredictedResult(
     itemScores: Array[ItemScore])
   extends Serializable
