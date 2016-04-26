@@ -1,14 +1,16 @@
 #The Universal Recommender
 
-The Universal Recommender (UR) is a new type of collaborative filtering recommender that creates correlators from any number of user actions, events, profile information, or context and serves results in a fast and scalable way. It also supports item properties for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender. 
+The Universal Recommender (UR) is a new type of collaborative filtering recommender based on an algorithm that can use data from a wide variety of user taste indicators&mdash;it is called the Correlated Cross-Occurrence algorithm. Unlike the matrix factorization embodied in things like MLlib's ALS, CCO is able to ingest any number of user actions, events, profile data, and contextual information. It then serves results in a fast and scalable way. It also supports item properties for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender. 
 
-The use of multiple **types** of data fundamentally changes that way a recommender is used and provides a significant increase in precision vs. using only one user event. Most recommenders, for instance, can only use "purchase" events, all of the popular Spark MLlib recommenders for instance. Using all we know about a user and their context allows us to much better predict their desires.
+The use of multiple **types** of data fundamentally changes that way a recommender is used and, when employed correctly, will provide a significant increase in quality of recommendations vs. using only one user event. Most recommenders, for instance, can only use "purchase" events. Using all we know about a user and their context allows us to much better predict their preferences.
 
 ##Quick Start
-Check the prerequisites below before setup, it will inform choices made.
 
- 1. [Install the PredictionIO framework](https://docs.prediction.io/install/) **be sure to choose HBase and Elasticsearch** for storage. This template requires Elasticsearch.
+The Universal Recommender requires the ActionML fork of PredictionIO. So follow these instalation instructions:
+
+ 1. [Install the PredictionIO framework](https://docs.prediction.io/install/) using one of [these setup guides](https://github.com/actionml/cluster-setup).
  2. Make sure the PIO console and services are running, check with `pio status`
+ 3. Check that HDFS and Spark are also running since `pio status` does not check this.
  3. Install the Universal Recommender as a PredictionIO Template with git. If you have git installed do the following:
  
  	```
@@ -18,11 +20,14 @@ Check the prerequisites below before setup, it will inform choices made.
  	This will put the Universal Recommender code in `~/universal` With pio installed and running (make sure `pio status` looks good) perform the integration test with the following:
  	
  	```
- 	pio app new handmade
+ 	$ sudo apt-get install python-pip # or other method for OS X
+ 	$ pip install predictionio datetime # to enable python test scripts
  	$ ./examples/integration-test
  	```
  	
- 	This will import data into pio, build the Universal Recommender code, train on the data, deploy the UR server, make sample queries, compare them with expected results, and restore the config to the original, leaving you ready to create your own app with tested config and code.
+ 	This will import data into pio, build the Universal Recommender code, train on the data, deploy the UR server, make sample queries, compare them with expected results, and restore the engine.json to the original, leaving you ready to create your own app with tested config and code.
+ 	
+ 	**Note**: a diff will be printed and the ordering of items may be different as long as the score is the same the test passes.
  
 ###Import Sample Data
 
@@ -35,35 +40,44 @@ Check the prerequisites below before setup, it will inform choices made.
 
 ##Important Notes for the Impatient
 
- - The Universal Recommender v0.2.0+ requires PredictionIO v0.9.5+
- - When sending events through the SDK, REST API, or importing it is required that all usage/preference events are named in the engine.json and **there must be data for the first named event** otherwise there will be **no model created** and errors will occur during traing.
+ - The Universal Recommender v0.3.0+ requires the ActionML fork of PredictionIO v0.9.6+
+ - When sending events through the SDK, REST API, or importing it is required that all usage/preference events are named in the engine.json and **there must be data for the first named event** otherwise there will be **no model created** and errors will occur during training (negative array index error).
  - When sending usage events it is required that the entityType is "user" and targetEntityType is "item". The type of the item is inferred from the event names, which must be one of the eventNames in the engine.json.
  - **Elasticsearch**: The UR **requires Eleasticsearch** since it performs the last step in the algorithm. It will store the model created at `pio train` time.
- - **EventStore**: The EventServer may use another DB than HBase but has been most heavilty tested with HBase.
+ - **EventStore**: The EventServer may use another DB than HBase but has been most heavily tested with HBase.
  
 ##What is a Universal Recommender
 
 The Universal Recommender (UR) will accept a range of data, auto correlate it, and allow for very flexible queries. The UR is different from most recommenders in these ways:
 
-* It takes a single very strong "primary" event type&mdash;one that clearly reflects a user's preference&mdash;and correlates any number of other "secondary" event types. user profile data, and user context data to the primary event. This has the effect of using virtually anything we know about the user to recommend the items attached to the primary event. Much of a user’s clickstream can be used to make recommendations. If a user has no history of the primary action (purchase for instance) but does have history of the secondary data, personalized recommendations for purchases can still be made. With user purchase history the recommendations become better. This is very important because it means better recommendatons for more users than typical recommenders.
+* It takes a single very strong "primary" indicator&mdash;one that clearly reflects a user's preference&mdash;and correlates any number of other "secondary" indicators. These can be user clickstream data, inferred preferences for categories or genres (what category or genre were the items the user bought, watched, read, or listened to), user profile data (gender, age-bracket), and user context data (location, device used). This has the effect of using virtually anything we know about the user to make recommendations. If a user has no history of the primary action (purchase for instance) but does have history of the secondary indicators then personalized recommendations can still be made. With user purchase history the recommendations become better. This is very important because it means better recommendatons for more users than typical recommenders.
 * It can boost and filter based on events or item metadata/properties. This means it can give personalized recommendations that are biased toward “SciFi” and filtered to only include “Promoted” items when the business rules call for this.
-* It can use a user's context to make recommendations even when the user is new. If usage data has been gathered for other users for referring URL, device type, or location, for instance, there may be a correlation between this data and items preferred. The UR can detect this if it exists and recommend based on this context, even to new users. We call this "micro-segmented" recommendations since they are not personal but group users based on limited contextual information. These will not be as good as when more behavioral information is know about the user but may be better than simply returning popular items.
-* It includes a fallback to some form of item popularity when there is no other information known about the user. Backfill types include popular, trending, and hot. Backfill can be boosted or filtered by item metadata just as any recommendation.
+* It can use a user's context to make recommendations even when the user is new. If usage data has been gathered for other users for referring URL, device type, or location, for instance, there may be a correlation between this data and items preferred. The UR can detect this and recommend based on this context. We call this "micro-segmented" recommendations since they are not personal but group users based on limited contextual or segmentation information. These will not be as good as when more behavioral information is know about the individual user but are often better than simply returning popular items.
+* It includes a fallback to some form of item popularity when there is no other information known about the user. Backfill types include popular, trending, and hot. Popular items can be boosted or filtered by item metadata just as any recommendation.
 * All of the above can be mixed into a single query for blended results and so the query can be tuned to a great many applications without special data or separate models.
-* Realtime user history is used in all recommendations. Even anonymous users will get recommendations if they have recorded preference history and a user-id. There is no  requirement to "retrain" the model to make this happen. The rule of thumb is to retrain based on frequency of adding new items. So for breaking-news articles you may want to retrain frequently but for ecom once a day would be fine. In either case realtime user behavior affects recommendations.
+* Realtime user history is used in all recommendations. Even anonymous users will get recommendations if they have recorded preference history and a user-id. There is no  requirement to "retrain" the model to make this happen. The rule of thumb is to retrain based on frequency of adding new items. So for breaking-news articles you may want to retrain frequently but for ecom once a day or week would be fine. In either case realtime user behavior affects recommendations.
 
 ###Typical Uses:
-* **Personalized Recommendations**
+* **Personalized Recommendations**: "just for you", when you have user history
 * **Similar Item Recommendations**: "people who liked this also like these"
-* **Shopping Cart Recommendations**:  more generally item-set recommendations. This can be applied to wishlists, watchlists, likes, any set of items that may go together.
+* **Shopping Cart Recommendations**:  more generally item-set recommendations. This can be applied to wishlists, watchlists, likes, any set of items that may go together. Some also call this "complimentary purchase" recommendations.
 * **Popular Items**: These can even be the primary form of recommendation if desired for some applications since serveral forms are supported. By default if a user has no recommendations popular items will backfill to achieve the number required.
 * **Hybrid Collaborative Filtering and Content-based Recommendations**: since item properties can boost or filter recommendations and can often also be treated as secondary user preference data a smooth blend of usage and content can be achieved. 
 
 ##Configuration, Events, and Queries
 
-###Primary and Secondary Data
+### Start Here: Find Your Primary Indicator
 
-**There must be a "primary" event/action recorded for some number of users**. This action defines the type of item returned in recommendations and is the measure by which all secondary data is measured. More technically speaking all secondary data is tested for correlation to the primary event. Secondary data can be anything that you may think of as giving some insight into the user. If something in the secondary data has no correlation to the primary event it will have no effect on recommendations. For instance in an ecom setting you may want "buy" as a primary event. There may be many (but none is also fine) secondary events like (user-id, device-preference, device-id). This can be thought of as a user's device preference and recorded at all logins. If this does not correlate to items bought it will not effect recommendations. 
+To start using a recommender you must have a primary indicator of user preference so ask yourself 2 questions:
+
+ 1. *"What item type do I want to recommend?"* For ecom this will be a product, for media it will be a story or video.
+ 2. *"Of all the data I have what is the most pure and unambiguous indication of user preference for this item?"* For ecom a "buy" is good, for media a "read" or "watch90" (for watching 90% of a video). Try to avoid ambiguous things like ratings, after all what does a rating of 3 mean for a 1-5 range? Does a rating of 2 mean a like or dislike? If you have ratings then 4-5 is a pretty unambiguous "like" so the other ratings may not apply to a primary indicator&mdash;though they may still be useful so read on.
+ 
+Take the item from #1, the indicator-name from #2 and the user-id and you have the data to create a "primary indicator" of the form **(user-id, "indicator-name", item-id)**. 
+
+###Secondary Indicators
+
+**There must be a "primary indicator" recorded for some number of users**. This  defines the type of item returned in recommendations and is the thing by which all secondary data is measured. More technically speaking all secondary data is tested for correlation to the primary indicator. Secondary data can be anything that you may think of as giving some insight into the user's taste. If something in the secondary data has no correlation to the primary indicator it will have no effect on recommendations. For instance in an ecom setting you may want "buy" as a primary event. There may be many (but none is also fine) secondary events like (user-id, device-preference, device-id). This can be thought of as a user's device preference and recorded at all logins. If this does not correlate to items bought it will not effect recommendations. 
 
 ###Biases
 
@@ -498,7 +512,7 @@ To begin using new data with an engine that has been used with sample data or us
  - For a step-by-step for setting up a cluster see this [guide](https://github.com/actionml/cluster-setup)
  - For Scaling and Architecture see [these docs](https://github.com/actionml/cluster-setup/blob/master/architecture-and-scaling.md)
 
-## Versions
+## Version Changelog
 
 ### v0.3.0
 
