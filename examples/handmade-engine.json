@@ -7,7 +7,7 @@
     "params" : {
       "name": "sample-handmade-data.txt",
       "appName": "handmade",
-      "eventNames": ["purchase", "view"]
+      "eventNames": ["purchase", "view"],
       "eventWindow": {
         "duration": "24 days",
         "removeDuplicates":true,
