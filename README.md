@@ -161,7 +161,7 @@ A full list of tuning and config parameters is below. See the field description 
         "params" : {
           "name": "some-data",
           "appName": "URApp1",
-          "eventNames": ["buy", "view"]
+          "eventNames": ["buy", "view"],
           "eventWindow": {
 	        "duration": "3650 days",
             "removeDuplicates": false,
@@ -185,7 +185,7 @@ A full list of tuning and config parameters is below. See the field description 
             "appName": "URApp1",
             "indexName": "urindex",
             "typeName": "items",
-            "eventNames": ["buy", "view"]
+            "eventNames": ["buy", "view"],
             "blacklistEvents": ["buy", "view"],
             "maxEventsPerEventType": 500,
             "maxCorrelatorsPerEventType": 50,
