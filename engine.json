@@ -6,8 +6,8 @@
   "datasource": {
     "params" : {
       "name": "sample-handmade-data.txt",
-      "appName": "default-rank",
-      "eventNames": ["show", "like"]
+      "appName": "handmade",
+      "eventNames": ["purchase", "view"]
     }
   },
   "sparkConf": {
@@ -23,17 +23,11 @@
       "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
       "name": "ur",
       "params": {
-        "appName": "default-rank",
+        "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
         "recsModel": "all",
-        "backfillField": {
-          "name": "popRank",
-          "backfillType": "popular",
-          "eventNames": ["show", "like"]
-        },
-        "comment": "must have data for the first event or the model will not build, other events are optional",
-        "eventNames": ["show", "like"]
+        "eventNames": ["purchase", "view"]
       }
     }
   ]
