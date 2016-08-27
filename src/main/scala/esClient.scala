@@ -211,17 +211,27 @@ object EsClient {
     * @param indexName the index to search
     * @return a [PredictedResults] collection
     */
-  def search(query: String, indexName: String): PredictedResult = {
+  def search(query: String, indexName: String, addRank: Boolean = false): PredictedResult = {
     val sr = client.prepareSearch(indexName).setSource(query).get()
 
     if (!sr.isTimedOut) {
-      val recs = sr.getHits.getHits.map( hit => new ItemScore(hit.getId, hit.getScore.toDouble) )
-      logger.info(s"Results: ${sr.getHits.getHits.size} retrieved of " +
-        s"a possible ${sr.getHits.totalHits()}")
-      new PredictedResult(recs)
+      val recs = sr.getHits.getHits.map { hit =>
+        if (addRank) {
+          val source = hit.getSource
+          ItemScore(hit.getId, hit.getScore.toDouble,
+            popRank = Some(source.get(RankField.PopRank).asInstanceOf[Double]),
+            defaultRank = Some(source.get(RankField.DefaultRank).asInstanceOf[Double]),
+            uniqueRank = Some(source.get(RankField.UniqueRank).asInstanceOf[Double])
+          )
+        } else {
+          ItemScore(hit.getId, hit.getScore.toDouble)
+        }
+      }
+      logger.info(s"Results: ${sr.getHits.getHits.length} retrieved of a possible ${sr.getHits.totalHits()}")
+      PredictedResult(recs)
     } else {
       logger.info(s"No results for query ${parse(query)}")
-      new PredictedResult(Array.empty[ItemScore])
+      PredictedResult(Array.empty[ItemScore])
     }
 
   }
@@ -257,7 +267,7 @@ object EsClient {
 
     if (allIndicesMap.size() == 1) { // must be a 1-1 mapping of alias <-> index
       var  indexName: String = ""
-      var itr = allIndicesMap.keysIt()
+      val itr = allIndicesMap.keysIt()
       while ( itr.hasNext )
         indexName = itr.next()
       Some(indexName) // the one index the alias points to
@@ -265,11 +275,12 @@ object EsClient {
       // delete all the indices that are pointed to by the alias, they can't be used
       logger.warn("There is no 1-1 mapping of index to alias so deleting the old indexes that are referenced by the " +
         "alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
-      val i = allIndicesMap.keys().toArray.asInstanceOf[Array[String]]
-      for ( indexName <- i ){
-        deleteIndex(indexName, true)
+      if (!allIndicesMap.isEmpty) {
+        val i = allIndicesMap.keys().toArray.asInstanceOf[Array[String]]
+        for (indexName <- i) {
+          deleteIndex(indexName, refresh = true)
+        }
       }
-
       None // if more than one abort, need to clean up bad aliases
     }
   }

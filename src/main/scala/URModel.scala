@@ -17,20 +17,16 @@
 
 package org.template
 
-import java.util.Date
-
 import grizzled.slf4j.Logger
-
 import io.prediction.data.storage.PropertyMap
 import org.apache.mahout.math.indexeddataset.IndexedDataset
-import org.apache.spark.rdd.RDD
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
 import org.template.conversions.IndexedDatasetConversions
-import org.elasticsearch.spark._
-import org.apache.spark.SparkContext
 
 
 /** Universal Recommender models to save in ES */
@@ -53,7 +49,7 @@ class URModel(
     * @param params from engine.json, algorithm control params
     * @return always returns true since most other reasons to not save cause exceptions
     */
-  def save( params: URAlgorithmParams): Boolean = {
+  def save(params: URAlgorithmParams): Boolean = {
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
@@ -72,7 +68,7 @@ class URModel(
     logger.info(s"Getting a list of action name strings")
     val allActions = coocurrenceMatrices.getOrElse(List.empty[(String, IndexedDatasetSpark)]).map(_._1)
 
-    logger.info(s"Ready to pass date fields names to closure ${dateNames}")
+    logger.info(s"Ready to pass date fields names to closure $dateNames")
     val closureDateNames = dateNames.getOrElse(List.empty[String])
     // convert the PropertyMap into Map[String, Seq[String]] for ES
     logger.info("Converting PropertyMap into Elasticsearch style rdd")
@@ -99,6 +95,9 @@ class URModel(
                   val dateTime = new DateTime(s)
                   val date: java.util.Date = dateTime.toDate()
                   m = m + (key -> date)
+                }
+                if (RankField.toSeq.contains(key)) {
+                  m = m + (key -> s.toDouble)
                 }
               case JDouble(rank) => // only the ranking double from PopModel should be here
                 m = m + (key -> rank)
@@ -142,7 +141,7 @@ class URModel(
         EsClient.hotSwap(
           params.indexName,
           params.typeName,
-          esFields.asInstanceOf[RDD[scala.collection.Map[String,Any]]],
+          esFields.asInstanceOf[RDD[scala.collection.Map[String, Any]]],
           allFields,
           typeMappings)
       } else logger.warn("No data to write. May have been caused by a failed or stopped `pio train`, " +
@@ -153,8 +152,7 @@ class URModel(
       // entire index
 
       // create a new index then hot-swap the new index by re-aliasing to it then delete old index
-      EsClient.hotSwap(params.indexName, params.typeName, propertiesRDD.get, allFields,
-        typeMappings)
+      EsClient.hotSwap(params.indexName, params.typeName, propertiesRDD.get, allFields, typeMappings)
     }
     true
   }

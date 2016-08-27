@@ -25,6 +25,5 @@ project/plugins/project/
 
 #PredictionIO specific
 manifest.json
-target/
-pio.log
 /pio.sbt
+*.out

@@ -55,12 +55,12 @@ class Preparator
       (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs).newRowCardinality(numUsers))
     }
 
-    new PreparedData(rowAdjustedIds, trainingData.fieldsRDD)
+    PreparedData(rowAdjustedIds, trainingData.fieldsRDD)
   }
 
 }
 
-class PreparedData(
-    val actions: List[(String, IndexedDataset)],
-    val fieldsRDD: RDD[(String, PropertyMap)])
-  extends Serializable
+case class PreparedData(
+    actions: List[(String, IndexedDataset)],
+    fieldsRDD: RDD[(String, PropertyMap)]
+) extends Serializable

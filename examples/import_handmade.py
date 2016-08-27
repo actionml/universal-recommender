@@ -58,12 +58,13 @@ def import_events(client, file):
     elif (data[1] == "$set"):  # must be a set event
       properties = data[2].split(PROPERTIES_DELIMITER)
       prop_name = properties.pop(0)
+      prop_value = properties if not prop_name == 'defaultRank' else float(properties[0])
       client.create_event(
         event=data[1],
         entity_type="item",
         entity_id=data[0],
-        event_time = current_date,
-        properties={prop_name: properties}
+        event_time=current_date,
+        properties={prop_name: prop_value}
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " properties/"+prop_name+": " + str(properties) + \
           " current_date: " + current_date.isoformat()

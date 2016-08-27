@@ -41,8 +41,9 @@ case class Query(
     returnSelf: Option[Boolean] = None,// means for an item query should the item itself be returned, defaults
                                        // to what is in the algorithm params or false
     num: Option[Int] = None, // default: whatever is in algorithm params, which itself has a default--probably 20
-    eventNames: Option[List[String]]) // names used to ID all user actions
-  extends Serializable
+    eventNames: Option[List[String]], // names used to ID all user actions
+    addRank: Option[Boolean] = None // Add to ItemScore rank fields values
+) extends Serializable
 
 /** Used to specify how Fields are represented in engine.json */
 case class Field( // no optional values for fields, whne specified
@@ -65,9 +66,12 @@ case class PredictedResult(
   extends Serializable
 
 case class ItemScore(
-    item: String, // item id
-    score: Double )// used to rank, original score returned from teh search engine
-  extends Serializable
+  item: String, // item id
+  score: Double, // used to rank, original score returned from teh search engine
+  popRank: Option[Double] = None,
+  defaultRank: Option[Double] = None,
+  uniqueRank: Option[Double] = None
+) extends Serializable
 
 object RecommendationEngine extends EngineFactory {
   def apply() = {
