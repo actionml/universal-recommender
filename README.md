@@ -209,6 +209,14 @@ A full list of tuning and config parameters is below. See the field description 
                 “bias”: -maxFloat..maxFloat,
               },...
             ]
+            "indicators": [
+              {
+                "eventName": "purchase"
+              },{
+                "eventName": "view",
+                "maxCorrelatorsPerItem": 1
+              }
+            ]
           }
         }
       ]
@@ -251,7 +259,10 @@ The `Algorithm: params:` section controls most of the features of the UR. Possib
 	* **eventNames** an array of eventNames to use in calculating the popularity model, this defaults to the single primary events&mdash;the first in the `algorithm: eventNames:` 
 	* **duration** a duration like "3 days" (which is the default), which defines the time from now back to the last event to count in the popularity calculation.
 	* **endDate** an ISO8601-date string to use to start the duration&mdash;the first event to count. This is almost never used live system but may be used in tests on batch imported events.
-* **seed** Set this if you want repeatable downsampling for some offline tests. This can be ignored and shouldn't be set in production. 
+* **seed** is set if you want repeatable downsampling for some offline tests. This can be ignored and shouldn't be set in production. 
+* **indicators ** This is an alternative long form of describing the same thing in `eventNames` but with an extra level of control over parameters used in the CCO algorithm. **This must be in the same order and contain the same names as the `eventNames` list.**
+  * **name** Same as the entry in `eventNames` and in the same order.
+  * **maxCorrelatorsPerItem** this serves the same function as `maxCorrelatorsPerEventType` but is applied to only the named indicator. This is important if the default value of 50 is too large, for instance if we have an indicator with only 10 values we will likely want less than 10 as the `maxCorrelatorsPerItem` or all possible indicators may be used for each item. A range of values for this needs to be tested with MAP@k to find the best value.
 
 ###Queries
 
