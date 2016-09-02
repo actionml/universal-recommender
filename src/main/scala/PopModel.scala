@@ -18,17 +18,17 @@
 package org.template
 
 import grizzled.slf4j.Logger
-import io.prediction.data.storage.{Event, PropertyMap}
+import io.prediction.data.storage.{ Event, PropertyMap }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import io.prediction.data.store.PEventStore
 import org.joda.time.format.ISODateTimeFormat
-import org.joda.time.{DateTime, Interval}
+import org.joda.time.{ DateTime, Interval }
 
 import scala.language.postfixOps
 import scala.util.Random
 
-object BackfillFieldName{
+object BackfillFieldName {
   val UserRank = "userRank"
   val UniqueRank = "uniqueRank"
   val PopRank = "popRank"
@@ -51,9 +51,9 @@ object BackfillType {
 
 class PopModel(fieldsRDD: RDD[(String, PropertyMap)]) {
 
-  @transient lazy val logger = Logger[this.type]
+  @transient lazy val logger: Logger = Logger[this.type]
 
-  def calc (
+  def calc(
     modelName: String,
     eventNames: Seq[String],
     appName: String,
@@ -67,7 +67,8 @@ class PopModel(fieldsRDD: RDD[(String, PropertyMap)]) {
       try {
         ISODateTimeFormat.dateTimeParser().parseDateTime(offsetDate.get)
       } catch {
-        case e: IllegalArgumentException => e
+        case e: IllegalArgumentException =>
+          e
           logger.warn("Bad end for popModel: " + offsetDate.get + " using 'now'")
           DateTime.now
       }
@@ -78,11 +79,11 @@ class PopModel(fieldsRDD: RDD[(String, PropertyMap)]) {
 
     // if None? debatable, this is either an error or may need to default to popular, why call popModel otherwise
     modelName match {
-      case BackfillType.Popular   => calcPopular(appName, eventNames, new Interval(end.minusSeconds(duration), end))
-      case BackfillType.Trending  => calcTrending(appName, eventNames, new Interval(end.minusSeconds(duration), end))
-      case BackfillType.Hot       => calcHot(appName, eventNames, new Interval(end.minusSeconds(duration), end))
+      case BackfillType.Popular => calcPopular(appName, eventNames, new Interval(end.minusSeconds(duration), end))
+      case BackfillType.Trending => calcTrending(appName, eventNames, new Interval(end.minusSeconds(duration), end))
+      case BackfillType.Hot => calcHot(appName, eventNames, new Interval(end.minusSeconds(duration), end))
       case BackfillType.UserDefined => sc.emptyRDD
-      case BackfillType.Random    => calcRandom(appName, eventNames, new Interval(end.minusSeconds(duration), end))
+      case BackfillType.Random => calcRandom(appName, eventNames, new Interval(end.minusSeconds(duration), end))
       case unknownBackfillType =>
         logger.warn(s"Bad backfills param type=[$unknownBackfillType] in engine definition params, possibly a bad json value. Use one of the available parameter values ($BackfillType).")
         sc.emptyRDD
@@ -100,7 +101,7 @@ class PopModel(fieldsRDD: RDD[(String, PropertyMap)]) {
     val events = eventsRDD(appName, eventNames, interval).cache()
     val f1 = events.map(_.targetEntityId).filter(_.isDefined).map(_.get).distinct()
     val f2 = fieldsRDD.map { case (itemID, _) => itemID }
-    f1.union(f2) distinct() map { itemID => itemID -> Random.nextFloat() }
+    f1.union(f2) distinct () map { itemID => itemID -> Random.nextFloat() }
   }
 
   /** Creates a rank from the number of named events per item for the duration */
@@ -113,14 +114,15 @@ class PopModel(fieldsRDD: RDD[(String, PropertyMap)]) {
     val events = eventsRDD(appName, eventNames, interval).cache()
     events.map { e => (e.targetEntityId, e.event) }
       .groupByKey()
-      .map { case(itemID, itEvents) => (itemID.get, itEvents.size.toFloat) }
-      .reduceByKey (_ + _) // make this a double in Elaseticsearch)
+      .map { case (itemID, itEvents) => (itemID.get, itEvents.size.toFloat) }
+      .reduceByKey(_ + _) // make this a double in Elaseticsearch)
   }
 
-  /** Creates a rank for each item by dividing the duration in two and counting named events in both buckets
-    * then dividing most recent by less recent. This ranks by change in popularity or velocity of populatiy change.
-    * Interval(start, end) end instant is always greater than or equal to the start instant.
-    */
+  /**
+   * Creates a rank for each item by dividing the duration in two and counting named events in both buckets
+   * then dividing most recent by less recent. This ranks by change in popularity or velocity of populatiy change.
+   * Interval(start, end) end instant is always greater than or equal to the start instant.
+   */
   def calcTrending(
     appName: String,
     eventNames: Seq[String] = List.empty,
@@ -137,17 +139,19 @@ class PopModel(fieldsRDD: RDD[(String, PropertyMap)]) {
     if (!olderPopRDD.isEmpty()) {
       val newerPopRDD = calcPopular(appName, eventNames, newerInterval)
       if (!newerPopRDD.isEmpty()) {
-        newerPopRDD.join(olderPopRDD).map { case (item, (newerScore, olderScore)) =>
-          val velocity = newerScore - olderScore
-          (item, velocity)
+        newerPopRDD.join(olderPopRDD).map {
+          case (item, (newerScore, olderScore)) =>
+            val velocity = newerScore - olderScore
+            (item, velocity)
         }
       } else newerPopRDD
     } else olderPopRDD
   }
 
-  /** Creates a rank for each item by divding all events per item into three buckets and calculating the change in
-    * velocity over time, in other words the acceleration of popularity change.
-    */
+  /**
+   * Creates a rank for each item by divding all events per item into three buckets and calculating the change in
+   * velocity over time, in other words the acceleration of popularity change.
+   */
   def calcHot(
     appName: String,
     eventNames: Seq[String] = List.empty,
@@ -160,25 +164,28 @@ class PopModel(fieldsRDD: RDD[(String, PropertyMap)]) {
 
     // TODO: make with andThen
     val olderPopRDD = calcPopular(appName, eventNames, olderInterval)
-    if (!olderPopRDD.isEmpty()){ // todo: may want to allow an interval with no events, give them 0 counts
+    if (!olderPopRDD.isEmpty()) { // todo: may want to allow an interval with no events, give them 0 counts
       //val debug = olderPopRDD.get.count()
       val middlePopRDD = calcPopular(appName, eventNames, middleInterval)
-      if (!middlePopRDD.isEmpty()){
+      if (!middlePopRDD.isEmpty()) {
         //val debug = middlePopRDD.get.count()
         val newerPopRDD = calcPopular(appName, eventNames, newerInterval)
         if (!newerPopRDD.isEmpty()) {
           //val debug = newerPopRDD.get.count()
-          val newVelocityRDD = newerPopRDD.join(middlePopRDD).map { case (item, (newerScore, olderScore)) =>
-            val velocity = newerScore - olderScore
-            (item, velocity)
+          val newVelocityRDD = newerPopRDD.join(middlePopRDD).map {
+            case (item, (newerScore, olderScore)) =>
+              val velocity = newerScore - olderScore
+              (item, velocity)
           }
-          val oldVelocityRDD = middlePopRDD.join(olderPopRDD).map { case (item, (newerScore, olderScore)) =>
-            val velocity = newerScore - olderScore
-            (item, velocity)
+          val oldVelocityRDD = middlePopRDD.join(olderPopRDD).map {
+            case (item, (newerScore, olderScore)) =>
+              val velocity = newerScore - olderScore
+              (item, velocity)
           }
-          newVelocityRDD.join(oldVelocityRDD).map { case (item, (newVelocity, oldVelocity)) =>
-            val acceleration = newVelocity - oldVelocity
-            (item, acceleration)
+          newVelocityRDD.join(oldVelocityRDD).map {
+            case (item, (newVelocity, oldVelocity)) =>
+              val acceleration = newVelocity - oldVelocity
+              (item, acceleration)
           }
         } else newerPopRDD
       } else middlePopRDD
@@ -206,7 +213,7 @@ object PopModel {
 
   def apply(fieldsRDD: RDD[(String, PropertyMap)]): PopModel = new PopModel(fieldsRDD)
 
-  val nameByType = Map(
+  val nameByType: Map[String, String] = Map(
     BackfillType.Popular -> BackfillFieldName.PopRank,
     BackfillType.Trending -> BackfillFieldName.TrendRank,
     BackfillType.Hot -> BackfillFieldName.HotRank,

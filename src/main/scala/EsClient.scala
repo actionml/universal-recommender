@@ -20,7 +20,7 @@ package org.template
 import java.util
 
 import grizzled.slf4j.Logger
-import io.prediction.data.storage.{Storage, StorageClientConfig, elasticsearch}
+import io.prediction.data.storage.{ Storage, StorageClientConfig, elasticsearch }
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -31,7 +31,7 @@ import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsReques
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.get.GetResponse
 import org.elasticsearch.client.transport.TransportClient
-import org.elasticsearch.common.settings.{ImmutableSettings, Settings}
+import org.elasticsearch.common.settings.{ ImmutableSettings, Settings }
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
@@ -41,39 +41,41 @@ import org.elasticsearch.search.SearchHits
 import scala.collection.immutable
 import scala.collection.parallel.mutable
 
-/** Elasticsearch notes:
-  * 1) every query clause wil laffect scores unless it has a constant_score and boost: 0
-  * 2) the Spark index writer is fast but must assemble all data for the index before the write occurs
-  * 3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
-  * 4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
-  *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
-  */
+/**
+ * Elasticsearch notes:
+ * 1) every query clause wil laffect scores unless it has a constant_score and boost: 0
+ * 2) the Spark index writer is fast but must assemble all data for the index before the write occurs
+ * 3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
+ * 4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
+ *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
+ */
 
 /** Defines methods to use on Elasticsearch. */
 object EsClient {
-  @transient lazy val logger = Logger[this.type]
+  @transient lazy val logger: Logger = Logger[this.type]
 
   private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
-      new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
-    else
-      throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
-        "proper configuration settings")
+    new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
+  else
+    throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
+      "proper configuration settings")
 
   // wrong way that uses only default settings, which will be a localhost ES sever.
   //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
 
-  /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
-    * the changes will not be reflected.
-    * @param indexName will delete all types under this index, types are not used by the UR
-    * @param refresh
-    * @return true if all is well
-    */
+  /**
+   * Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
+   * the changes will not be reflected.
+   * @param indexName will delete all types under this index, types are not used by the UR
+   * @param refresh
+   * @return true if all is well
+   */
   def deleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
     //val debug = client.connectedNodes()
-    if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists()) {
+    if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
       val delete = client.admin().indices().delete(new DeleteIndexRequest(indexName)).actionGet()
       if (!delete.isAcknowledged) {
-        logger.info(s"Index ${indexName} wasn't deleted, but may have quietly failed.")
+        logger.info(s"Index $indexName wasn't deleted, but may have quietly failed.")
       } else {
         // now refresh to get it 'committed'
         // todo: should do this after the new index is created so no index downtime
@@ -81,35 +83,37 @@ object EsClient {
       }
       true
     } else {
-      logger.warn(s"Elasticsearch index: ${indexName} wasn't deleted because it didn't exist. This may be an error.")
+      logger.warn(s"Elasticsearch index: $indexName wasn't deleted because it didn't exist. This may be an error.")
       false
     }
   }
 
-  /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
-    * @param indexName elasticsearch name
-    * @param indexType names the type of index, usually use the item name
-    * @param fieldNames ES field names
-    * @param typeMappings indicates which ES fields are to be not_analyzed without norms
-    * @param refresh should the index be refreshed so the create is committed
-    * @return true if all is well
-    */
+  /**
+   * Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
+   * @param indexName elasticsearch name
+   * @param indexType names the type of index, usually use the item name
+   * @param fieldNames ES field names
+   * @param typeMappings indicates which ES fields are to be not_analyzed without norms
+   * @param refresh should the index be refreshed so the create is committed
+   * @return true if all is well
+   */
   def createIndex(
     indexName: String,
     indexType: String,
     fieldNames: List[String],
     typeMappings: Map[String, String] = Map.empty,
-    refresh: Boolean = false): Boolean = {
+    refresh: Boolean = false
+  ): Boolean = {
     if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
       var mappings = """
         |{
         |  "properties": {
         """.stripMargin.replace("\n", "")
 
-      def mappingsField(t: String) = {
+      def mappingsField(`type`: String) = {
         s"""
         |    : {
-        |      "type": "${t}",
+        |      "type": "${`type`}",
         |      "index": "not_analyzed",
         |      "norms" : {
         |        "enabled" : false
@@ -138,7 +142,7 @@ object EsClient {
       }
       mappings += mappingsTail // any other string is not_analyzed
 
-      val cir = new CreateIndexRequest(indexName).mapping(indexType,mappings)
+      val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
       val create = client.admin().indices().create(cir).actionGet()
       if (!create.isAcknowledged) {
         logger.info(s"Index $indexName wasn't created, but may have quietly failed.")
@@ -165,7 +169,8 @@ object EsClient {
     typeName: String,
     indexRDD: RDD[Map[String, AnyRef]],
     fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty): Unit = {
+    typeMappings: Map[String, String] = Map.empty
+  ): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
@@ -176,8 +181,8 @@ object EsClient {
     //refreshIndex(newIndex)
 
     if (!aliasMetadata.isEmpty
-    && aliasMetadata.get(alias) != null
-    && aliasMetadata.get(alias).get(0) != null) { // was alias so remove the old one
+      && aliasMetadata.get(alias) != null
+      && aliasMetadata.get(alias).get(0) != null) { // was alias so remove the old one
       //append the DateTime to the alias to create an index name
       val oldIndex = aliasMetadata.get(alias).get(0).getIndexRouting
       client.admin().indices().prepareAliases()
@@ -200,18 +205,19 @@ object EsClient {
     }
     // clean out any old indexes that were the product of a failed train?
     val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
-    indices.map{ index =>
+    indices.map { index =>
       if (index.contains(alias) && index != newIndex) deleteIndex(index) //clean out any old orphaned indexes
     }
 
   }
 
-  /** Performs a search using the JSON query String
-    *
-    * @param query the JSON query string parable by Elasticsearch
-    * @param indexName the index to search
-    * @return a [PredictedResults] collection
-    */
+  /**
+   * Performs a search using the JSON query String
+   *
+   * @param query the JSON query string parable by Elasticsearch
+   * @param indexName the index to search
+   * @return a [PredictedResults] collection
+   */
   def search(query: String, indexName: String): Option[SearchHits] = {
     val sr = client.prepareSearch(indexName).setSource(query).get()
     if (!sr.isTimedOut) {
@@ -221,13 +227,14 @@ object EsClient {
     }
   }
 
-  /** Gets the "source" field of an Elasticsearch document
-    *
-    * @param indexName index that contains the doc/item
-    * @param typeName type name used to construct ES REST URI
-    * @param doc for UR the item id
-    * @return source [java.util.Map] of field names to any valid field values or null if empty
-    */
+  /**
+   * Gets the "source" field of an Elasticsearch document
+   *
+   * @param indexName index that contains the doc/item
+   * @param typeName type name used to construct ES REST URI
+   * @param doc for UR the item id
+   * @return source [java.util.Map] of field names to any valid field values or null if empty
+   */
   def getSource(indexName: String, typeName: String, doc: String): util.Map[String, AnyRef] = {
     client.prepareGet(indexName, typeName, doc)
       .execute()
@@ -251,9 +258,9 @@ object EsClient {
     val allIndicesMap = client.admin().indices().getAliases(new GetAliasesRequest(alias)).actionGet().getAliases
 
     if (allIndicesMap.size() == 1) { // must be a 1-1 mapping of alias <-> index
-      var  indexName: String = ""
+      var indexName: String = ""
       val itr = allIndicesMap.keysIt()
-      while ( itr.hasNext )
+      while (itr.hasNext)
         indexName = itr.next()
       Some(indexName) // the one index the alias points to
     } else {

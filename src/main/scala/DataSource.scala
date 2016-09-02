@@ -17,45 +17,42 @@
 
 package org.template
 
-import _root_.io.prediction.controller.PDataSource
-import _root_.io.prediction.controller.EmptyEvaluationInfo
-import _root_.io.prediction.controller.EmptyActualResult
-import _root_.io.prediction.controller.Params
-import _root_.io.prediction.data.storage.{PropertyMap, Event}
+import _root_.io.prediction.controller.{ EmptyActualResult, EmptyEvaluationInfo, PDataSource, Params }
+import _root_.io.prediction.data.storage.PropertyMap
 import _root_.io.prediction.data.store.PEventStore
-import io.prediction.core.{EventWindow, SelfCleaningDataSource}
-import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
+import grizzled.slf4j.Logger
+import io.prediction.core.{ EventWindow, SelfCleaningDataSource }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import grizzled.slf4j.Logger
 
-/** Taken from engine.json these are passed in to the DataSource constructor
-  *
-  * @param appName registered name for the app
-  * @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
-  *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
-  */
+/**
+ * Taken from engine.json these are passed in to the DataSource constructor
+ *
+ * @param appName registered name for the app
+ * @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
+ *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
+ */
 case class DataSourceParams(
-   appName: String,
-   eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
-   eventWindow: Option[EventWindow])
-extends Params
+  appName: String,
+  eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
+  eventWindow: Option[EventWindow]
+) extends Params
 
-/** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
-  * are sent to the Preparator for further processing.
-  * @param dsp parameters taken from engine.json
-  */
+/**
+ * Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
+ * are sent to the Preparator for further processing.
+ * @param dsp parameters taken from engine.json
+ */
 class DataSource(val dsp: DataSourceParams)
-  extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
+    extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
 
-  @transient override lazy val logger = Logger[this.type]
+  @transient override lazy val logger: Logger = Logger[this.type]
 
-  override def appName = dsp.appName
-  override def eventWindow = dsp.eventWindow
+  override def appName: String = dsp.appName
+  override def eventWindow: Option[EventWindow] = dsp.eventWindow
 
   /** Reads events from PEventStore and create and RDD for each */
-  override
-  def readTraining(sc: SparkContext): TrainingData = {
+  override def readTraining(sc: SparkContext): TrainingData = {
 
     val eventNames = dsp.eventNames
 
@@ -65,7 +62,8 @@ class DataSource(val dsp: DataSourceParams)
       appName = dsp.appName,
       entityType = Some("user"),
       eventNames = Some(eventNames),
-      targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
+      targetEntityType = Some(Some("item"))
+    )(sc).repartition(sc.defaultParallelism)
 
     // now separate the events by event name
     val actionRDDs = eventNames.map { eventName =>
@@ -92,17 +90,18 @@ class DataSource(val dsp: DataSourceParams)
   }
 }
 
-/** Low level RDD based representation of the data ready for the Preparator
-  *
-  * @param actions List of Tuples (actionName, actionRDD)qw
-  * @param fieldsRDD RDD of item keyed PropertyMap for item metadata
-  */
+/**
+ * Low level RDD based representation of the data ready for the Preparator
+ *
+ * @param actions List of Tuples (actionName, actionRDD)qw
+ * @param fieldsRDD RDD of item keyed PropertyMap for item metadata
+ */
 case class TrainingData(
     actions: List[(String, RDD[(String, String)])],
     fieldsRDD: RDD[(String, PropertyMap)]
 ) extends Serializable {
 
-  override def toString = {
+  override def toString: String = {
     val a = actions.map { t =>
       s"${t._1} actions: [count:${t._2.count()}] + sample:${t._2.take(2).toList} "
     }.toString()

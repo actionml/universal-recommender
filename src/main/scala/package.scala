@@ -27,7 +27,7 @@ import org.apache.spark.rdd.RDD
 /** Utility conversions for IndexedDatasetSpark */
 package object conversions {
 
-  def drawActionML(implicit logger: Logger) = {
+  def drawActionML(implicit logger: Logger): Unit = {
     val actionML =
       """
         |
@@ -44,14 +44,15 @@ package object conversions {
     logger.info(actionML)
   }
 
-  def drawInfo(title: String, dataMap: Map[String, Any])(implicit logger: Logger) = {
-    val leftAlignFormat = "║ %-30s %-67s ║"
+  def drawInfo(title: String, dataMap: Seq[(String, Any)])(implicit logger: Logger): Unit = {
+    val leftAlignFormat = "║ %-30s%-28s ║"
 
-    val line = "═"*100
+    val line = "═" * 60
 
-    val preparedTitle = "║ %-98s ║".format(title)
-    val data = dataMap.map { case (key, value) =>
-      leftAlignFormat.format(key, value)
+    val preparedTitle = "║ %-58s ║".format(title)
+    val data = dataMap.map {
+      case (key, value) =>
+        leftAlignFormat.format(key, value)
     } mkString "\n"
 
     logger.info(
@@ -60,7 +61,8 @@ package object conversions {
          |$preparedTitle
          |$data
          |╚$line╝
-         |""".stripMargin)
+         |""".stripMargin
+    )
 
   }
 
@@ -84,34 +86,34 @@ package object conversions {
 
       // may want to mapPartition and create bulk updates as a slight optimization
       // creates an RDD of (itemID, Map[correlatorName, list-of-correlator-values])
-      indexedDataset.matrix.rdd.map[(String, Map[String, Seq[String]])] { case (rowNum, itemVector) =>
+      indexedDataset.matrix.rdd.map[(String, Map[String, Seq[String]])] {
+        case (rowNum, itemVector) =>
 
-        // turn non-zeros into list for sorting
-        var itemList = List[(Int, Double)]()
-        for (ve <- itemVector.nonZeroes) {
-          val v = ve
-          itemList = itemList :+(ve.index, ve.get)
-        }
-        //sort by highest strength value descending(-)
-        val vector = itemList.sortBy { elem => -elem._2 }
-
-        val itemID = rowIDDictionary_bcast.value.inverse.getOrElse(rowNum, "INVALID_ITEM_ID")
-        try {
-
-          require(itemID != "INVALID_ITEM_ID", s"Bad row number in  matrix, skipping item ${rowNum}")
-          require(vector.nonEmpty, s"No values so skipping item ${rowNum}")
-
-          // create a list of element ids
-          val values = vector.map { item =>
-            columnIDDictionary_bcast.value.inverse.getOrElse(item._1, "") // should always be in the dictionary
+          // turn non-zeros into list for sorting
+          var itemList = List[(Int, Double)]()
+          for (ve <- itemVector.nonZeroes) {
+            itemList = itemList :+ (ve.index, ve.get)
           }
+          //sort by highest strength value descending(-)
+          val vector = itemList.sortBy { elem => -elem._2 }
 
-          (itemID, Map(actionName -> values))
+          val itemID = rowIDDictionary_bcast.value.inverse.getOrElse(rowNum, "INVALID_ITEM_ID")
+          try {
 
-        } catch {
-          case cce: IllegalArgumentException => //non-fatal, ignore line
-            null.asInstanceOf[(String, Map[String, Seq[String]])]
-        }
+            require(itemID != "INVALID_ITEM_ID", s"Bad row number in  matrix, skipping item $rowNum")
+            require(vector.nonEmpty, s"No values so skipping item $rowNum")
+
+            // create a list of element ids
+            val values = vector.map { item =>
+              columnIDDictionary_bcast.value.inverse.getOrElse(item._1, "") // should always be in the dictionary
+            }
+
+            (itemID, Map(actionName -> values))
+
+          } catch {
+            case cce: IllegalArgumentException => //non-fatal, ignore line
+              null.asInstanceOf[(String, Map[String, Seq[String]])]
+          }
 
       }.filter(_ != null)
     }
