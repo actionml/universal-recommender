@@ -26,15 +26,15 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
-import org.template.conversions.IndexedDatasetConversions
+import org.template.conversions.{ IndexedDatasetConversions, ItemID }
 
 /** Universal Recommender models to save in ES */
 class URModel(
-    coocurrenceMatrices: Seq[(String, IndexedDataset)] = Seq.empty,
+    coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
     fieldsRDD: RDD[(String, DataMap)],
-    nullModel: Boolean = false,
+    propertiesRDD: RDD[Map[String, AnyRef]],
     typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
-    propertiesRDD: RDD[Map[String, AnyRef]]
+    nullModel: Boolean = false
 ) {
   @transient lazy val logger: Logger = Logger[this.type]
 
@@ -64,8 +64,6 @@ class URModel(
     logger.info(s"Ready to pass date fields names to closure $dateNames")
     // convert the PropertyMap into Map[String, Seq[String]] for ES
     logger.info("Converting PropertyMap into Elasticsearch style rdd")
-
-    //    logger.info(Utils.hl(s"FieldsRDD:\n${fieldsRDD.collect().toMap.mkString("\n")}"))
 
     val properties: RDD[(String, Map[String, Any])] = fieldsRDD.map {
       case (item, pm) =>
@@ -103,9 +101,7 @@ class URModel(
           }
         }
         (item, m)
-    } cache ()
-
-    //    logger.info(Utils.hl(s"Properties:\n${properties.collect().toMap.mkString("\n")}"))
+    }
 
     // getting action names since they will be ES fields
     logger.info(s"Getting a list of action name strings")
@@ -144,12 +140,13 @@ class URModel(
           allFields,
           typeMappings
         )
-      } else logger.warn("No data to write. May have been caused by a failed or stopped `pio train`, " +
-        "try running it again")
+      } else {
+        logger.warn("No data to write. May have been caused by a failed or stopped `pio train`, try running it again")
+      }
 
     } else {
-      // this happens when updating only the popularity backfill model but to do a hotSwap we need to dup the
-      // entire index
+      // this happens when updating only the popularity backfill model
+      // but to do a hotSwap we need to dup the entire index
 
       // create a new index then hot-swap the new index by re-aliasing to it then delete old index
       EsClient.hotSwap(params.indexName, params.typeName, propertiesRDD, allFields, typeMappings)
@@ -157,7 +154,7 @@ class URModel(
     true
   }
 
-  def groupAll(fields: Seq[RDD[(String, (Map[String, Any]))]]): RDD[(String, (Map[String, Any]))] = {
+  def groupAll(fields: Seq[RDD[(ItemID, (Map[String, Any]))]]): RDD[(ItemID, (Map[String, Any]))] = {
     //if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
     if (fields.size > 1) {
       fields.head.cogroup[Map[String, Any]](groupAll(fields.drop(1))).map {
@@ -168,7 +165,9 @@ class URModel(
           val fullMap = rdd1Maps ++ rdd2Maps
           (key, fullMap)
       }
-    } else fields.head
+    } else {
+      fields.head
+    }
   }
 
 }

@@ -5,107 +5,106 @@ echo "Queries to illustrate many use cases on a small standard dataset and for a
 echo ""
 echo "WARNING: for this to produce the correct result you must:"
 echo "  1. Import data with"
-echo "     $ python examples/import_handmade.py --access_key <your-app-accesskey>"
-echo "  2. Copy handmade-engine.json to engine.json."
+echo "     $ python examples/import_rank.py --access_key <your-app-accesskey>"
+echo "  2. Copy rank-engine.json to engine.json."
 echo "  3. Run 'pio build', 'pio train', and 'pio deploy'"
 echo "  4. The queries must be run the same day as the import was done because date filters are part of the test."
-echo "NOTE: due to available and expire dates you should never see the Iphone 5 or Iphone 6."
 
 echo ""
 echo "============ simple user recs ============"
 echo ""
-echo "Recommendations for user: u1"
+echo "Recommendations for user: user-1"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1"
+    "user": "user-1"
 }' http://localhost:8000/queries.json
 echo ""
 
 
 echo ""
-echo "Recommendations for user: U 2"
+echo "Recommendations for user: user-2"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "U 2"
+    "user": "user-2"
 }' http://localhost:8000/queries.json
 echo ""
 
 
 echo ""
-echo "Recommendations for user: u-3"
+echo "Recommendations for user: user-3"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u-3"
+    "user": "user-3"
 }' http://localhost:8000/queries.json
 echo ""
 
 
 echo ""
-echo "Recommendations for user: u-4"
+echo "Recommendations for user: user-4"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u-4"
+    "user": "user-4"
 }' http://localhost:8000/queries.json
 echo ""
 
 
 echo ""
-echo "Recommendations for user: u5"
+echo "Recommendations for user: user-5"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u5"
+    "user": "user-5"
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
 echo "============ simple similar item recs ============"
 echo ""
-echo "Recommendations for item: Iphone 4"
+echo "Recommendations for item: product-1"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "item": "Iphone 4"
+    "item": "product-1"
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for item: Ipad-retina"
+echo "Recommendations for item: product-2"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "item": "Ipad-retina"
+    "item": "product-2"
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for item: Nexus"
+echo "Recommendations for item: product-3"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "item": "Nexus"
+    "item": "product-3"
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for item: Galaxy"
+echo "Recommendations for item: product-4"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "item": "Galaxy"
+    "item": "product-4"
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for item: Surface"
+echo "Recommendations for item: product-5"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "item": "Surface"
+    "item": "product-5"
 }' http://localhost:8000/queries.json
 echo ""
 
@@ -139,13 +138,13 @@ echo ""
 
 
 echo ""
-echo "Recommendations for no user no item, all from popularity, Tablets filter"
+echo "Recommendations for no user no item, all from popularity, red color filter"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
     "fields": [{
-        "name": "categories",
-        "values": ["Tablets"],
+        "name": "color",
+        "values": ["red"],
         "bias": -1
     }]
 }' http://localhost:8000/queries.json
@@ -153,13 +152,13 @@ echo ""
 
 
 echo ""
-echo "Recommendations for no user no item, all from popularity, Tablets boost"
+echo "Recommendations for no user no item, all from popularity, green boost"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
     "fields": [{
-        "name": "categories",
-        "values": ["Tablets"],
+        "name": "color",
+        "values": ["green"],
         "bias": 1.05
     }]
 }' http://localhost:8000/queries.json
@@ -167,17 +166,17 @@ echo ""
 
 
 echo ""
-echo "Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter"
+echo "Recommendations for no user no item, all from popularity, red color boost, S size filter"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
     "fields": [{
-        "name": "categories",
-        "values": ["Tablets"],
+        "name": "color",
+        "values": ["red"],
         "bias": 1.05
     }, {
-        "name": "countries",
-        "values": ["Estados Unidos Mexicanos"],
+        "name": "size",
+        "values": ["S"],
         "bias": -1
     }]
 }' http://localhost:8000/queries.json
@@ -195,11 +194,11 @@ else
   AFTER=`date -v -1d +"%Y-%m-%dT%H:%M:%SZ"`
 fi
 #echo "before: $BEFORE after: $AFTER"
-echo "Recommendations for user: u1"
+echo "Recommendations for user: user-1"
 echo ""
 curl -H "Content-Type: application/json" -d "
 {
-    \"user\": \"u1\",
+    \"user\": \"user-1\",
     \"dateRange\": {
         \"name\": \"date\",
         \"before\": \"$BEFORE\",
@@ -212,12 +211,12 @@ echo ""
 echo "============ query with item and user *EXPERIMENTAL* ============"
 # This is experimental, use at your own risk, not well founded in theory
 echo ""
-echo "Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter"
+echo "Recommendations for user-1 & product-1"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1",
-    "item": "Iphone 4"
+    "user": "user-1",
+    "item": "product-1"
 }' http://localhost:8000/queries.json
 echo ""
 

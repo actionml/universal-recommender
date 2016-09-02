@@ -13,7 +13,7 @@ LINE="=================================================================="
 set -e
 
 echo -e "${YELLOW}${LINE}"
-echo -e "Integration test for The Universal Recommender."
+echo -e "Integration test [Rank] for The Universal Recommender."
 echo -e "If some step fails check that your engine.json file has been restored"
 echo -e "or look for it in 'user-engine.json'"
 echo -e "${LINE}${NC}"
@@ -24,8 +24,8 @@ if [ ! -f examples/rank-engine.json ]; then
     exit 1
 fi
 
-if [ ! -f data/sample-default-rank-data.txt ]; then
-    echo -e "File not found: data/sample-default-rank-data.txt"
+if [ ! -f data/sample-rank-data.txt ]; then
+    echo -e "File not found: data/sample-rank-data.txt"
     exit 1
 fi
 
@@ -34,10 +34,10 @@ if [ -f user-engine.json ]; then
     exit 1
 fi
 
-#if [ ! -f data/integration-test-rank-expected.txt ]; then
-#    echo -e "File not found: data/integration-test-rank-expected.txt"
-#    exit 1
-#fi
+if [ ! -f data/rank-test-query-expected.txt ]; then
+    echo -e "File not found: data/rank-test-query-expected.txt"
+    exit 1
+fi
 
 echo -e "${GREEN}${LINE}"
 echo -e "Checking status, should exit if pio is not running."
@@ -68,21 +68,25 @@ pio app data-delete ${APP_NAME} -f
 echo -e "${GREEN}${LINE}"
 echo -e "Importing data for integration test"
 echo -e "${LINE}${NC}"
-python examples/import_default_rank.py --access_key ${APP_ACCESS_KEY}
+python examples/import_rank.py --access_key ${APP_ACCESS_KEY}
 
 echo -e "${GREEN}${LINE}"
 echo -e "Building and delpoying model"
 echo -e "${LINE}${NC}"
 pio build
 pio train -- --executor-memory 1g --driver-memory 1g --master local
-#echo -e "Model will remain deployed after this test"
-#nohup pio deploy > deploy.out &
-#echo -e "Waiting 30 seconds for the server to start"
-#sleep 30
 
-#echo -e "${GREEN}${LINE}"
-#echo -e "Running test query."
-#./examples/multi-query-handmade.sh > test.out
+echo -e "${GREEN}${LINE}"
+echo -e "Model will remain deployed after this test"
+nohup pio deploy > deploy.out &
+echo -e "Waiting 30 seconds for the server to start"
+echo -e "${LINE}${NC}"
+sleep 30
+
+echo -e "${GREEN}${LINE}"
+echo -e "Running test query."
+echo -e "${LINE}${NC}"
+./examples/multi-query-rank.sh > rank-query-test-result.out
 
 #this is due bug where first query had bad results
 #TODO: Investigate and squash
@@ -94,11 +98,11 @@ echo -e "Restoring engine.json"
 echo -e "${LINE}${NC}"
 mv user-engine.json engine.json
 
-#echo -e "${GREEN}${LINE}"
-#echo -e "Differences between expected and actual results, none is a passing test."
-#echo -e "Note: differences in ordering of results with the same score is allowed."
-#echo -e "${LINE}${NC}"
-#diff data/integration-test-expected.txt test.out
+echo -e "${GREEN}${LINE}"
+echo -e "Differences between expected and actual results, none is a passing test."
+echo -e "Note: differences in ordering of results with the same score is allowed."
+echo -e "${LINE}${NC}"
+diff data/rank-test-query-expected.txt rank-query-test-result.out
 
 deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
 echo -e "${GREEN}${LINE}"

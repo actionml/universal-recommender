@@ -101,7 +101,7 @@ if __name__ == '__main__':
     description="Import sample data for recommendation engine")
   parser.add_argument('--access_key', default='123456789')
   parser.add_argument('--url', default="http://localhost:7070")
-  parser.add_argument('--file', default="./data/sample-default-rank-data.txt")
+  parser.add_argument('--file', default="./data/sample-rank-data.txt")
 
   args = parser.parse_args()
   print args

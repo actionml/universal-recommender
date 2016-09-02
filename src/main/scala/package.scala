@@ -27,6 +27,9 @@ import org.apache.spark.rdd.RDD
 /** Utility conversions for IndexedDatasetSpark */
 package object conversions {
 
+  type ItemID = String
+  type ActionID = String
+
   def drawActionML(implicit logger: Logger): Unit = {
     val actionML =
       """

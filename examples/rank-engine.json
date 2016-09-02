@@ -30,7 +30,7 @@
         "eventNames": ["show", "like"],
         "backfillsParams":[
           {
-            "name": "popRank",
+            "name": "popularRank",
             "type": "popular",
             "eventNames": ["show", "like"],
             "duration": "3650 days",
