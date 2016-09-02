@@ -21,21 +21,20 @@ import java.util
 
 import grizzled.slf4j.Logger
 import io.prediction.controller.{P2LAlgorithm, Params}
-import io.prediction.data.storage.{Event, NullModel, PropertyMap}
+import io.prediction.data.storage.{DataMap, Event, NullModel, PropertyMap}
 import io.prediction.data.store.LEventStore
 import org.apache.mahout.math.cf.SimilarityAnalysis
-import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
+import org.json4s.JValue
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
+import org.template.conversions._
 
-import scala.collection.convert.wrapAsScala._
 import scala.concurrent.duration.Duration
-import scala.language.implicitConversions
-import scala.util.Random
+import scala.language.{implicitConversions, postfixOps}
 
 /**
   * Available value for algorithm param "RecsModel"
@@ -45,14 +44,6 @@ object RecsModel{
   val CF = "collabFiltering"
   val BF = "backfill"
   override def toString = s"$All, $CF, $BF"
-}
-
-object RankField{
-  val DefaultRank = "defaultRank"
-  val UniqueRank = "uniqueRank"
-  val PopRank = "popRank"
-  def toSeq = Seq(DefaultRank, UniqueRank, PopRank)
-  override def toString = s"$DefaultRank, $UniqueRank, $PopRank"
 }
 
 /** Setting the option in the params case class doesn't work as expected when the param is missing from
@@ -68,17 +59,19 @@ object defaultURAlgorithmParams {
   val DefaultAvailableDateName = "availableDate" //defualt name for and item's available after date
   val DefaultDateName = "date" // when using a date range in the query this is the name of the item's date
   val DefaultRecsModel = RecsModel.All // use CF + backfill
-  val DefaultBackfillParams = BackfillField()
-  val DefaultBackfillFieldName = RankField.PopRank
-  val DefaultBackfillType = "popular"
+  val DefaultBackfillParams = BackfillParams()
+  val DefaultBackfillFieldName = BackfillFieldName.PopRank
+  val DefaultBackfillType = BackfillType.Popular
   val DefaultBackfillDuration = "3650 days" // for all time
+
+  val DefaultReturnSelf = false
 }
 
 /* default values must be set in code not the case class declaration
 case class BackfillField(
   name: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
   backfillType: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillType), // may be 'hot', or 'trending' also
-  eventNames: Option[List[String]] = None, // None means use the algo eventNames list, otherwise a list of events
+  eventNames: Option[Seq[String]] = None, // None means use the algo eventNames list, otherwise a list of events
   offsetDate: Option[String] = None, // used only for tests, specifies the offset date to start the duration so the most
   // recent date for events going back by from the more recent offsetDate - duration
   duration: Option[String] = Some(defaultURAlgorithmParams.DefaultBackfillDuration)) // duration worth of events
@@ -89,8 +82,8 @@ case class URAlgorithmParams(
   indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
   recsModel: Option[String] = Some(defaultURAlgorithmParams.DefaultRecsModel), // "all", "collabFiltering", "backfill"
-  eventNames: List[String], // names used to ID all user actions
-  blacklistEvents: Option[List[String]] = None,// None means use the primary event, empty array means no filter
+  eventNames: Seq[String], // names used to ID all user actions
+  blacklistEvents: Option[Seq[String]] = None,// None means use the primary event, empty array means no filter
   // number of events in user-based recs query
   maxQueryEvents: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxQueryEvents),
   maxEventsPerEventType: Option[Int] = Some(defaultURAlgorithmParams.DefaultMaxEventsPerEventType),
@@ -99,7 +92,7 @@ case class URAlgorithmParams(
   userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
   itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
   returnSelf: Option[Boolean] = None, // query building logic defaults this to false
-  fields: Option[List[Field]] = None, //defaults to no fields
+  fields: Option[Seq[Field]] = None, //defaults to no fields
   // leave out for default or popular
   backfillField: Option[BackfillField] = None,
   // name of date property field for when the item is available
@@ -112,22 +105,28 @@ case class URAlgorithmParams(
   extends Params //fixed default make it reproducible unless supplied
   */
 
-case class BackfillField(
+case class BackfillParams(
   name: Option[String] = None,
-  backfillType: Option[String] = None, // may be 'hot', or 'trending' also
-  eventNames: Option[List[String]] = None, // None means use the algo eventNames list, otherwise a list of events
+  `type`: Option[String] = None, // may be 'hot', or 'trending' also
+  eventNames: Option[Seq[String]] = None, // None means use the algo eventNames list, otherwise a list of events
   offsetDate: Option[String] = None, // used only for tests, specifies the offset date to start the duration so the most
   // recent date for events going back by from the more recent offsetDate - duration
-  duration: Option[String] = None) // duration worth of events
+  endDate: Option[String] = None,
+  duration: Option[String] = None // duration worth of events
   // to use in calculation of backfill
+) {
+  override def toString: String = {
+    s"(name: $name, type: ${`type`}, eventNames: $eventNames, offsetDate: $offsetDate, endDate: $endDate, duration: $duration)"
+  }
+}
 
 case class URAlgorithmParams(
   appName: String, // filled in from engine.json
   indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
   recsModel: Option[String] = None, // "all", "collabFiltering", "backfill"
-  eventNames: List[String], // names used to ID all user actions
-  blacklistEvents: Option[List[String]] = None,// None means use the primary event, empty array means no filter
+  eventNames: Seq[String], // names used to ID all user actions
+  blacklistEvents: Option[Seq[String]] = None, // None means use the primary event, empty array means no filter
   // number of events in user-based recs query
   maxQueryEvents: Option[Int] = None,
   maxEventsPerEventType: Option[Int] = None,
@@ -136,17 +135,17 @@ case class URAlgorithmParams(
   userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
   itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
   returnSelf: Option[Boolean] = None, // query building logic defaults this to false
-  fields: Option[List[Field]] = None, //defaults to no fields
+  fields: Option[Seq[Field]] = None, //defaults to no fields
   // leave out for default or popular
-  backfillField: Option[BackfillField] = None,
+  backfillsParams: Option[Seq[BackfillParams]] = None,
   // name of date property field for when the item is available
   availableDateName: Option[String] = None,
   // name of date property field for when an item is no longer available
   expireDateName: Option[String] = None,
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
-  seed: Option[Long] = None) // seed is not used presently
-  extends Params //fixed default make it reproducible unless supplied
+  seed: Option[Long] = None // seed is not used presently
+) extends Params //fixed default make it reproducible unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
   * [[org.apache.mahout.math.cf.SimilarityAnalysis]] The analysis part of the recommender is
@@ -161,33 +160,69 @@ class URAlgorithm(val ap: URAlgorithmParams)
   case class BoostableCorrelators(actionName: String, itemIDs: Seq[String], boost: Option[Float])
   case class FilterCorrelators(actionName: String, itemIDs: Seq[String])
 
+  val appName = ap.appName
+  val recsModel = ap.recsModel.getOrElse(defaultURAlgorithmParams.DefaultRecsModel)
+  val eventNames = ap.eventNames
+
+  val userBias =  ap.userBias.getOrElse(1f)
+  val itemBias =  ap.itemBias.getOrElse(1f)
+  val maxQueryEvents = ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents)
+  val limit = ap.num.getOrElse(defaultURAlgorithmParams.DefaultNum)
+
+  val blacklistEvents = ap.blacklistEvents.getOrEmpty
+  val returnSelf = ap.returnSelf.getOrElse(defaultURAlgorithmParams.DefaultReturnSelf)
+  val fields = ap.fields.getOrEmpty
+
+  val randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt
+  val maxCorrelatorsPerEventType = ap.maxCorrelatorsPerEventType.getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType)
+  val maxEventsPerEventType = ap.maxEventsPerEventType.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType)
+
+  val backfillsParams: Seq[BackfillParams] = ap.backfillsParams.getOrElse(Seq(BackfillParams(
+    name = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
+    `type` = Some(defaultURAlgorithmParams.DefaultBackfillType),
+    eventNames = None,
+    offsetDate = None,
+    endDate = None,
+    duration = Some(defaultURAlgorithmParams.DefaultBackfillDuration)
+  )))
+
+  val dateNames: Seq[String] = Seq(ap.dateName, ap.availableDateName, ap.expireDateName).collect { case Some(date) => date } distinct
+  val backfillFieldNames: Seq[String] = backfillsParams.map(_.name).collect { case Some(name) => name } distinct
+
+  val esIndex = ap.indexName
+  val esType = ap.typeName
+
+  logger.info(
+    s"""
+       |╔=======================================================================================
+       |‖   Init URAlgorithm
+       |‖   App name:         $appName
+       |‖   ES index name:    $esIndex
+       |‖   ES type name:     $esType
+       |‖
+       |‖   RecsModel:        $recsModel
+       |‖   Event names:      $eventNames
+       |‖
+       |‖   Cooccurrence model params
+       |‖     randomSeed: $randomSeed
+       |‖     maxCorrelatorsPerEventType: $maxCorrelatorsPerEventType
+       |‖     maxEventsPerEventType: $maxEventsPerEventType
+       |‖
+       |‖   BackfillsParams:
+       |‖     ${backfillsParams.mkString("\n‖     ")}
+       |‖
+       |‖
+       |╚=======================================================================================
+       |""".stripMargin)
+
   @transient lazy val logger = Logger[this.type]
 
   def train(sc: SparkContext, data: PreparedData): NullModel = {
 
-    logger.info(" Start train model.")
-    logger.debug(s"AlgorithmParams: $ap")
-
-    val dateNames: Option[List[String]] = Some(
-      List(ap.dateName, ap.availableDateName, ap.expireDateName)
-        .filter(_.isDefined)
-        .map(_.get)
-    ) // todo: return None if all are empty?
-    //logger.info(s"backfill: ${ap.backfillField.toString}")
-    val backfillFieldName = ap
-      .backfillField.getOrElse(BackfillField())
-      .name.getOrElse(defaultURAlgorithmParams.DefaultBackfillFieldName)
-
-    // Add to [[org.template.PreparedData]] uniqueRank (random float value)
-    val dataWithRank = data.copy(fieldsRDD = data.fieldsRDD map { case (item, propMap) =>
-      val propMapWithRank = propMap.fields + (RankField.UniqueRank -> JDouble(Random.nextDouble()))
-      item -> PropertyMap(propMapWithRank, propMap.firstUpdated, DateTime.now())
-    })
-
-    ap.recsModel.getOrElse(defaultURAlgorithmParams.DefaultRecsModel) match {
-      case RecsModel.All => calcAll(sc, dataWithRank, dateNames, backfillFieldName)
-      case RecsModel.CF  => calcAll(sc, dataWithRank, dateNames, backfillFieldName, popular = false)
-      case RecsModel.BF  => calcPop(sc, dataWithRank, dateNames, backfillFieldName)
+    recsModel match {
+      case RecsModel.All => calcAll(data)(sc)
+      case RecsModel.CF  => calcAll(data, calcPopular = false)(sc)
+      case RecsModel.BF  => calcPop(data)(sc)
       // error, throw an exception
       case unknownRecsModel => throw new IllegalArgumentException(s"Bad algorithm param recsModel=[$unknownRecsModel] in engine definition params, possibly a bad json value. Use one of the available parameter values ($RecsModel).")
     }
@@ -195,12 +230,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   /** Calculates recs model as well as popularity model */
   def calcAll(
-    sc: SparkContext,
     data: PreparedData,
-    dateNames: Option[List[String]] = None,
-    backfillFieldName: String,
-    popular: Boolean = true):
-  NullModel = {
+    calcPopular: Boolean = true
+  )(implicit sc: SparkContext): NullModel = {
 
     // No one likes empty training data.
     require(data.actions.take(1).nonEmpty,
@@ -208,68 +240,32 @@ class URAlgorithm(val ap: URAlgorithmParams)
          |Please check if DataSource generates TrainingData
          |and Preparator generates PreparedData correctly.""".stripMargin)
 
-    val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
-    val nonDefaultMappings = getRankMapping(backfillFieldName)
     logger.info("Actions read now creating correlators")
     val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
-      data.actions.map(_._2).toArray,
-      randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
-      maxInterestingItemsPerThing = ap.maxCorrelatorsPerEventType
-        .getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
-      maxNumInteractions = ap.maxEventsPerEventType.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType))
-      .map(_.asInstanceOf[IndexedDatasetSpark]) // strip action names
+      indexedDatasets = data.actions.map(_._2).toArray,
+      randomSeed = randomSeed,
+      maxInterestingItemsPerThing = maxCorrelatorsPerEventType,
+      maxNumInteractions = maxEventsPerEventType
+    ) // strip action names
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
-    val popModel = if (popular) {
-      val durationString = ap
-        .backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
-        .duration.getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration)
-      val duration = Duration(durationString).toSeconds.toInt
-      val backfillEvents = backfillParams.eventNames.getOrElse(List(ap.eventNames.head))
-      val end = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
-        .offsetDate
-      PopModel.calc(
-        Some(backfillParams.backfillType.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)),
-        backfillEvents,
-        ap.appName,
-        duration,
-        end)(sc)
-    } else None
-
-    val allPropertiesRDD: RDD[(String, PropertyMap)] = if (popModel.nonEmpty) {
-      data.fieldsRDD.cogroup(popModel.get).map { case (item, (iterPropMap, iterPopRank)) =>
-
-        val pm = (iterPropMap.headOption, iterPopRank.headOption) match {
-
-          case (Some(propMap), Some(popRank)) =>
-            val newPM = propMap.fields + (backfillFieldName -> JDouble(popRank))
-            PropertyMap(newPM, propMap.firstUpdated, DateTime.now())
-
-          case (_, Some(popRank)) =>
-            PropertyMap(Map(
-              backfillFieldName -> JDouble(popRank),
-              RankField.UniqueRank -> JDouble(Random.nextDouble())
-            ), DateTime.now(), DateTime.now())
-
-          case (Some(propMap), _) => propMap
-
-          case _ =>
-            logger.warn(s"Attention! Both propMap and popRank for [$item] is empty. Maybe somewhere error.")
-            PropertyMap(Map(RankField.UniqueRank -> JDouble(Random.nextDouble())), DateTime.now, DateTime.now)
-        }
-
-        (item, pm)
+    val allPropertiesRDD: RDD[(String, DataMap)] = if (calcPopular) {
+      val ranksRdd = getRanksRDD(data.fieldsRDD)
+      data.fieldsRDD.fullOuterJoin(ranksRdd).map {
+        case (item, (Some(fieldsPropMap), Some(rankPropMap))) => item -> (fieldsPropMap ++ rankPropMap)
+        case (item, (Some(fieldsPropMap), None)) => item -> fieldsPropMap
+        case (item, (None, Some(rankPropMap))) => item -> rankPropMap
+        case (item, _) => item -> DataMap()
       }
-    } else data.fieldsRDD
+    } else sc.emptyRDD
 
     logger.info("Correlators created now putting into URModel")
-    val model = new URModel(
-      Some(cooccurrenceCorrelators),
-      Some(allPropertiesRDD),
-      ap.indexName,
-      dateNames,
-      typeMappings = Some(nonDefaultMappings))
-    model.save(ap)
+    new URModel(
+      coocurrenceMatrices = cooccurrenceCorrelators,
+      fieldsRDD = allPropertiesRDD,
+      typeMappings = getRankMapping(backfillFieldNames),
+      propertiesRDD = sc.emptyRDD
+    ).save(ap)
     new NullModel
   }
 
@@ -277,70 +273,31 @@ class URAlgorithm(val ap: URAlgorithmParams)
     * It is used when you want to re-calc the popularity model between training on useage data. It leaves
     * the part of the model created from usage data alone and only modifies the popularity ranking.
     */
-  def calcPop(
-    sc: SparkContext,
-    data: PreparedData,
-    dateNames: Option[List[String]] = None,
-    backfillFieldName: String = ""): NullModel = {
+  def calcPop(data: PreparedData)(implicit sc: SparkContext): NullModel = {
 
-    val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
-    val backfillEvents = backfillParams.eventNames.getOrElse(List(ap.eventNames.head))//default to first/primary event
-    val durationString = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).duration
-        .getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration)
-    val duration = Duration(durationString).toSeconds.toInt
-    val end = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams).offsetDate
-    val popModel = PopModel.calc(
-      modelName = Some(backfillParams.backfillType.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)),
-      eventNames = backfillEvents,
-      appName = ap.appName,
-      duration = duration,
-      offsetDate = end)(sc)
-    val popRDD = if (popModel.nonEmpty) {
-      val model = popModel.get.map { case (item, rank)  =>
-        val newPM = Map(backfillFieldName -> JDouble(rank))
-        (item, PropertyMap(newPM, DateTime.now, DateTime.now))
-      }
-      Some(model)
-    } else None
+    val ranksRdd: RDD[(String, DataMap)] = getRanksRDD(data.fieldsRDD)
 
-    val propertiesRDD: Option[RDD[collection.Map[String, Any]]] = for {
-      popModelRDD <- popModel
-      // may be an empty index so ignore
-      currentMetadataRDD <- EsClient.getRDD(sc, ap.indexName, ap.typeName)
-    } yield popModelRDD.cogroup(currentMetadataRDD)
-      .map { case (item, (iterPopRank, iterMap)) =>
-        logger.debug(Utils.hl(s"$item: ${iterPopRank.size}, ${iterMap.size}"))
-        (iterMap.headOption, iterPopRank.headOption) match {
-          case (Some(map), Some(popRank)) => map ++ Map(
-            backfillFieldName -> popRank,
-            RankField.UniqueRank -> Random.nextDouble()
-          )
-          case (_, Some(popRank)) => Map(
-            backfillFieldName -> popRank,
-            RankField.UniqueRank -> Random.nextDouble()
-          )
-          case (Some(map), _) => map ++ Map(
-            RankField.UniqueRank -> Random.nextDouble()
-          )
-          // could happen if only calculating popularity, which may leave out items with no events
-          case _ => Map.empty
-        }
+    val currentMetadataRDD: RDD[(String, Map[String, AnyRef])] = EsClient.getRDD(esIndex, esType)
+
+    val propertiesRDD: RDD[Map[String, AnyRef]] = currentMetadataRDD fullOuterJoin ranksRdd map { case (item, maps) =>
+      maps match {
+        case (Some(map), Some(propMap)) => map ++ propMap.fields
+        case (None, Some(propMap)) => propMap.fields
+        case (Some(map), None) => map
+        case _ => Map.empty
       }
+    }
 
     // returns the existing model plus new popularity ranking
-    val model = new URModel(
-      None,
-      None,
-      ap.indexName,
-      None,
+    new URModel(
+      fieldsRDD = data.fieldsRDD.asInstanceOf[RDD[(String, DataMap)]],
       propertiesRDD = propertiesRDD,
-      typeMappings = Some(getRankMapping(backfillFieldName))
-    )
-    model.save(ap)
+      typeMappings = getRankMapping(backfillFieldNames)
+    ).save(ap)
     new NullModel
   }
 
-  var queryEventNames = List.empty[String] // if passed in with the query overrides the engine.json list--used in MAP@k
+  var queryEventNames = Seq.empty[String] // if passed in with the query overrides the engine.json list--used in MAP@k
   //testing, this only effects which events are used in queries.
 
   /** Return a list of items recommended for a user identified in the query
@@ -424,23 +381,83 @@ class URAlgorithm(val ap: URAlgorithmParams)
     *       ranking if no PopModel is being used, same for "must" clause and dates.
     */
   def predict(model: NullModel, query: Query): PredictedResult = {
-    logger.debug(s"Query received: $query")
-    logger.info(s"Query BackFillField: ${ap.backfillField}")
 
-    queryEventNames = query.eventNames.getOrElse(ap.eventNames) // eventNames in query take precedence for the query
-    // part of their use
-    val backfillFieldName = ap.backfillField.getOrElse(BackfillField()).name
-    logger.info(s"PopModel using fieldName: $backfillFieldName")
-    val queryAndBlacklist = buildQuery(ap, query, backfillFieldName.getOrElse(defaultURAlgorithmParams.DefaultBackfillFieldName))
-    val recs = EsClient.search(queryAndBlacklist._1, ap.indexName, query.addRank.getOrElse(false))
+    queryEventNames = query.eventNames.getOrElse(eventNames) // eventNames in query take precedence for the query
+
+    val (queryStr, blacklist) = buildQuery(ap, query, backfillFieldNames)
+    val searchHitsOpt = EsClient.search(queryStr, esIndex)
+
+    val addRankFields = query.addRank.getOrElse(false)
+    val predictedResult = searchHitsOpt match {
+      case Some(searchHits) =>
+        val recs = searchHits.getHits.map { hit =>
+          if (addRankFields) {
+            val source = hit.getSource
+            val ranks: Map[String, Double] = backfillsParams map { backfillParams =>
+              val backfillType = backfillParams.`type`.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)
+              val backfillFieldName = backfillParams.name.getOrElse(PopModel.nameByType(backfillType))
+              backfillFieldName -> source.get(backfillFieldName).asInstanceOf[Double]
+            } toMap
+
+            ItemScore(hit.getId, hit.getScore.toDouble,
+              ranks = if (ranks.nonEmpty) Some(ranks) else None
+            )
+          } else {
+            ItemScore(hit.getId, hit.getScore.toDouble)
+          }
+        }
+        logger.info(s"Results: ${searchHits.getHits.length} retrieved of a possible ${searchHits.totalHits()}")
+        PredictedResult(recs)
+
+      case _ =>
+        logger.info(s"No results for query ${parse(queryStr)}")
+        PredictedResult(Array.empty[ItemScore])
+    }
+
     // should have all blacklisted items excluded
     // todo: need to add dithering, mean, sigma, seed required, make a seed that only changes on some fixed time
     // period so the recs ordering stays fixed for that time period.
-    recs
+    predictedResult
+  }
+
+  def getRanksRDD(fieldsRDD: RDD[(String, PropertyMap)])(implicit sc: SparkContext): RDD[(String, DataMap)] = {
+    val popModel = PopModel(fieldsRDD)
+    val rankRDDs = backfillsParams map { backfillParams =>
+      val backfillType = backfillParams.`type`.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)
+      val backfillFieldName = backfillParams.name.getOrElse(PopModel.nameByType(backfillType))
+      val durationAsString = backfillParams.duration.getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration)
+      val duration = Duration(durationAsString).toSeconds.toInt
+      val backfillEvents = backfillType match {
+        case BackfillType.Random => backfillParams.eventNames.getOrElse(eventNames)
+        case _ => backfillParams.eventNames.getOrElse(eventNames.take(1))
+      }
+      val offsetDate = backfillParams.offsetDate
+      val rankRdd = popModel.calc(modelName = backfillType, eventNames = backfillEvents, appName, duration, offsetDate).cache()
+
+      backfillFieldName -> rankRdd
+    }
+
+    logger.debug(s"RankRDDs: ${rankRDDs.size}")
+    rankRDDs.foldLeft[RDD[(String, DataMap)]](sc.emptyRDD) { case (leftRdd, (fieldName, rightRdd)) =>
+      leftRdd.fullOuterJoin(rightRdd).map {
+        case (item, (Some(propMap), Some(rank))) =>
+          val joinPropMap = propMap.fields + (fieldName -> JDouble(rank))
+          item -> DataMap(joinPropMap)
+
+        case (item, (Some(propMap), None)) =>
+          item -> propMap
+
+        case (item, (None, Some(rank))) =>
+          item -> DataMap(Map(fieldName -> JDouble(rank)))
+
+        case (item, _) =>
+          item -> DataMap()
+      }
+    }
   }
 
   /** Build a query from default algorithms params and the query itself taking into account defaults */
-  def buildQuery(ap: URAlgorithmParams, query: Query, backfillFieldName: String = ""): (String, List[Event]) = {
+  def buildQuery(ap: URAlgorithmParams, query: Query, backfillFieldNames: Seq[String] = Seq.empty): (String, Seq[Event]) = {
 
     try { // require the minimum of a user or item, if not then return popular if any
       //require( query.item.nonEmpty || query.user.nonEmpty, "Warning: a query must include either a user or item id")
@@ -449,31 +466,31 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val alluserEvents = getBiasedRecentUserActions(query)
 
       // create a list of all boosted query correlators
-      val recentUserHistory = if ( ap.userBias.getOrElse(1f) >= 0f )
-        alluserEvents._1.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
-      else List.empty[BoostableCorrelators]
+      val recentUserHistory = if (userBias >= 0f)
+        alluserEvents._1.slice(0, maxQueryEvents - 1)
+      else Seq.empty[BoostableCorrelators]
 
-      val similarItems = if ( ap.itemBias.getOrElse(1f) >= 0f )
+      val similarItems = if (itemBias >= 0f)
         getBiasedSimilarItems(query)
-      else List.empty[BoostableCorrelators]
+      else Seq.empty[BoostableCorrelators]
 
       val boostedMetadata = getBoostedMetadata(query)
 
       val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata
 
       // create a lsit of all query correlators that are to be used to filter results
-      val recentUserHistoryFilter = if ( ap.userBias.getOrElse(1f) < 0f ) {
+      val recentUserHistoryFilter = if (userBias < 0f) {
         // strip any boosts
         alluserEvents._1.map { i =>
           FilterCorrelators(i.actionName, i.itemIDs)
-        }.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
-      } else List.empty[FilterCorrelators]
+        }.slice(0, maxQueryEvents - 1)
+      } else Seq.empty[FilterCorrelators]
 
-      val similarItemsFilter = if ( ap.itemBias.getOrElse(1f) < 0f ) {
+      val similarItemsFilter = if (itemBias < 0f) {
         getBiasedSimilarItems(query).map { i =>
           FilterCorrelators(i.actionName, i.itemIDs)
         }.toList
-      } else List.empty[FilterCorrelators]
+      } else Seq.empty[FilterCorrelators]
 
       val filteringMetadata = getFilteringMetadata(query)
 
@@ -485,15 +502,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
       // purchase or view, we'll pass both to the query if the user history or items correlators are empty
       // then metadata or backfill must be relied on to return results.
 
-      val numRecs = query.num.getOrElse(ap.num.getOrElse(defaultURAlgorithmParams.DefaultNum))
+      val numRecs = query.num.getOrElse(limit)
 
-      val shouldFields: Option[List[JValue]] = if (allBoostedCorrelators.isEmpty) None
+      val shouldFields: Option[Seq[JValue]] = if (allBoostedCorrelators.isEmpty) None
       else {
         Some(allBoostedCorrelators.map { i =>
           render("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> i.boost))
         }.toList)
       }
-      val popModelSort = List(parse(
+      val popModelSort = Seq(parse(
         """
           |{
           |  "constant_score": {
@@ -505,36 +522,22 @@ class URAlgorithm(val ap: URAlgorithmParams)
           |}
           |""".stripMargin))
 
-      val should: List[JValue] = if (shouldFields.isEmpty) popModelSort else shouldFields.get ::: popModelSort
+      val should: Seq[JValue] = if (shouldFields.isEmpty) popModelSort else shouldFields.get ++ popModelSort
 
-      val mustFields: List[JValue] = allFilteringCorrelators.map { i =>
+      val mustFields: Seq[JValue] = allFilteringCorrelators.map { i =>
         render("terms" -> (i.actionName -> i.itemIDs) ~ ("boost" -> 0))}.toList
-      val must: List[JValue] = mustFields ::: filteringDateRange
+      val must: Seq[JValue] = mustFields ++ filteringDateRange
 
       val mustNotFields: JValue = render("ids" -> ("values" -> getExcludedItems(alluserEvents._2, query)) ~ ("boost" -> 0))
       val mustNot: JValue = mustNotFields
 
-      val recsModel = ap.recsModel.getOrElse(RecsModel.All)
       val popQuery = if (recsModel == RecsModel.All || recsModel == RecsModel.BF) {
-        List(
-          parse( """{"_score": {"order": "desc"}}"""),
-          parse(
-            s"""
-               |{
-               |    "$backfillFieldName": {
-               |      "unmapped_type": "double",
-               |      "order": "desc"
-               |    },
-               |    "${RankField.DefaultRank}": {
-               |      "unmapped_type": "double",
-               |      "order": "desc"
-               |    },
-               |    "${RankField.UniqueRank}": {
-               |      "unmapped_type": "double",
-               |      "order": "desc"
-               |    }
-               |}""".stripMargin))
-      } else List.empty
+        val sortByScore: Seq[JValue] = Seq(parse("""{"_score": {"order": "desc"}}"""))
+        val sortByRanks: Seq[JValue] = backfillFieldNames map { rankFieldName =>
+          parse(s"""{ "$rankFieldName": { "unmapped_type": "double", "order": "desc" } }""")
+        }
+        sortByScore ++ sortByRanks
+      } else Seq.empty
 
       val json =
         ("size" -> numRecs) ~
@@ -551,25 +554,24 @@ class URAlgorithm(val ap: URAlgorithmParams)
       (compact(render(json)), alluserEvents._2)
     } catch {
       case e: IllegalArgumentException =>
-        ("", List.empty[Event])
+        ("", Seq.empty[Event])
     }
   }
 
   /** Create a list of item ids that the user has interacted with or are not to be included in recommendations */
-  def getExcludedItems(userEvents: List[Event], query: Query): List[String] = {
+  def getExcludedItems(userEvents: Seq[Event], query: Query): Seq[String] = {
 
     val blacklistedItems = userEvents.filter { event =>
-      if (ap.blacklistEvents.nonEmpty) {
-        // either a list or an empty list of filtering events so honor them
-        if (ap.blacklistEvents.get == List.empty[String]) false // no filtering events so all are allowed
-        else ap.blacklistEvents.get.contains(event.event) // if its filtered remove it, else allow
-      } else ap.eventNames(0).equals(event.event) // remove the primary event if nothing specified
-    }.map (_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrElse(List.empty[String])
-      .distinct
+      // either a list or an empty list of filtering events so honor them
+      blacklistEvents match {
+        case Nil => eventNames.head equals event.event
+        case _ => blacklistEvents contains event.event
+      }
+    }.map(_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrEmpty.distinct
 
     // Now conditionally add the query item itself
-    val includeSelf = query.returnSelf.getOrElse(ap.returnSelf.getOrElse(false))
-    val allExcludedItems = if ( !includeSelf && query.item.nonEmpty )
+    val includeSelf = query.returnSelf.getOrElse(returnSelf)
+    val allExcludedItems = if (!includeSelf && query.item.nonEmpty)
       blacklistedItems :+ query.item.get // add the query item to be excuded
     else
       blacklistedItems
@@ -579,36 +581,35 @@ class URAlgorithm(val ap: URAlgorithmParams)
   /** Get similar items for an item, these are already in the action correlators in ES */
   def getBiasedSimilarItems(query: Query): Seq[BoostableCorrelators] = {
     if (query.item.nonEmpty) {
-      val m = EsClient.getSource(ap.indexName, ap.typeName, query.item.get)
+      val m = EsClient.getSource(esIndex, esType, query.item.get)
 
       if (m != null) {
-        val itemEventBias = query.itemBias.getOrElse(ap.itemBias.getOrElse(1f))
+        val itemEventBias = query.itemBias.getOrElse(itemBias)
         val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
-        ap.eventNames.map { action =>
-          val items = try {
-            if (m.containsKey(action) && m.get(action) != null) m.get(action).asInstanceOf[util.ArrayList[String]].toList
-            else List.empty[String]
+        eventNames.map { action =>
+          val items: Seq[String] = try {
+            if (m.containsKey(action) && m.get(action) != null) m.get(action).asInstanceOf[Seq[String]]
+            else Seq.empty[String]
           } catch {
             case cce: ClassCastException =>
-              logger.warn(s"Bad value in item ${query.item} corresponding to key: ${action} that was not a List[String]" +
+              logger.warn(s"Bad value in item ${query.item} corresponding to key: $action that was not a Seq[String]" +
                 " ignored.")
-              List.empty[String]
+              Seq.empty[String]
           }
-          val rItems = if (items.size <= ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents))
-            items else items.slice(0, ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents) - 1)
+          val rItems = if (items.size <= maxQueryEvents)
+            items else items.slice(0, maxQueryEvents - 1)
           BoostableCorrelators(action, rItems, itemEventsBoost)
         }
-      } else List.empty[BoostableCorrelators] // no similar items
-    } else List.empty[BoostableCorrelators] // no item specified
+      } else Seq.empty[BoostableCorrelators] // no similar items
+    } else Seq.empty[BoostableCorrelators] // no item specified
   }
 
   /** Get recent events of the user on items to create the recommendations query from */
-  def getBiasedRecentUserActions(
-    query: Query): (Seq[BoostableCorrelators], List[Event]) = {
+  def getBiasedRecentUserActions(query: Query): (Seq[BoostableCorrelators], Seq[Event]) = {
 
     val recentEvents = try {
       LEventStore.findByEntity(
-        appName = ap.appName,
+        appName = appName,
         // entityType and entityId is specified for fast lookup
         entityType = "user",
         entityId = query.user.get,
@@ -625,26 +626,25 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } catch {
       case e: scala.concurrent.TimeoutException =>
         logger.error(s"Timeout when read recent events." +
-          s" Empty list is used. ${e}")
-        List.empty[Event]
+          s" Empty list is used. $e")
+        Seq.empty[Event]
       case e: NoSuchElementException => // todo: bad form to use an exception to check if there is a user id
         logger.info("No user id for recs, returning similar items for the item specified")
-        List.empty[Event]
+        Seq.empty[Event]
       case e: Exception => // fatal because of error, an empty query
-        logger.error(s"Error when read recent events: ${e}")
+        logger.error(s"Error when read recent events: $e")
         throw e
     }
 
-    val userEventBias = query.userBias.getOrElse(ap.userBias.getOrElse(1f))
+    val userEventBias = query.userBias.getOrElse(userBias)
     val userEventsBoost = if (userEventBias > 0 && userEventBias != 1) Some(userEventBias) else None
     //val rActions = ap.eventNames.map { action =>
     val rActions = queryEventNames.map { action =>
-      var items = List[String]()
+      var items = Seq.empty[String]
 
-      for ( event <- recentEvents )
-        if (event.event == action && items.size <
-          ap.maxQueryEvents.getOrElse(defaultURAlgorithmParams.DefaultMaxQueryEvents)) {
-          items = event.targetEntityId.get :: items
+      for (event <- recentEvents)
+        if (event.event == action && items.size < maxQueryEvents) {
+          items = event.targetEntityId.get +: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
       // userBias may be None, which will cause no JSON output for this
@@ -654,39 +654,29 @@ class URAlgorithm(val ap: URAlgorithmParams)
   }
 
   /** get all metadata fields that potentially have boosts (not filters) */
-  def getBoostedMetadata( query: Query ): List[BoostableCorrelators] = {
-    val paramsBoostedFields = ap.fields.getOrElse(List.empty[Field]).filter( field => field.bias < 0 ).map { field =>
-      BoostableCorrelators(field.name, field.values, Some(field.bias))
-    }
+  def getBoostedMetadata(query: Query): Seq[BoostableCorrelators] = {
+    val paramsBoostedFields = fields.filter(_.bias < 0f)
+    val queryBoostedFields = query.fields.getOrEmpty.filter(_.bias >= 0f)
 
-    val queryBoostedFields = query.fields.getOrElse(List.empty[Field]).filter { field =>
-      field.bias >=  0f
-    }.map { field =>
-      BoostableCorrelators(field.name, field.values, Some(field.bias))
-    }
-
-    (queryBoostedFields ++ paramsBoostedFields).distinct  // de-dup and favor query fields
+    (queryBoostedFields ++ paramsBoostedFields)
+      .map(field => BoostableCorrelators(field.name, field.values, Some(field.bias)))
+      .distinct  // de-dup and favor query fields
   }
 
   /** get all metadata fields that are filters (not boosts) */
-  def getFilteringMetadata( query: Query ): List[FilterCorrelators] = {
-    val paramsFilterFields = ap.fields.getOrElse(List.empty[Field]).filter( field => field.bias >= 0 ).map { field =>
-      FilterCorrelators(field.name, field.values)
-    }
+  def getFilteringMetadata(query: Query): Seq[FilterCorrelators] = {
+    val paramsFilterFields = fields.filter(_.bias >= 0f)
+    val queryFilterFields = query.fields.getOrEmpty.filter(_.bias <  0f)
 
-    val queryFilterFields = query.fields.getOrElse(List.empty[Field]).filter { field =>
-      field.bias <  0f
-    }.map { field =>
-      FilterCorrelators(field.name, field.values)
-    }
-
-    (queryFilterFields ++ paramsFilterFields).distinct // de-dup and favor query fields
+    (queryFilterFields ++ paramsFilterFields)
+      .map(field => FilterCorrelators(field.name, field.values))
+      .distinct // de-dup and favor query fields
   }
 
   /** get part of query for dates and date ranges */
-  def getFilteringDateRange( query: Query ): List[JValue] = {
+  def getFilteringDateRange(query: Query): Seq[JValue] = {
 
-    var json: List[JValue] = List.empty[JValue]
+    var json: Seq[JValue] = Seq.empty[JValue]
     // currentDate in the query overrides the dateRange in the same query so ignore daterange if both
     val currentDate = query.currentDate.getOrElse(DateTime.now().toDateTimeISO.toString)
 
@@ -700,15 +690,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
                           |  "constant_score": {
                           |    "filter": {
                           |      "range": {
-                          |        "${name}": {
+                          |        "$name": {
         """.stripMargin
 
       val rangeAfter = s"""
-                          |          "gt": "${after}"
+                          |          "gt": "$after"
         """.stripMargin
 
       val rangeBefore = s"""
-                           |          "lt": "${before}"
+                           |          "lt": "$before"
         """.stripMargin
 
       val rangeEnd = s"""
@@ -738,8 +728,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
                          |  "constant_score": {
                          |    "filter": {
                          |      "range": {
-                         |        "${availableDate}": {
-                         |          "lte": "${currentDate}"
+                         |        "$availableDate": {
+                         |          "lte": "$currentDate"
                          |        }
                          |      }
                          |    },
@@ -754,8 +744,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
                       |  "constant_score": {
                       |    "filter": {
                       |      "range": {
-                      |        "${expireDate}": {
-                      |          "gt": "${currentDate}"
+                      |        "$expireDate": {
+                      |          "gt": "$currentDate"
                       |        }
                       |      }
                       |    },
@@ -770,10 +760,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
     json
   }
 
-  def getRankMapping(backfillFieldName: String) = Map(
-    backfillFieldName -> "float",
-    RankField.DefaultRank -> "float",
-    RankField.UniqueRank -> "float"
-  )
+  def getRankMapping(backfillFieldNames: Seq[String]) = backfillFieldNames map ( fieldName =>
+    fieldName -> "float"
+  ) toMap
 
 }

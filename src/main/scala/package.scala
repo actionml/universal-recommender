@@ -27,6 +27,12 @@ import org.apache.spark.rdd.RDD
 /** Utility conversions for IndexedDatasetSpark */
 package object conversions {
 
+  implicit class OptionCollection[T](collectionOpt: Option[Seq[T]]) {
+    def getOrEmpty: Seq[T] = {
+      collectionOpt.getOrElse(Seq.empty[T])
+    }
+  }
+
   implicit class IndexedDatasetConversions(val indexedDataset: IndexedDatasetSpark) {
     def toStringMapRDD(actionName: String): RDD[(String, Map[String, Seq[String]])] = {
       @transient lazy val logger = Logger[this.type]

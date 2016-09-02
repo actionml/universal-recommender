@@ -31,11 +31,12 @@ import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsReques
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.get.GetResponse
 import org.elasticsearch.client.transport.TransportClient
-import org.elasticsearch.common.settings.{Settings, ImmutableSettings}
+import org.elasticsearch.common.settings.{ImmutableSettings, Settings}
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
 import org.elasticsearch.node.NodeBuilder._
+import org.elasticsearch.search.SearchHits
 
 import scala.collection.immutable
 import scala.collection.parallel.mutable
@@ -97,9 +98,9 @@ object EsClient {
     indexName: String,
     indexType: String,
     fieldNames: List[String],
-    typeMappings: Option[Map[String, String]] = None,
+    typeMappings: Map[String, String] = Map.empty,
     refresh: Boolean = false): Boolean = {
-    if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists()) {
+    if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
       var mappings = """
         |{
         |  "properties": {
@@ -130,8 +131,8 @@ object EsClient {
       """.stripMargin.replace("\n", "")
 
       fieldNames.foreach { fieldName =>
-        if (typeMappings.nonEmpty && typeMappings.get.contains(fieldName))
-          mappings += (fieldName + mappingsField(typeMappings.get(fieldName)))
+        if (typeMappings.contains(fieldName))
+          mappings += (fieldName + mappingsField(typeMappings(fieldName)))
         else // unspecified fields are treated as not_analyzed strings
           mappings += (fieldName + mappingsField("string"))
       }
@@ -140,7 +141,7 @@ object EsClient {
       val cir = new CreateIndexRequest(indexName).mapping(indexType,mappings)
       val create = client.admin().indices().create(cir).actionGet()
       if (!create.isAcknowledged) {
-        logger.info(s"Index ${indexName} wasn't created, but may have quietly failed.")
+        logger.info(s"Index $indexName wasn't created, but may have quietly failed.")
       } else {
         // now refresh to get it 'committed'
         // todo: should do this after the new index is created so no index downtime
@@ -148,7 +149,7 @@ object EsClient {
       }
       true
     } else {
-      logger.warn(s"Elasticsearch index: ${indexName} wasn't created because it already exists. This may be an error.")
+      logger.warn(s"Elasticsearch index: $indexName wasn't created because it already exists. This may be an error.")
       false
     }
   }
@@ -162,9 +163,9 @@ object EsClient {
   def hotSwap(
     alias: String,
     typeName: String,
-    indexRDD: RDD[scala.collection.Map[String,Any]],
+    indexRDD: RDD[Map[String, AnyRef]],
     fieldNames: List[String],
-    typeMappings: Option[Map[String, String]] = None): Unit = {
+    typeMappings: Map[String, String] = Map.empty): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
@@ -211,29 +212,13 @@ object EsClient {
     * @param indexName the index to search
     * @return a [PredictedResults] collection
     */
-  def search(query: String, indexName: String, addRank: Boolean = false): PredictedResult = {
+  def search(query: String, indexName: String): Option[SearchHits] = {
     val sr = client.prepareSearch(indexName).setSource(query).get()
-
     if (!sr.isTimedOut) {
-      val recs = sr.getHits.getHits.map { hit =>
-        if (addRank) {
-          val source = hit.getSource
-          ItemScore(hit.getId, hit.getScore.toDouble,
-            popRank = Some(source.get(RankField.PopRank).asInstanceOf[Double]),
-            defaultRank = Some(source.get(RankField.DefaultRank).asInstanceOf[Double]),
-            uniqueRank = Some(source.get(RankField.UniqueRank).asInstanceOf[Double])
-          )
-        } else {
-          ItemScore(hit.getId, hit.getScore.toDouble)
-        }
-      }
-      logger.info(s"Results: ${sr.getHits.getHits.length} retrieved of a possible ${sr.getHits.totalHits()}")
-      PredictedResult(recs)
+      Some(sr.getHits)
     } else {
-      logger.info(s"No results for query ${parse(query)}")
-      PredictedResult(Array.empty[ItemScore])
+      None
     }
-
   }
 
   /** Gets the "source" field of an Elasticsearch document
@@ -285,13 +270,12 @@ object EsClient {
     }
   }
 
-  def getRDD(sc: SparkContext, alias: String, typeName: String):
-  Option[RDD[(String, collection.Map[String, AnyRef])]] = {
-    val index = getIndexName(alias)
-    if (index.nonEmpty) { // ensures there is a 1-1 mapping of alias to index
-      val indexAsRDD = sc.esRDD(alias + "/" + typeName)
-      //val debug = indexAsRDD.count()
-      Some(indexAsRDD)
-    } else None // error so no index for the alias
+  def getRDD(
+    alias: String,
+    typeName: String
+  )(implicit sc: SparkContext): RDD[(String, Map[String, AnyRef])] = {
+    getIndexName(alias)
+      .map(index => sc.esRDD(alias + "/" + typeName) map { case (key, map) => key -> map.toMap })
+      .getOrElse(sc.emptyRDD)
   }
 }

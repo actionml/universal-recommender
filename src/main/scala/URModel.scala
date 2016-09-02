@@ -18,7 +18,7 @@
 package org.template
 
 import grizzled.slf4j.Logger
-import io.prediction.data.storage.PropertyMap
+import io.prediction.data.storage.DataMap
 import org.apache.mahout.math.indexeddataset.IndexedDataset
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
@@ -27,18 +27,17 @@ import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
 import org.template.conversions.IndexedDatasetConversions
+import org.apache.mahout.sparkbindings._
 
 
 /** Universal Recommender models to save in ES */
 class URModel(
-    coocurrenceMatrices: Option[List[(String, IndexedDataset)]],
-    fieldsRDD: Option[RDD[(String, PropertyMap)]],
-    indexName: String,
-    dateNames: Option[List[String]] = None,
+    coocurrenceMatrices: Seq[(String, IndexedDataset)] = Seq.empty,
+    fieldsRDD: RDD[(String, DataMap)],
     nullModel: Boolean = false,
-    typeMappings: Option[Map[String, String]] = None, // maps fieldname that need type mapping in Elasticsearch
-    propertiesRDD: Option[RDD[collection.Map[String, Any]]] = None)
-     {
+    typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
+    propertiesRDD: RDD[Map[String, AnyRef]]
+) {
   @transient lazy val logger = Logger[this.type]
 
   /** Save all fields to be indexed by Elasticsearch and queried for recs
@@ -53,82 +52,80 @@ class URModel(
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
-    val esIndexURI = s"/${params.indexName}/${params.typeName}"
-
     // for ES we need to create the entire index in an rdd of maps, one per item so we'll use
     // convert cooccurrence matrices into correlators as RDD[(itemID, (actionName, Seq[itemID])]
     // do they need to be in Elasticsearch format
     logger.info("Converting cooccurrence matrices into correlators")
-    val correlators = if (coocurrenceMatrices.nonEmpty) coocurrenceMatrices.get.map { case (actionName, dataset) =>
+    val correlators: Seq[RDD[(String, Map[String, Any])]] = coocurrenceMatrices.map { case (actionName, dataset) =>
       dataset.asInstanceOf[IndexedDatasetSpark].toStringMapRDD(actionName).asInstanceOf[RDD[(String, Map[String, Any])]]
-      //} else List.empty[RDD[(String, Map[String, Seq[String]])]] // empty mena only calculating PopModel
-    } else List.empty[RDD[(String, Map[String, Any])]] // empty mena only calculating PopModel
+    }
+
+    val dateNames = Seq(params.dateName, params.availableDateName, params.expireDateName).collect { case Some(date) => date }.distinct
+    logger.info(s"Ready to pass date fields names to closure $dateNames")
+    // convert the PropertyMap into Map[String, Seq[String]] for ES
+    logger.info("Converting PropertyMap into Elasticsearch style rdd")
+
+//    logger.info(Utils.hl(s"FieldsRDD:\n${fieldsRDD.collect().toMap.mkString("\n")}"))
+
+    val properties: RDD[(String, Map[String, Any])] = fieldsRDD.map { case (item, pm) =>
+      var m: Map[String, Any] = Map()
+      for (key <- pm.keySet) {
+        try {
+          // if we get something unexpected, add ignore and add nothing to the map
+          pm.get[JValue](key) match {
+            case JArray(list) => // assumes all lists are string tokens for bias
+              val l = list.map {
+                case JString(s) => s
+                case _ => ""
+              }
+              m = m + (key -> l)
+            case JString(s) => // name for this field is in engine params
+              if (dateNames.contains(key)) {
+                // one of the date fields
+                val dateTime = new DateTime(s)
+                val date: java.util.Date = dateTime.toDate
+                m = m + (key -> date)
+              }
+              if (BackfillFieldName.toSeq.contains(key)) {
+                m = m + (key -> s.toDouble)
+              }
+            case JDouble(rank) => // only the ranking double from PopModel should be here
+              m = m + (key -> rank)
+            case JInt(someInt) => // not sure what this is but pass it on
+              m = m + (key -> someInt)
+          }
+        } catch {
+          case e: ClassCastException => e
+          case e: IllegalArgumentException => e
+          case e: MatchError => e
+          //got something we didn't expect so ignore it, put nothing in the map
+        }
+      }
+      (item, m)
+    } cache()
+
+//    logger.info(Utils.hl(s"Properties:\n${properties.collect().toMap.mkString("\n")}"))
 
     // getting action names since they will be ES fields
     logger.info(s"Getting a list of action name strings")
-    val allActions = coocurrenceMatrices.getOrElse(List.empty[(String, IndexedDatasetSpark)]).map(_._1)
+    val allActions = coocurrenceMatrices.map { case (actionName, dataset) => actionName }
 
-    logger.info(s"Ready to pass date fields names to closure $dateNames")
-    val closureDateNames = dateNames.getOrElse(List.empty[String])
-    // convert the PropertyMap into Map[String, Seq[String]] for ES
-    logger.info("Converting PropertyMap into Elasticsearch style rdd")
-    var properties = List.empty[RDD[(String, Map[String, Any])]]
-    var allPropKeys = List.empty[String]
-    if (fieldsRDD.nonEmpty) {
-      properties = List(fieldsRDD.get.map { case (item, pm) =>
-        var m: Map[String, Any] = Map()
-        for (key <- pm.keySet) {
-          val k = key
-          val v = pm.get[JValue](key)
-          try {
-            // if we get something unexpected, add ignore and add nothing to the map
-            pm.get[JValue](key) match {
-              case JArray(list) => // assumes all lists are string tokens for bias
-                val l = list.map {
-                  case JString(s) => s
-                  case _ => ""
-                }
-                m = m + (key -> l)
-              case JString(s) => // name for this field is in engine params
-                if (closureDateNames.contains(key)) {
-                  // one of the date fields
-                  val dateTime = new DateTime(s)
-                  val date: java.util.Date = dateTime.toDate()
-                  m = m + (key -> date)
-                }
-                if (RankField.toSeq.contains(key)) {
-                  m = m + (key -> s.toDouble)
-                }
-              case JDouble(rank) => // only the ranking double from PopModel should be here
-                m = m + (key -> rank)
-              case JInt(someInt) => // not sure what this is but pass it on
-                m = m + (key -> someInt)
-            }
-          } catch {
-            case e: ClassCastException => e
-            case e: IllegalArgumentException => e
-            case e: MatchError => e
-            //got something we didn't expect so ignore it, put nothing in the map
-          }
-        }
-        (item, m)
-      })
-      allPropKeys = properties.head.flatMap(_._2.keySet).distinct.collect().toList
-    }
-
+    val allPropKeys: List[String] = properties
+      .flatMap { case (item, fieldMap) => fieldMap.keySet }
+      .distinct.collect().toList
 
     // these need to be indexed with "not_analyzed" and no norms so have to
     // collect all field names before ES index create
-    val allFields = (allActions ++ allPropKeys).distinct // shouldn't need distinct but it's fast
+    val allFields = (allActions ++ allPropKeys).distinct.toList // shouldn't need distinct but it's fast
 
     if (propertiesRDD.isEmpty) {
       // Elasticsearch takes a Map with all fields, not a tuple
       logger.info("Grouping all correlators into doc + fields for writing to index")
       logger.info(s"Finding non-empty RDDs from a list of ${correlators.length} correlators and " +
-        s"${properties.length} properties")
-      val esRDDs: List[RDD[(String, Map[String, Any])]] =
+        s"${properties.isEmpty()} properties")
+      val esRDDs: Seq[RDD[(String, Map[String, Any])]] =
         //(correlators ::: properties).filterNot(c => c.isEmpty())// for some reason way too slow
-        (correlators ::: properties)
+        correlators :+ properties
           //c.take(1).length == 0
       if (esRDDs.nonEmpty) {
         val esFields = groupAll(esRDDs).map { case (item, map) =>
@@ -141,7 +138,7 @@ class URModel(
         EsClient.hotSwap(
           params.indexName,
           params.typeName,
-          esFields.asInstanceOf[RDD[scala.collection.Map[String, Any]]],
+          esFields.asInstanceOf[RDD[Map[String, AnyRef]]],
           allFields,
           typeMappings)
       } else logger.warn("No data to write. May have been caused by a failed or stopped `pio train`, " +
@@ -152,7 +149,7 @@ class URModel(
       // entire index
 
       // create a new index then hot-swap the new index by re-aliasing to it then delete old index
-      EsClient.hotSwap(params.indexName, params.typeName, propertiesRDD.get, allFields, typeMappings)
+      EsClient.hotSwap(params.indexName, params.typeName, propertiesRDD, allFields, typeMappings)
     }
     true
   }
@@ -170,11 +167,6 @@ class URModel(
     } else fields.head
   }
 
-  override def toString = {
-    s"URModel in Elasticsearch at index: ${indexName}"
-  }
-
-
 }
 
 object URModel {
@@ -190,7 +182,7 @@ object URModel {
     */
   def apply(id: String, params: URAlgorithmParams, sc: Option[SparkContext]): URModel = {
     // todo: need changes in PIO to remove the need for this
-    val urm = new URModel(null, null, null, nullModel =  true)
+    val urm = new URModel(null, null, nullModel = true, null, null)
     logger.info("Created dummy null model")
     urm
   }

@@ -71,7 +71,7 @@ class DataSource(val dsp: DataSourceParams)
     val actionRDDs = eventNames.map { eventName =>
       val actionRDD = eventsRDD.filter { event =>
 
-        require(eventNames.contains(event.event), s"Unexpected event ${event} is read.") // is this really needed?
+        require(eventNames.contains(event.event), s"Unexpected event $event is read.") // is this really needed?
         require(event.entityId.nonEmpty && event.targetEntityId.get.nonEmpty, "Empty user or item ID")
 
         eventName.equals(event.event)
@@ -84,13 +84,11 @@ class DataSource(val dsp: DataSourceParams)
     }
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
-    val fieldsRDD = PEventStore.aggregateProperties(
-      appName= dsp.appName,
-      entityType=  "item")(sc)
+    val fieldsRDD: RDD[(String, PropertyMap)] = PEventStore.aggregateProperties(appName = dsp.appName, entityType = "item")(sc)
 
     // Have a list of (actionName, RDD), for each action
     // todo: some day allow data to be content, which requires rethinking how to use EventStore
-    new TrainingData(actionRDDs, fieldsRDD)
+    TrainingData(actionRDDs, fieldsRDD)
   }
 }
 
@@ -99,10 +97,10 @@ class DataSource(val dsp: DataSourceParams)
   * @param actions List of Tuples (actionName, actionRDD)qw
   * @param fieldsRDD RDD of item keyed PropertyMap for item metadata
   */
-class TrainingData(
-    val actions: List[(String, RDD[(String, String)])],
-    val fieldsRDD: RDD[(String, PropertyMap)])
-  extends Serializable {
+case class TrainingData(
+    actions: List[(String, RDD[(String, String)])],
+    fieldsRDD: RDD[(String, PropertyMap)]
+) extends Serializable {
 
   override def toString = {
     val a = actions.map { t =>

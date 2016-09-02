@@ -48,7 +48,7 @@ case class Query(
 /** Used to specify how Fields are represented in engine.json */
 case class Field( // no optional values for fields, whne specified
     name: String, // name of metadata field
-    values: Array[String], // fields can have multiple values like tags of a single value as when using hierarchical
+    values: Seq[String], // fields can have multiple values like tags of a single value as when using hierarchical
     // taxonomies
     bias: Float)// any positive value is a boost, negative is a filter
   extends Serializable
@@ -68,9 +68,7 @@ case class PredictedResult(
 case class ItemScore(
   item: String, // item id
   score: Double, // used to rank, original score returned from teh search engine
-  popRank: Option[Double] = None,
-  defaultRank: Option[Double] = None,
-  uniqueRank: Option[Double] = None
+  ranks: Option[Map[String, Double]] = None
 ) extends Serializable
 
 object RecommendationEngine extends EngineFactory {
