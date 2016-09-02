@@ -33,6 +33,7 @@ import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import org.template.conversions._
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
 import scala.language.{implicitConversions, postfixOps}
 
@@ -157,6 +158,8 @@ case class URAlgorithmParams(
 class URAlgorithm(val ap: URAlgorithmParams)
   extends P2LAlgorithm[PreparedData, NullModel, Query, PredictedResult] {
 
+  @transient lazy implicit val logger: Logger = Logger[this.type]
+
   case class BoostableCorrelators(actionName: String, itemIDs: Seq[String], boost: Option[Float])
   case class FilterCorrelators(actionName: String, itemIDs: Seq[String])
 
@@ -192,30 +195,18 @@ class URAlgorithm(val ap: URAlgorithmParams)
   val esIndex = ap.indexName
   val esType = ap.typeName
 
-  logger.info(
-    s"""
-       |╔=======================================================================================
-       |‖   Init URAlgorithm
-       |‖   App name:         $appName
-       |‖   ES index name:    $esIndex
-       |‖   ES type name:     $esType
-       |‖
-       |‖   RecsModel:        $recsModel
-       |‖   Event names:      $eventNames
-       |‖
-       |‖   Cooccurrence model params
-       |‖     randomSeed: $randomSeed
-       |‖     maxCorrelatorsPerEventType: $maxCorrelatorsPerEventType
-       |‖     maxEventsPerEventType: $maxEventsPerEventType
-       |‖
-       |‖   BackfillsParams:
-       |‖     ${backfillsParams.mkString("\n‖     ")}
-       |‖
-       |‖
-       |╚=======================================================================================
-       |""".stripMargin)
+  drawActionML
 
-  @transient lazy val logger = Logger[this.type]
+  drawInfo("Init URAlgorithm", Map(
+    "App name" -> appName,
+    "ES index name" -> esIndex,
+    "ES type name" -> esType,
+    "RecsModel" -> recsModel,
+    "Event names" -> eventNames,
+    "Random seed" -> randomSeed,
+    "maxCorrelatorsPerEventType" -> maxCorrelatorsPerEventType,
+    "maxEventsPerEventType" -> maxEventsPerEventType
+  ))
 
   def train(sc: SparkContext, data: PreparedData): NullModel = {
 
@@ -588,12 +579,11 @@ class URAlgorithm(val ap: URAlgorithmParams)
         val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
         eventNames.map { action =>
           val items: Seq[String] = try {
-            if (m.containsKey(action) && m.get(action) != null) m.get(action).asInstanceOf[Seq[String]]
+            if (m.containsKey(action) && m.get(action) != null) m.get(action).asInstanceOf[util.ArrayList[String]].asScala
             else Seq.empty[String]
           } catch {
             case cce: ClassCastException =>
-              logger.warn(s"Bad value in item ${query.item} corresponding to key: $action that was not a Seq[String]" +
-                " ignored.")
+              logger.warn(s"Bad value in item [${query.item}] corresponding to key: [$action] that was not a Seq[String] ignored.")
               Seq.empty[String]
           }
           val rItems = if (items.size <= maxQueryEvents)

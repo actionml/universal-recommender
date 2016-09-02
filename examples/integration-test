@@ -3,6 +3,11 @@
 # exit on any error
 set -e
 
+restore-engine () {
+    echo ""
+    echo "Restoring engine.json"
+    mv user-engine.json engine.json
+}
 echo ""
 echo "Integration test for The Universal Recommender."
 echo "If some step fails check that your engine.json file has been restored"
@@ -77,9 +82,7 @@ sleep 30
 
 ./examples/multi-query-handmade.sh > test.out
 
-echo ""
-echo "Restoring engine.json"
-mv user-engine.json engine.json
+restore-engine
 
 echo ""
 echo "Differences between expected and actual results, none is a passing test."

@@ -27,6 +27,43 @@ import org.apache.spark.rdd.RDD
 /** Utility conversions for IndexedDatasetSpark */
 package object conversions {
 
+  def drawActionML(implicit logger: Logger) = {
+    val actionML =
+      """
+        |
+        |               _   _             __  __ _
+        |     /\       | | (_)           |  \/  | |
+        |    /  \   ___| |_ _  ___  _ __ | \  / | |
+        |   / /\ \ / __| __| |/ _ \| '_ \| |\/| | |
+        |  / ____ \ (__| |_| | (_) | | | | |  | | |____
+        | /_/    \_\___|\__|_|\___/|_| |_|_|  |_|______|
+        |
+        |
+      """.stripMargin
+
+    logger.info(actionML)
+  }
+
+  def drawInfo(title: String, dataMap: Map[String, Any])(implicit logger: Logger) = {
+    val leftAlignFormat = "║ %-30s %-67s ║"
+
+    val line = "═"*100
+
+    val preparedTitle = "║ %-98s ║".format(title)
+    val data = dataMap.map { case (key, value) =>
+      leftAlignFormat.format(key, value)
+    } mkString "\n"
+
+    logger.info(
+      s"""
+         |╔$line╗
+         |$preparedTitle
+         |$data
+         |╚$line╝
+         |""".stripMargin)
+
+  }
+
   implicit class OptionCollection[T](collectionOpt: Option[Seq[T]]) {
     def getOrEmpty: Seq[T] = {
       collectionOpt.getOrElse(Seq.empty[T])
