@@ -50,8 +50,8 @@ case class Field( // no optional values for fields, whne specified
   name: String, // name of metadata field
   values: Seq[String], // fields can have multiple values like tags of a single value as when using hierarchical
   // taxonomies
-  bias: Float // any positive value is a boost, negative is a filter
-) extends Serializable
+  bias: Float) // any positive value is a boost, negative is a filter
+  extends Serializable
 
 /** Used to specify the date range for a query */
 case class DateRange(

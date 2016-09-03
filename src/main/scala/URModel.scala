@@ -32,7 +32,7 @@ import org.template.conversions.{ IndexedDatasetConversions, ItemID }
 class URModel(
   coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
   fieldsRDD: RDD[(String, DataMap)],
-  propertiesRDD: RDD[Map[String, AnyRef]],
+  propertiesRDD: RDD[Map[String, Any]],
   typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
   nullModel: Boolean = false) {
 
@@ -119,7 +119,7 @@ class URModel(
         EsClient.hotSwap(
           esIndex,
           esType,
-          esFields.asInstanceOf[RDD[Map[String, AnyRef]]],
+          esFields.asInstanceOf[RDD[Map[String, Any]]],
           allFields,
           typeMappings)
       } else {

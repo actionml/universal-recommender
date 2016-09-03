@@ -163,7 +163,7 @@ object EsClient {
   def hotSwap(
     alias: String,
     typeName: String,
-    indexRDD: RDD[Map[String, AnyRef]],
+    indexRDD: RDD[Map[String, Any]],
     fieldNames: List[String],
     typeMappings: Map[String, String] = Map.empty): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one

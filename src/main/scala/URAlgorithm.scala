@@ -293,7 +293,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val currentMetadataRDD: RDD[(ItemID, Map[String, AnyRef])] = EsClient.getRDD(esIndex, esType)
 
-    val propertiesRDD: RDD[Map[String, AnyRef]] = currentMetadataRDD fullOuterJoin ranksRdd map {
+    val propertiesRDD: RDD[Map[String, Any]] = currentMetadataRDD fullOuterJoin ranksRdd map {
       case (item, maps) =>
         maps match {
           case (Some(map), Some(propMap)) => map ++ propMap.fields

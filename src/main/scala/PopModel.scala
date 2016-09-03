@@ -144,12 +144,9 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
             val velocity = newerScore - olderScore
             (item, velocity)
         }
-      } else {
-        newerPopRDD
-      }
-    } else {
-      olderPopRDD
-    }
+      } else sc.emptyRDD
+    } else sc.emptyRDD
+
   }
 
   /** Creates a rank for each item by divding all events per item into three buckets and calculating the change in
@@ -189,15 +186,9 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
               val acceleration = newVelocity - oldVelocity
               (item, acceleration)
           }
-        } else {
-          newerPopRDD
-        }
-      } else {
-        middlePopRDD
-      }
-    } else {
-      olderPopRDD
-    }
+        } else sc.emptyRDD
+      } else sc.emptyRDD
+    } else sc.emptyRDD
   }
 
   def eventsRDD(
