@@ -193,13 +193,13 @@ A full list of tuning and config parameters is below. See the field description 
             "num": 20,
             "seed": 3,
             "recsModel": "all",
-			"backfillsParams": [
+            "backfillsParams": [
                 {
                     "name": "popRank"
-                    "type": "popular",
+                    "type": "popular", // or "trending" or "hot"
                     "eventNames": ["buy", "view"],
                     "duration": "3 days",
-                    "endDate": "ISO8601-date" //most recent date to end the duration
+                    "endDate": "ISO8601-date" // most recent date to end the duration
                 },
                 {
                     "name": "uniqueRank"
