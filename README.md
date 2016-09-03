@@ -193,7 +193,7 @@ A full list of tuning and config parameters is below. See the field description 
             "num": 20,
             "seed": 3,
             "recsModel": "all",
-            "backfillsParams": [
+            "backfills": [
                 {
                     "name": "popRank"
                     "type": "popular", // or "trending" or "hot"
@@ -260,7 +260,7 @@ The `Algorithm: params:` section controls most of the features of the UR. Possib
 * **dateName** optional, a date or timestamp used in a `dateRange` recommendations filter.
 * **returnSelf**: optional, default = false. Boolean asking to include the item that was part of the query (if there was one) as part of the results. The default is false and this is by far the most common use so this is seldom required.
 * **recsModel** optional, default = "all", which means  collaborative filtering with popular items returned when no other recommendations can be made. Otherwise: "all", "collabFiltering", "backfill". If only "backfill" is specified then the train will create only some backfill type like popular. If only "collabFiltering" then no backfill will be included when there are no other recommendations.
-* **backfillsParams** optional (use with great care), this set of parameters defines the calculation of the popularity model that ranks all items by their events in one of three different ways corresponding to: event counts (popular), change in event counts over time (trending), and change in trending over time (hot). If there are not enough recommendations to return teh number asked for, popular items will fill in the remaining recommendations asked for&mdash;hence the term "backfill". Purely popular items may be requested in the query by specifying no user of item.
+* **backfills** optional (use with great care), this set of parameters defines the calculation of the popularity model that ranks all items by their events in one of three different ways corresponding to: event counts (popular), change in event counts over time (trending), and change in trending over time (hot). If there are not enough recommendations to return teh number asked for, popular items will fill in the remaining recommendations asked for&mdash;hence the term "backfill". Purely popular items may be requested in the query by specifying no user of item.
 	* **name** give the field a name in the model and defaults to "popRank"
 	* **type**  "popular", "trending", and "hot". These are event counts, velocity of change in event counts, or the acceleration of event counts. **Note**: when using "hot" the algorithm divides the events into three periods and since events tend to be cyclical by day, 3 days will produce results mostly free of daily effects for all types. Making this time period smaller may cause odd effects from time of day the algorithm is executed. Popular is not split and trending splits the events in two. So choose the duration accordingly.
 	* **eventNames** an array of eventNames to use in calculating the popularity model, this defaults to the single primary events&mdash;the first in the `algorithm: eventNames:` 

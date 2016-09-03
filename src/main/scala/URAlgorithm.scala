@@ -141,7 +141,7 @@ case class URAlgorithmParams(
   returnSelf: Option[Boolean] = None, // query building logic defaults this to false
   fields: Option[Seq[Field]] = None, //defaults to no fields
   // leave out for default or popular
-  backfillsParams: Option[Seq[BackfillParams]] = None,
+  backfills: Option[Seq[BackfillParams]] = None,
   // name of date property field for when the item is available
   availableDateName: Option[String] = None,
   // name of date property field for when an item is no longer available
@@ -189,7 +189,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   val maxEventsPerEventType: Int = ap.maxEventsPerEventType
     .getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType)
 
-  val backfillsParams: Seq[BackfillParams] = ap.backfillsParams.getOrElse(Seq(BackfillParams(
+  val backfillsParams: Seq[BackfillParams] = ap.backfills.getOrElse(Seq(BackfillParams(
     name = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
     `type` = Some(defaultURAlgorithmParams.DefaultBackfillType),
     eventNames = Some(eventNames.take(1)),
@@ -224,7 +224,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ("Max query events", maxQueryEvents),
     ("Limit", limit),
     ("══════════════════════════════", "════════════════════════════"),
-    ("BackfillsParams:", "")) ++ backfillsParams.map(x => (x.`type`.get, x.name)))
+    ("Backfills:", "")) ++ backfillsParams.map(x => (x.`type`.get, x.name)))
 
   def train(sc: SparkContext, data: PreparedData): NullModel = {
 

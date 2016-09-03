@@ -28,12 +28,12 @@
         "typeName": "items",
         "eventNames": ["purchase", "view"],
         "recsModel": "backfill",
-        "backfillField": {
+        "backfills": [{
           "name": "trendRank",
           "backfillType": "trending",
           "eventNames": ["purchase", "view"],
           "duration": 259200
-        }
+        }]
       }
     }
   ]
