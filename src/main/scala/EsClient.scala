@@ -41,12 +41,11 @@ import org.elasticsearch.search.SearchHits
 import scala.collection.immutable
 import scala.collection.parallel.mutable
 
-/**
- * Elasticsearch notes:
- * 1) every query clause wil laffect scores unless it has a constant_score and boost: 0
- * 2) the Spark index writer is fast but must assemble all data for the index before the write occurs
- * 3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
- * 4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
+/** Elasticsearch notes:
+ *  1) every query clause wil laffect scores unless it has a constant_score and boost: 0
+ *  2) the Spark index writer is fast but must assemble all data for the index before the write occurs
+ *  3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
+ *  4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
  *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
  */
 
@@ -63,12 +62,11 @@ object EsClient {
   // wrong way that uses only default settings, which will be a localhost ES sever.
   //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
 
-  /**
-   * Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
-   * the changes will not be reflected.
-   * @param indexName will delete all types under this index, types are not used by the UR
-   * @param refresh
-   * @return true if all is well
+  /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
+   *  the changes will not be reflected.
+   *  @param indexName will delete all types under this index, types are not used by the UR
+   *  @param refresh
+   *  @return true if all is well
    */
   def deleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
     //val debug = client.connectedNodes()
@@ -88,22 +86,20 @@ object EsClient {
     }
   }
 
-  /**
-   * Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
-   * @param indexName elasticsearch name
-   * @param indexType names the type of index, usually use the item name
-   * @param fieldNames ES field names
-   * @param typeMappings indicates which ES fields are to be not_analyzed without norms
-   * @param refresh should the index be refreshed so the create is committed
-   * @return true if all is well
+  /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
+   *  @param indexName elasticsearch name
+   *  @param indexType names the type of index, usually use the item name
+   *  @param fieldNames ES field names
+   *  @param typeMappings indicates which ES fields are to be not_analyzed without norms
+   *  @param refresh should the index be refreshed so the create is committed
+   *  @return true if all is well
    */
   def createIndex(
     indexName: String,
     indexType: String,
     fieldNames: List[String],
     typeMappings: Map[String, String] = Map.empty,
-    refresh: Boolean = false
-  ): Boolean = {
+    refresh: Boolean = false): Boolean = {
     if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
       var mappings = """
         |{
@@ -169,8 +165,7 @@ object EsClient {
     typeName: String,
     indexRDD: RDD[Map[String, AnyRef]],
     fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty
-  ): Unit = {
+    typeMappings: Map[String, String] = Map.empty): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
@@ -211,12 +206,11 @@ object EsClient {
 
   }
 
-  /**
-   * Performs a search using the JSON query String
+  /** Performs a search using the JSON query String
    *
-   * @param query the JSON query string parable by Elasticsearch
-   * @param indexName the index to search
-   * @return a [PredictedResults] collection
+   *  @param query the JSON query string parable by Elasticsearch
+   *  @param indexName the index to search
+   *  @return a [PredictedResults] collection
    */
   def search(query: String, indexName: String): Option[SearchHits] = {
     val sr = client.prepareSearch(indexName).setSource(query).get()
@@ -227,13 +221,12 @@ object EsClient {
     }
   }
 
-  /**
-   * Gets the "source" field of an Elasticsearch document
+  /** Gets the "source" field of an Elasticsearch document
    *
-   * @param indexName index that contains the doc/item
-   * @param typeName type name used to construct ES REST URI
-   * @param doc for UR the item id
-   * @return source [java.util.Map] of field names to any valid field values or null if empty
+   *  @param indexName index that contains the doc/item
+   *  @param typeName type name used to construct ES REST URI
+   *  @param doc for UR the item id
+   *  @return source [java.util.Map] of field names to any valid field values or null if empty
    */
   def getSource(indexName: String, typeName: String, doc: String): util.Map[String, AnyRef] = {
     client.prepareGet(indexName, typeName, doc)
@@ -279,8 +272,7 @@ object EsClient {
 
   def getRDD(
     alias: String,
-    typeName: String
-  )(implicit sc: SparkContext): RDD[(String, Map[String, AnyRef])] = {
+    typeName: String)(implicit sc: SparkContext): RDD[(String, Map[String, AnyRef])] = {
     getIndexName(alias)
       .map(index => sc.esRDD(alias + "/" + typeName) map { case (key, map) => key -> map.toMap })
       .getOrElse(sc.emptyRDD)

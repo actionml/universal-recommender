@@ -59,8 +59,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
     eventNames: Seq[String],
     appName: String,
     duration: Int = 0,
-    offsetDate: Option[String] = None
-  )(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
+    offsetDate: Option[String] = None)(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
 
     // todo: make end manditory and fill it with "now" upstream if not specified, will simplify logic here
     // end should always be 'now' except in unusual conditions like for testing
@@ -81,17 +80,16 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
 
     // if None? debatable, this is either an error or may need to default to popular, why call popModel otherwise
     modelName match {
-      case BackfillType.Popular => calcPopular(appName, eventNames, interval)
-      case BackfillType.Trending => calcTrending(appName, eventNames, interval)
-      case BackfillType.Hot => calcHot(appName, eventNames, interval)
-      case BackfillType.Random => calcRandom(appName, eventNames, interval)
+      case BackfillType.Popular     => calcPopular(appName, eventNames, interval)
+      case BackfillType.Trending    => calcTrending(appName, eventNames, interval)
+      case BackfillType.Hot         => calcHot(appName, eventNames, interval)
+      case BackfillType.Random      => calcRandom(appName, eventNames, interval)
       case BackfillType.UserDefined => sc.emptyRDD
       case unknownBackfillType =>
         logger.warn(
           s"""
              |Bad backfills param type=[$unknownBackfillType] in engine definition params, possibly a bad json value.
-             |Use one of the available parameter values ($BackfillType).""".stripMargin
-        )
+             |Use one of the available parameter values ($BackfillType).""".stripMargin)
         sc.emptyRDD
     }
 
@@ -101,8 +99,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
   def calcRandom(
     appName: String,
     eventNames: Seq[String],
-    interval: Interval
-  )(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
+    interval: Interval)(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
 
     val events = eventsRDD(appName, eventNames, interval)
     val itemRDD1 = events.map(_.targetEntityId).filter(_.isDefined).map(_.get).distinct()
@@ -114,8 +111,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
   def calcPopular(
     appName: String,
     eventNames: Seq[String],
-    interval: Interval
-  )(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
+    interval: Interval)(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
 
     val events = eventsRDD(appName, eventNames, interval)
     events.map { e => (e.targetEntityId, e.event) }
@@ -124,16 +120,14 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
       .reduceByKey(_ + _) // make this a double in Elaseticsearch)
   }
 
-  /**
-   * Creates a rank for each item by dividing the duration in two and counting named events in both buckets
-   * then dividing most recent by less recent. This ranks by change in popularity or velocity of populatiy change.
-   * Interval(start, end) end instant is always greater than or equal to the start instant.
+  /** Creates a rank for each item by dividing the duration in two and counting named events in both buckets
+   *  then dividing most recent by less recent. This ranks by change in popularity or velocity of populatiy change.
+   *  Interval(start, end) end instant is always greater than or equal to the start instant.
    */
   def calcTrending(
     appName: String,
     eventNames: Seq[String],
-    interval: Interval
-  )(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
+    interval: Interval)(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
 
     val halfInterval = (interval.toDurationMillis / 2).toInt
     val olderInterval = new Interval(interval.getStart, interval.getStart.plusMillis(halfInterval))
@@ -158,15 +152,13 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
     }
   }
 
-  /**
-   * Creates a rank for each item by divding all events per item into three buckets and calculating the change in
-   * velocity over time, in other words the acceleration of popularity change.
+  /** Creates a rank for each item by divding all events per item into three buckets and calculating the change in
+   *  velocity over time, in other words the acceleration of popularity change.
    */
   def calcHot(
     appName: String,
     eventNames: Seq[String] = List.empty,
-    interval: Interval
-  )(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
+    interval: Interval)(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
 
     val olderInterval = new Interval(interval.getStart, interval.getStart.plusMillis((interval.toDurationMillis / 3).toInt))
     val middleInterval = new Interval(olderInterval.getEnd, olderInterval.getEnd.plusMillis(olderInterval.toDurationMillis.toInt))
@@ -211,16 +203,14 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
   def eventsRDD(
     appName: String,
     eventNames: Seq[String],
-    interval: Interval
-  )(implicit sc: SparkContext): RDD[Event] = {
+    interval: Interval)(implicit sc: SparkContext): RDD[Event] = {
 
     //logger.info(s"PopModel getting eventsRDD for startTime: ${interval.getStart} and endTime ${interval.getEnd}")
     PEventStore.find(
       appName = appName,
       startTime = Some(interval.getStart),
       untilTime = Some(interval.getEnd),
-      eventNames = Some(eventNames)
-    )(sc)
+      eventNames = Some(eventNames))(sc)
   }
 
 }
@@ -234,7 +224,6 @@ object PopModel {
     BackfillType.Trending -> BackfillFieldName.TrendRank,
     BackfillType.Hot -> BackfillFieldName.HotRank,
     BackfillType.UserDefined -> BackfillFieldName.UserRank,
-    BackfillType.Random -> BackfillFieldName.UniqueRank
-  ).withDefaultValue(BackfillFieldName.UnknownRank)
+    BackfillType.Random -> BackfillFieldName.UniqueRank).withDefaultValue(BackfillFieldName.UnknownRank)
 
 }

@@ -27,5 +27,3 @@ project/plugins/project/
 manifest.json
 /pio.sbt
 *.out
-/actionml/
-/load-data.sh

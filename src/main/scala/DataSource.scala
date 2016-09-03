@@ -26,26 +26,24 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.template.conversions.{ ActionID, ItemID }
 
-/**
- * Taken from engine.json these are passed in to the DataSource constructor
+/** Taken from engine.json these are passed in to the DataSource constructor
  *
- * @param appName registered name for the app
- * @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
+ *  @param appName registered name for the app
+ *  @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
  *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
  */
 case class DataSourceParams(
   appName: String,
   eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
-  eventWindow: Option[EventWindow]
-) extends Params
+  eventWindow: Option[EventWindow]) extends Params
 
-/**
- * Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
- * are sent to the Preparator for further processing.
- * @param dsp parameters taken from engine.json
+/** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
+ *  are sent to the Preparator for further processing.
+ *  @param dsp parameters taken from engine.json
  */
 class DataSource(val dsp: DataSourceParams)
-    extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
+  extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult]
+  with SelfCleaningDataSource {
 
   @transient override lazy val logger: Logger = Logger[this.type]
 
@@ -56,15 +54,12 @@ class DataSource(val dsp: DataSourceParams)
   override def readTraining(sc: SparkContext): TrainingData = {
 
     val eventNames = dsp.eventNames
-
     cleanPersistedPEvents(sc)
-
     val eventsRDD = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("user"),
       eventNames = Some(eventNames),
-      targetEntityType = Some(Some("item"))
-    )(sc).repartition(sc.defaultParallelism)
+      targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
 
     // now separate the events by event name
     val actionRDDs = eventNames.map { eventName =>
@@ -83,8 +78,7 @@ class DataSource(val dsp: DataSourceParams)
     // aggregating all $set/$unsets for metadata fields, which are attached to items
     val fieldsRDD: RDD[(ItemID, PropertyMap)] = PEventStore.aggregateProperties(
       appName = dsp.appName,
-      entityType = "item"
-    )(sc)
+      entityType = "item")(sc)
 
     // Have a list of (actionName, RDD), for each action
     // todo: some day allow data to be content, which requires rethinking how to use EventStore
@@ -92,16 +86,14 @@ class DataSource(val dsp: DataSourceParams)
   }
 }
 
-/**
- * Low level RDD based representation of the data ready for the Preparator
+/** Low level RDD based representation of the data ready for the Preparator
  *
- * @param actions List of Tuples (actionName, actionRDD)qw
- * @param fieldsRDD RDD of item keyed PropertyMap for item metadata
+ *  @param actions List of Tuples (actionName, actionRDD)qw
+ *  @param fieldsRDD RDD of item keyed PropertyMap for item metadata
  */
 case class TrainingData(
-    actions: Seq[(ActionID, RDD[(String, String)])],
-    fieldsRDD: RDD[(ItemID, PropertyMap)]
-) extends Serializable {
+  actions: Seq[(ActionID, RDD[(String, String)])],
+  fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable {
 
   override def toString: String = {
     val a = actions.map { t =>

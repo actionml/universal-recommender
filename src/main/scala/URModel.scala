@@ -30,24 +30,22 @@ import org.template.conversions.{ IndexedDatasetConversions, ItemID }
 
 /** Universal Recommender models to save in ES */
 class URModel(
-    coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
-    fieldsRDD: RDD[(String, DataMap)],
-    propertiesRDD: RDD[Map[String, AnyRef]],
-    typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
-    nullModel: Boolean = false
-) {
+  coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
+  fieldsRDD: RDD[(String, DataMap)],
+  propertiesRDD: RDD[Map[String, AnyRef]],
+  typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
+  nullModel: Boolean = false) {
+
   @transient lazy val logger: Logger = Logger[this.type]
 
-  /**
-   * Save all fields to be indexed by Elasticsearch and queried for recs
-   * This will is something like a table with row IDs = item IDs and separate fields for all
-   * cooccurrence and cross-cooccurrence correlators and metadata for each item. Metadata fields are
-   * limited to text term collections so vector types. Scalar values can be used but depend on
-   * Elasticsearch's support. One exception is the Data scalar, which is also supported
-   * @param params from engine.json, algorithm control params
-   * @return always returns true since most other reasons to not save cause exceptions
+  /** Save all fields to be indexed by Elasticsearch and queried for recs
+   *  This will is something like a table with row IDs = item IDs and separate fields for all
+   *  cooccurrence and cross-cooccurrence correlators and metadata for each item. Metadata fields are
+   *  limited to text term collections so vector types. Scalar values can be used but depend on
+   *  Elasticsearch's support. One exception is the Data scalar, which is also supported
+   *  @return always returns true since most other reasons to not save cause exceptions
    */
-  def save(params: URAlgorithmParams): Boolean = {
+  def save(dateNames: Seq[String], esIndex: String, esType: String): Boolean = {
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
@@ -55,52 +53,37 @@ class URModel(
     // convert cooccurrence matrices into correlators as RDD[(itemID, (actionName, Seq[itemID])]
     // do they need to be in Elasticsearch format
     logger.info("Converting cooccurrence matrices into correlators")
-    val correlators: Seq[RDD[(String, Map[String, Any])]] = coocurrenceMatrices.map {
+    val correlators: Seq[RDD[(ItemID, Map[String, Any])]] = coocurrenceMatrices.map {
       case (actionName, dataset) =>
-        dataset.asInstanceOf[IndexedDatasetSpark].toStringMapRDD(actionName).asInstanceOf[RDD[(String, Map[String, Any])]]
+        dataset.asInstanceOf[IndexedDatasetSpark].toStringMapRDD(actionName).asInstanceOf[RDD[(ItemID, Map[String, Any])]]
     }
 
-    val dateNames = Seq(params.dateName, params.availableDateName, params.expireDateName).collect { case Some(date) => date }.distinct
     logger.info(s"Ready to pass date fields names to closure $dateNames")
     // convert the PropertyMap into Map[String, Seq[String]] for ES
     logger.info("Converting PropertyMap into Elasticsearch style rdd")
 
-    val properties: RDD[(String, Map[String, Any])] = fieldsRDD.map {
-      case (item, pm) =>
-        var m: Map[String, Any] = Map()
-        for (key <- pm.keySet) {
-          try {
-            // if we get something unexpected, add ignore and add nothing to the map
-            pm.get[JValue](key) match {
-              case JArray(list) => // assumes all lists are string tokens for bias
-                val l = list.map {
-                  case JString(s) => s
-                  case _ => ""
-                }
-                m = m + (key -> l)
-              case JString(s) => // name for this field is in engine params
-                if (dateNames.contains(key)) {
-                  // one of the date fields
-                  val dateTime = new DateTime(s)
-                  val date: java.util.Date = dateTime.toDate
-                  m = m + (key -> date)
-                }
-                if (BackfillFieldName.toSeq.contains(key)) {
-                  m = m + (key -> s.toDouble)
-                }
-              case JDouble(rank) => // only the ranking double from PopModel should be here
-                m = m + (key -> rank)
-              case JInt(someInt) => // not sure what this is but pass it on
-                m = m + (key -> someInt)
-            }
-          } catch {
-            case e: ClassCastException => e
-            case e: IllegalArgumentException => e
-            case e: MatchError => e
-            //got something we didn't expect so ignore it, put nothing in the map
+    val properties: RDD[(ItemID, Map[String, Any])] = fieldsRDD.map {
+      case (item, dataMap) => (item, dataMap.fields.collect {
+        case (fieldName, jvalue) =>
+          jvalue match {
+            case JArray(list) => fieldName -> list.collect { case JString(s) => s }
+            case JString(s) => // name for this field is in engine params
+              if (dateNames.contains(fieldName)) {
+                // one of the date fields
+                val date: java.util.Date = new DateTime(s).toDate
+                fieldName -> date
+              } else if (BackfillFieldName.toSeq.contains(fieldName)) {
+                fieldName -> s.toDouble
+              } else {
+                fieldName -> s
+              }
+            case JDouble(rank) => // only the ranking double from PopModel should be here
+              fieldName -> rank
+            case JInt(someInt) => // not sure what this is but pass it on
+              fieldName -> someInt
+            case _ => fieldName -> ""
           }
-        }
-        (item, m)
+      } /*filter { case (_, value) => value.isInstanceOf[String] && value.asInstanceOf[String].nonEmpty }*/ )
     }
 
     // getting action names since they will be ES fields
@@ -134,12 +117,11 @@ class URModel(
         // create a new index then hot-swap the new index by re-aliasing to it then delete old index
         logger.info("New data to index, performing a hot swap of the index.")
         EsClient.hotSwap(
-          params.indexName,
-          params.typeName,
+          esIndex,
+          esType,
           esFields.asInstanceOf[RDD[Map[String, AnyRef]]],
           allFields,
-          typeMappings
-        )
+          typeMappings)
       } else {
         logger.warn("No data to write. May have been caused by a failed or stopped `pio train`, try running it again")
       }
@@ -149,7 +131,7 @@ class URModel(
       // but to do a hotSwap we need to dup the entire index
 
       // create a new index then hot-swap the new index by re-aliasing to it then delete old index
-      EsClient.hotSwap(params.indexName, params.typeName, propertiesRDD, allFields, typeMappings)
+      EsClient.hotSwap(esIndex, esType, propertiesRDD, allFields, typeMappings)
     }
     true
   }
@@ -175,18 +157,17 @@ class URModel(
 object URModel {
   @transient lazy val logger: Logger = Logger[this.type]
 
-  /**
-   * This is actually only used to read saved values and since they are in Elasticsearch we don't need to read
-   * this means we create a null model since it will not be used.
-   * todo: we should rejigger the template framework so this is not required.
-   * @param id ignored
-   * @param params ignored
-   * @param sc ignored
-   * @return dummy null model
+  /** This is actually only used to read saved values and since they are in Elasticsearch we don't need to read
+   *  this means we create a null model since it will not be used.
+   *  todo: we should rejigger the template framework so this is not required.
+   *  @param id ignored
+   *  @param params ignored
+   *  @param sc ignored
+   *  @return dummy null model
    */
   def apply(id: String, params: URAlgorithmParams, sc: Option[SparkContext]): URModel = {
     // todo: need changes in PIO to remove the need for this
-    val urm = new URModel(null, null, nullModel = true, null, null)
+    val urm = new URModel(null, null, null, null, nullModel = true)
     logger.info("Created dummy null model")
     urm
   }

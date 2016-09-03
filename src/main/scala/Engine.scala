@@ -19,15 +19,13 @@ package org.template
 
 import io.prediction.controller.{ EmptyActualResult, EmptyEvaluationInfo, Engine, EngineFactory }
 
-/**
- * This file contains case classes that are used with reflection to specify how query and config
- * JSON is to be parsed. the Query case class, for instance defines the way a JSON query is to be
- * formed. The same for param case classes.
+/** This file contains case classes that are used with reflection to specify how query and config
+ *  JSON is to be parsed. the Query case class, for instance defines the way a JSON query is to be
+ *  formed. The same for param case classes.
  */
 
-/**
- * The Query spec with optional values. The only hard rule is that there must be either a user or
- * an item id. All other values are optional.
+/** The Query spec with optional values. The only hard rule is that there must be either a user or
+ *  an item id. All other values are optional.
  */
 case class Query(
   user: Option[String] = None, // must be a user or item id
@@ -63,14 +61,12 @@ case class DateRange(
 
 /** results of a MMRAlgoritm.predict */
 case class PredictedResult(
-  itemScores: Array[ItemScore]
-) extends Serializable
+  itemScores: Array[ItemScore]) extends Serializable
 
 case class ItemScore(
   item: String, // item id
   score: Double, // used to rank, original score returned from teh search engine
-  ranks: Option[Map[String, Double]] = None
-) extends Serializable
+  ranks: Option[Map[String, Double]] = None) extends Serializable
 
 object RecommendationEngine extends EngineFactory {
   def apply(): Engine[TrainingData, EmptyEvaluationInfo, PreparedData, Query, PredictedResult, EmptyActualResult] = {
@@ -78,7 +74,6 @@ object RecommendationEngine extends EngineFactory {
       classOf[DataSource],
       classOf[Preparator],
       Map("ur" -> classOf[URAlgorithm]), // IMPORTANT: "ur" must be the "name" of the parameter set in engine.json
-      classOf[Serving]
-    )
+      classOf[Serving])
   }
 }

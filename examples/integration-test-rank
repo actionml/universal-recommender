@@ -98,17 +98,18 @@ echo -e "Restoring engine.json"
 echo -e "${LINE}${NC}"
 mv user-engine.json engine.json
 
-echo -e "${GREEN}${LINE}"
-echo -e "Differences between expected and actual results, none is a passing test."
-echo -e "Note: differences in ordering of results with the same score is allowed."
-echo -e "${LINE}${NC}"
-diff data/rank-test-query-expected.txt rank-query-test-result.out
-
 deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
 echo -e "${GREEN}${LINE}"
 echo -e "Killing the deployed test PredictionServer"
 echo -e "${LINE}${NC}"
 kill "$deploy_pid"
+
+echo -e "${YELLOW}${LINE}"
+echo -e "Differences between expected and actual results, none is a passing test."
+echo -e "Note: differences in ordering of results with the same score is allowed."
+echo -e "${LINE}"
+diff data/rank-test-query-expected.txt rank-query-test-result.out
+echo -e "${LINE}${NC}"
 
 
 

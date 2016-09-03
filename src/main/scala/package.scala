@@ -64,8 +64,7 @@ package object conversions {
          |$preparedTitle
          |$data
          |╚$line╝
-         |""".stripMargin
-    )
+         |""".stripMargin)
 
   }
 

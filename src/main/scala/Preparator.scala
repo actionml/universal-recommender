@@ -26,14 +26,13 @@ import org.apache.spark.rdd.RDD
 import org.template.conversions._
 
 class Preparator
-    extends PPreparator[TrainingData, PreparedData] {
+  extends PPreparator[TrainingData, PreparedData] {
 
-  /**
-   * Create [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]] rdd backed
-   * "distributed row matrices" from the input string keyed rdds.
-   * @param sc Spark context
-   * @param trainingData list of (actionName, actionRDD)
-   * @return list of (correlatorName, correlatorIndexedDataset)
+  /** Create [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]] rdd backed
+   *  "distributed row matrices" from the input string keyed rdds.
+   *  @param sc Spark context
+   *  @param trainingData list of (actionName, actionRDD)
+   *  @return list of (correlatorName, correlatorIndexedDataset)
    */
   def prepare(sc: SparkContext, trainingData: TrainingData): PreparedData = {
     // now that we have all actions in separate RDDs we must merge any user dictionaries and
@@ -69,5 +68,4 @@ class Preparator
 
 case class PreparedData(
   actions: Seq[(ActionID, IndexedDataset)],
-  fieldsRDD: RDD[(ItemID, PropertyMap)]
-) extends Serializable
+  fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable
