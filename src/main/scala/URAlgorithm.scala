@@ -401,11 +401,11 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val (queryStr, blacklist) = buildQuery(ap, query, backfillFieldNames)
     val searchHitsOpt = EsClient.search(queryStr, esIndex)
 
-    val addRankFields = query.addRank.getOrElse(false)
+    val withRanks = query.withRanks.getOrElse(false)
     val predictedResult = searchHitsOpt match {
       case Some(searchHits) =>
         val recs = searchHits.getHits.map { hit =>
-          if (addRankFields) {
+          if (withRanks) {
             val source = hit.getSource
             val ranks: Map[String, Double] = backfillsParams map { backfillParams =>
               val backfillType = backfillParams.`type`.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)

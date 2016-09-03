@@ -18,6 +18,7 @@
 package org.template
 
 import io.prediction.controller.{ EmptyActualResult, EmptyEvaluationInfo, Engine, EngineFactory }
+import org.template.conversions.ItemID
 
 /** This file contains case classes that are used with reflection to specify how query and config
  *  JSON is to be parsed. the Query case class, for instance defines the way a JSON query is to be
@@ -41,7 +42,7 @@ case class Query(
   // to what is in the algorithm params or false
   num: Option[Int] = None, // default: whatever is in algorithm params, which itself has a default--probably 20
   eventNames: Option[List[String]], // names used to ID all user actions
-  addRank: Option[Boolean] = None // Add to ItemScore rank fields values
+  withRanks: Option[Boolean] = None // Add to ItemScore rank fields values, default fasle
 ) extends Serializable
 
 /** Used to specify how Fields are represented in engine.json */
@@ -60,11 +61,10 @@ case class DateRange(
 ) extends Serializable
 
 /** results of a MMRAlgoritm.predict */
-case class PredictedResult(
-  itemScores: Array[ItemScore]) extends Serializable
+case class PredictedResult(itemScores: Array[ItemScore]) extends Serializable
 
 case class ItemScore(
-  item: String, // item id
+  item: ItemID, // item id
   score: Double, // used to rank, original score returned from teh search engine
   ranks: Option[Map[String, Double]] = None) extends Serializable
 
