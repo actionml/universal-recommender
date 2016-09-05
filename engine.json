@@ -27,7 +27,17 @@
         "indexName": "urindex",
         "typeName": "items",
         "comment": "must have data for the first event or the model will not build, other events are optional",
-        "eventNames": ["purchase", "view"]
+        "eventNames": ["purchase", "view"],
+        "indicators":[
+          {
+            "eventName": "purchase"
+          },
+          {
+            "eventName": "view",
+            "maxCorrelatorsPerItem": 1
+          }
+        ],
+        "num": 4
       }
     }
   ]

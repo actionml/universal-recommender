@@ -23,7 +23,8 @@ import io.prediction.controller.Params
 import io.prediction.data
 import io.prediction.data.storage.{NullModel, PropertyMap, Event}
 import io.prediction.data.store.LEventStore
-import org.apache.mahout.math.cf.SimilarityAnalysis
+import org.apache.mahout.math.cf._
+import org.apache.mahout.math.indexeddataset.IndexedDataset
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
@@ -107,6 +108,12 @@ case class BackfillField(
   duration: Option[String] = None) // duration worth of events
   // to use in calculation of backfill
 
+case class IndicatorParams(
+  eventName: String, // must match one in eventNames
+  maxItemsPerUser: Option[Int], // defaults to maxEventsPerEventType
+  maxCorrelatorsPerItem: Option[Int], // defaults to maxCorrelatorsPerEventType
+  minLLR: Option[Double]) // defaults to none, takes precendence over maxCorrelatorsPerItem
+
 case class URAlgorithmParams(
   appName: String, // filled in from engine.json
   indexName: String, // can optionally be used to specify the elasticsearch index name
@@ -131,6 +138,7 @@ case class URAlgorithmParams(
   expireDateName: Option[String] = None,
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
+  indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
   seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducible unless supplied
 
@@ -183,14 +191,35 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
     val nonDefaultMappings = Map(backfillParams.name.getOrElse(defaultURAlgorithmParams.DefaultBackfillFieldName) -> "float")
+
     logger.info("Actions read now creating correlators")
-    val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
-      data.actions.map(_._2).toArray,
-      randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
-      maxInterestingItemsPerThing = ap.maxCorrelatorsPerEventType
-        .getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
-      maxNumInteractions = ap.maxEventsPerEventType.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType))
-      .map(_.asInstanceOf[IndexedDatasetSpark]) // strip action names
+    val cooccurrenceIDSs = if( ap.indicators.isEmpty) { // using one global set of algo params
+      SimilarityAnalysis.cooccurrencesIDSs(
+        data.actions.map(_._2).toArray,
+        randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
+        maxInterestingItemsPerThing = ap.maxCorrelatorsPerEventType
+          .getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+        maxNumInteractions = ap.maxEventsPerEventType.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType))
+      .map(_.asInstanceOf[IndexedDatasetSpark])
+    } else { // using params per matrix pair, these take the place of eventNames, maxCorrelatorsPerEventType,
+      // and maxEventsPerEventType!
+      val indicators = ap.indicators.get
+      val iDs = data.actions.map(_._2).toSeq
+
+      val datasets = iDs.zipWithIndex.map { case (iD, i) =>
+        new DownsamplableCrossOccurrenceDataset(
+          iD,
+          indicators(i).maxItemsPerUser.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType),
+          indicators(i).maxCorrelatorsPerItem.getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+          indicators(i).minLLR)
+      }.toList
+
+      SimilarityAnalysis.crossOccurrenceDownsampled(
+        datasets,
+        ap.seed.getOrElse(System.currentTimeMillis()).toInt)
+      .map(_.asInstanceOf[IndexedDatasetSpark])
+    }
+
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     val popModel = if (popular) {
