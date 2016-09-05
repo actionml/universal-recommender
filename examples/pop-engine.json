@@ -30,7 +30,7 @@
         "recsModel": "backfill",
         "backfills": [{
           "name": "popRank",
-          "backfillType": "popular",
+          "type": "popular",
           "eventNames": ["purchase", "view"],
           "duration": 259200
         }]

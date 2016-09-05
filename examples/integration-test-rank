@@ -10,32 +10,33 @@ APP_ACCESS_KEY='123456789'
 
 LINE="=================================================================="
 # exit on any error
-set -e
+#set -e
 
-echo -e "${YELLOW}${LINE}"
+echo -e "${GREEN}${LINE}"
 echo -e "Integration test [Rank] for The Universal Recommender."
-echo -e "If some step fails check that your engine.json file has been restored"
-echo -e "or look for it in 'user-engine.json'"
+echo -e "If some step fails check that your engine.json file has been restored or look for it in 'user-engine.json'"
 echo -e "${LINE}${NC}"
 
+echo -e "${GREEN}${LINE}"
 echo -e "Checking for needed files"
+echo -e "${LINE}${NC}"
 if [ ! -f examples/rank-engine.json ]; then
-    echo -e "File not found: examples/rank-engine.json"
+    echo -e "${RED}File not found: examples/rank-engine.json${NC}"
     exit 1
 fi
 
 if [ ! -f data/sample-rank-data.txt ]; then
-    echo -e "File not found: data/sample-rank-data.txt"
+    echo -e "${RED}File not found: data/sample-rank-data.txt${NC}"
     exit 1
 fi
 
 if [ -f user-engine.json ]; then
-    echo -e "File user-engine.json found, this may be an error so we cannot replace engine.json"
+    echo -e "${RED}File user-engine.json found, this may be an error so we cannot replace engine.json${NC}"
     exit 1
 fi
 
 if [ ! -f data/rank-test-query-expected.txt ]; then
-    echo -e "File not found: data/rank-test-query-expected.txt"
+    echo -e "${RED}File not found: data/rank-test-query-expected.txt${NC}"
     exit 1
 fi
 
@@ -104,12 +105,19 @@ echo -e "Killing the deployed test PredictionServer"
 echo -e "${LINE}${NC}"
 kill "$deploy_pid"
 
-echo -e "${YELLOW}${LINE}"
-echo -e "Differences between expected and actual results, none is a passing test."
-echo -e "Note: differences in ordering of results with the same score is allowed."
-echo -e "${LINE}"
-diff data/rank-test-query-expected.txt rank-query-test-result.out
+DIFF_RESULT=`diff data/rank-test-query-expected.txt rank-query-test-result.out`
+
+if [[ -z "${DIFF_RESULT// }" ]]; then
+    echo -e "${GREEN}${LINE}"
+    echo -e "ALL TESTS PASS SUCCESS$"
+else
+    echo -e "${RED}${LINE}"
+    echo -e "ONE OR MORE TESTS FAILURE:"
+    echo -e "${LINE}"
+    echo ${DIFF_RESULT}
+fi
 echo -e "${LINE}${NC}"
+
 
 
 

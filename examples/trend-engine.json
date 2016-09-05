@@ -30,7 +30,7 @@
         "recsModel": "backfill",
         "backfills": [{
           "name": "trendRank",
-          "backfillType": "trending",
+          "type": "trending",
           "eventNames": ["purchase", "view"],
           "duration": 259200
         }]

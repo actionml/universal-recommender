@@ -30,7 +30,7 @@
         "recsModel": "backfill",
         "backfillField": {
           "name": "popRank",
-          "backfillType": "popular",
+          "type": "popular",
           "eventNames": ["purchase", "view"],
           "duration": 259200,
           "comment": "VERY IMPORTANT that the line below be set to today - 4 days for integration-test-pop-model",

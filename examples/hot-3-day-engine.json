@@ -26,10 +26,10 @@
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase"],
-        "backfillField": {
-          "backfillType": "hot",
+        "backfills": [{
+          "type": "hot",
           "duration": 259200
-        },
+        }]
       }
     }
   ]
