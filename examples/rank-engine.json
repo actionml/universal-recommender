@@ -28,7 +28,7 @@
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["show", "like"],
-        "backfills":[
+        "rankings":[
           {
             "name": "popularRank",
             "type": "popular",

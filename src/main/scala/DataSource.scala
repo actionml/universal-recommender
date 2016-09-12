@@ -42,8 +42,8 @@ case class DataSourceParams(
  *  @param dsp parameters taken from engine.json
  */
 class DataSource(val dsp: DataSourceParams)
-  extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult]
-  with SelfCleaningDataSource {
+    extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult]
+    with SelfCleaningDataSource {
 
   @transient override lazy val logger: Logger = Logger[this.type]
 
@@ -69,9 +69,8 @@ class DataSource(val dsp: DataSourceParams)
         eventName.equals(event.event)
       }.map { event =>
         (event.entityId, event.targetEntityId.get)
-      }.cache()
+      }
 
-      logger.debug(s"Action[$eventName] -> ${actionRDD.count()}")
       (eventName, actionRDD)
     } filterNot { case (_, actionRDD) => actionRDD.isEmpty() }
 
@@ -92,8 +91,8 @@ class DataSource(val dsp: DataSourceParams)
  *  @param fieldsRDD RDD of item keyed PropertyMap for item metadata
  */
 case class TrainingData(
-  actions: Seq[(ActionID, RDD[(String, String)])],
-  fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable {
+    actions: Seq[(ActionID, RDD[(String, String)])],
+    fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable {
 
   override def toString: String = {
     val a = actions.map { t =>

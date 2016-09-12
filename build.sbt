@@ -38,7 +38,7 @@ SbtScalariform.scalariformSettings
 
 ScalariformKeys.preferences := ScalariformKeys.preferences.value
   .setPreference(AlignSingleLineCaseStatements, true)
-  .setPreference(DoubleIndentClassDeclaration, false)
+  .setPreference(DoubleIndentClassDeclaration, true)
   .setPreference(DanglingCloseParenthesis, Prevent)
   .setPreference(MultilineScaladocCommentsStartOnFirstLine, true)
 

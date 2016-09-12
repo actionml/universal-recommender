@@ -29,7 +29,7 @@ import org.template.conversions.ItemID
 import scala.language.postfixOps
 import scala.util.Random
 
-object BackfillFieldName {
+object RankingFieldName {
   val UserRank = "userRank"
   val UniqueRank = "uniqueRank"
   val PopRank = "popRank"
@@ -40,7 +40,7 @@ object BackfillFieldName {
   override def toString: String = s"$UserRank, $UniqueRank, $PopRank, $TrendRank, $HotRank"
 }
 
-object BackfillType {
+object RankingType {
   val Popular = "popular"
   val Trending = "trending"
   val Hot = "hot"
@@ -80,16 +80,16 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
 
     // if None? debatable, this is either an error or may need to default to popular, why call popModel otherwise
     modelName match {
-      case BackfillType.Popular     => calcPopular(appName, eventNames, interval)
-      case BackfillType.Trending    => calcTrending(appName, eventNames, interval)
-      case BackfillType.Hot         => calcHot(appName, eventNames, interval)
-      case BackfillType.Random      => calcRandom(appName, eventNames, interval)
-      case BackfillType.UserDefined => sc.emptyRDD
-      case unknownBackfillType =>
+      case RankingType.Popular     => calcPopular(appName, eventNames, interval)
+      case RankingType.Trending    => calcTrending(appName, eventNames, interval)
+      case RankingType.Hot         => calcHot(appName, eventNames, interval)
+      case RankingType.Random      => calcRandom(appName, eventNames, interval)
+      case RankingType.UserDefined => sc.emptyRDD
+      case unknownRankingType =>
         logger.warn(
           s"""
-             |Bad backfills param type=[$unknownBackfillType] in engine definition params, possibly a bad json value.
-             |Use one of the available parameter values ($BackfillType).""".stripMargin)
+             |Bad rankings param type=[$unknownRankingType] in engine definition params, possibly a bad json value.
+             |Use one of the available parameter values ($RankingType).""".stripMargin)
         sc.emptyRDD
     }
 
@@ -112,11 +112,8 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
     appName: String,
     eventNames: Seq[String],
     interval: Interval)(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
-
-    val events = eventsRDD(appName, eventNames, interval)
-    events.map { e => (e.targetEntityId, e.event) }
-      .groupByKey()
-      .map { case (itemID, itEvents) => (itemID.get, itEvents.size.toFloat) }
+    eventsRDD(appName, eventNames, interval)
+      .map(_.targetEntityId.get -> 1f)
       .reduceByKey(_ + _) // make this a double in Elaseticsearch)
   }
 
@@ -211,10 +208,10 @@ object PopModel {
   def apply(fieldsRDD: RDD[(ItemID, PropertyMap)]): PopModel = new PopModel(fieldsRDD)
 
   val nameByType: Map[String, String] = Map(
-    BackfillType.Popular -> BackfillFieldName.PopRank,
-    BackfillType.Trending -> BackfillFieldName.TrendRank,
-    BackfillType.Hot -> BackfillFieldName.HotRank,
-    BackfillType.UserDefined -> BackfillFieldName.UserRank,
-    BackfillType.Random -> BackfillFieldName.UniqueRank).withDefaultValue(BackfillFieldName.UnknownRank)
+    RankingType.Popular -> RankingFieldName.PopRank,
+    RankingType.Trending -> RankingFieldName.TrendRank,
+    RankingType.Hot -> RankingFieldName.HotRank,
+    RankingType.UserDefined -> RankingFieldName.UserRank,
+    RankingType.Random -> RankingFieldName.UniqueRank).withDefaultValue(RankingFieldName.UnknownRank)
 
 }

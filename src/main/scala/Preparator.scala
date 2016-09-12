@@ -26,7 +26,7 @@ import org.apache.spark.rdd.RDD
 import org.template.conversions._
 
 class Preparator
-  extends PPreparator[TrainingData, PreparedData] {
+    extends PPreparator[TrainingData, PreparedData] {
 
   /** Create [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]] rdd backed
    *  "distributed row matrices" from the input string keyed rdds.
@@ -51,15 +51,12 @@ class Preparator
 
     // now make sure all matrices have identical row space since this corresponds to all users
     // todo: check to see that there are events in primary event IndexedDataset and abort if not.
-    val rowAdjustedIds = userDictionary match {
-      case Some(userDict) =>
-        val numUsers = userDict.size
-        indexedDatasets.map {
-          case (eventName, eventIDS) =>
-            (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs).newRowCardinality(numUsers))
-        }
-      case None => Seq.empty
-    }
+    val rowAdjustedIds = userDictionary map { userDict =>
+      indexedDatasets.map {
+        case (eventName, eventIDS) =>
+          (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs).newRowCardinality(userDict.size))
+      }
+    } getOrElse Seq.empty
 
     PreparedData(rowAdjustedIds, trainingData.fieldsRDD)
   }

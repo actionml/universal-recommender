@@ -26,7 +26,7 @@
         "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase"],
-        "backfills": [{
+        "rankings": [{
           "type": "hot",
           "duration": 259200
         }]

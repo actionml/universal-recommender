@@ -58,9 +58,9 @@ object defaultURAlgorithmParams {
   val DefaultAvailableDateName = "availableDate" //defualt name for and item's available after date
   val DefaultDateName = "date" // when using a date range in the query this is the name of the item's date
   val DefaultRecsModel = RecsModel.All // use CF + backfill
-  val DefaultBackfillParams = BackfillParams()
-  val DefaultBackfillFieldName = BackfillFieldName.PopRank
-  val DefaultBackfillType = BackfillType.Popular
+  val DefaultBackfillParams = RankingParams()
+  val DefaultBackfillFieldName = RankingFieldName.PopRank
+  val DefaultBackfillType = RankingType.Popular
   val DefaultBackfillDuration = "3650 days" // for all time
 
   val DefaultReturnSelf = false
@@ -141,7 +141,7 @@ case class URAlgorithmParams(
   returnSelf: Option[Boolean] = None, // query building logic defaults this to false
   fields: Option[Seq[Field]] = None, //defaults to no fields
   // leave out for default or popular
-  backfills: Option[Seq[BackfillParams]] = None,
+  rankings: Option[Seq[RankingParams]] = None,
   // name of date property field for when the item is available
   availableDateName: Option[String] = None,
   // name of date property field for when an item is no longer available
@@ -159,7 +159,7 @@ case class URAlgorithmParams(
  *  @param ap taken from engine.json to describe limits and event types
  */
 class URAlgorithm(val ap: URAlgorithmParams)
-  extends P2LAlgorithm[PreparedData, NullModel, Query, PredictedResult] {
+    extends P2LAlgorithm[PreparedData, NullModel, Query, PredictedResult] {
 
   @transient lazy implicit val logger: Logger = Logger[this.type]
 
@@ -189,7 +189,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   val maxEventsPerEventType: Int = ap.maxEventsPerEventType
     .getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType)
 
-  val backfillsParams: Seq[BackfillParams] = ap.backfills.getOrElse(Seq(BackfillParams(
+  val rankingsParams: Seq[RankingParams] = ap.rankings.getOrElse(Seq(RankingParams(
     name = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
     `type` = Some(defaultURAlgorithmParams.DefaultBackfillType),
     eventNames = Some(eventNames.take(1)),
@@ -201,7 +201,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ap.dateName,
     ap.availableDateName,
     ap.expireDateName).collect { case Some(date) => date } distinct
-  val backfillFieldNames: Seq[String] = backfillsParams.map(_.name).collect { case Some(name) => name } distinct
+  val backfillFieldNames: Seq[String] = rankingsParams.map(_.name).collect { case Some(name) => name } distinct
 
   val esIndex: String = ap.indexName
   val esType: String = ap.typeName
@@ -224,7 +224,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ("Max query events", maxQueryEvents),
     ("Limit", limit),
     ("══════════════════════════════", "════════════════════════════"),
-    ("Backfills:", "")) ++ backfillsParams.map(x => (x.`type`.get, x.name)))
+    ("Backfills:", "")) ++ rankingsParams.map(x => (x.`type`.get, x.name)))
 
   def train(sc: SparkContext, data: PreparedData): NullModel = {
 
@@ -407,7 +407,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         val recs = searchHits.getHits.map { hit =>
           if (withRanks) {
             val source = hit.getSource
-            val ranks: Map[String, Double] = backfillsParams map { backfillParams =>
+            val ranks: Map[String, Double] = rankingsParams map { backfillParams =>
               val backfillType = backfillParams.`type`.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)
               val backfillFieldName = backfillParams.name.getOrElse(PopModel.nameByType(backfillType))
               backfillFieldName -> source.get(backfillFieldName).asInstanceOf[Double]
@@ -440,14 +440,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
    */
   def getRanksRDD(fieldsRDD: RDD[(ItemID, PropertyMap)])(implicit sc: SparkContext): RDD[(ItemID, DataMap)] = {
     val popModel = PopModel(fieldsRDD)
-    val rankRDDs = backfillsParams map { backfillParams =>
+    val rankRDDs = rankingsParams map { backfillParams =>
       val backfillType = backfillParams.`type`.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)
       val backfillFieldName = backfillParams.name.getOrElse(PopModel.nameByType(backfillType))
       val durationAsString = backfillParams.duration.getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration)
       val duration = Duration(durationAsString).toSeconds.toInt
       val backfillEvents = backfillType match {
-        case BackfillType.Random => backfillParams.eventNames.getOrElse(eventNames)
-        case _                   => backfillParams.eventNames.getOrElse(eventNames.take(1))
+        case RankingType.Random => eventNames
+        case _                  => backfillParams.eventNames.getOrElse(eventNames.take(1))
       }
       val offsetDate = backfillParams.offsetDate
       val rankRdd = popModel.calc(modelName = backfillType, eventNames = backfillEvents, appName, duration, offsetDate)
@@ -490,7 +490,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val numRecs = query.num.getOrElse(limit)
       val should = buildQueryShould(query, boostable)
       val must = buildQueryMust(query, boostable)
-      val mustNot = buildQueryMastNot(query, events)
+      val mustNot = buildQueryMustNot(query, events)
       val sort = buildQuerySort()
 
       val json =
@@ -580,7 +580,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   }
 
   /** Build not must query part */
-  def buildQueryMastNot(query: Query, events: Seq[Event]): JValue = {
+  def buildQueryMustNot(query: Query, events: Seq[Event]): JValue = {
     val mustNotFields: JValue = render("ids" -> ("values" -> getExcludedItems(events, query)) ~ ("boost" -> 0))
     mustNotFields
   }

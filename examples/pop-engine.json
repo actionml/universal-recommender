@@ -28,7 +28,7 @@
         "typeName": "items",
         "eventNames": ["purchase", "view"],
         "recsModel": "backfill",
-        "backfills": [{
+        "rankings": [{
           "name": "popRank",
           "type": "popular",
           "eventNames": ["purchase", "view"],

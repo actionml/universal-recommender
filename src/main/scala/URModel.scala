@@ -30,11 +30,11 @@ import org.template.conversions.{ IndexedDatasetConversions, ItemID }
 
 /** Universal Recommender models to save in ES */
 class URModel(
-  coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
-  fieldsRDD: RDD[(String, DataMap)],
-  propertiesRDD: RDD[Map[String, Any]],
-  typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
-  nullModel: Boolean = false) {
+    coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
+    fieldsRDD: RDD[(String, DataMap)],
+    propertiesRDD: RDD[Map[String, Any]],
+    typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
+    nullModel: Boolean = false) {
 
   @transient lazy val logger: Logger = Logger[this.type]
 
@@ -72,7 +72,7 @@ class URModel(
                 // one of the date fields
                 val date: java.util.Date = new DateTime(s).toDate
                 fieldName -> date
-              } else if (BackfillFieldName.toSeq.contains(fieldName)) {
+              } else if (RankingFieldName.toSeq.contains(fieldName)) {
                 fieldName -> s.toDouble
               } else {
                 fieldName -> s
