@@ -112,8 +112,11 @@ class PopModel(fieldsRDD: RDD[(ItemID, PropertyMap)]) {
     appName: String,
     eventNames: Seq[String],
     interval: Interval)(implicit sc: SparkContext): RDD[(ItemID, Float)] = {
-    eventsRDD(appName, eventNames, interval)
-      .map(_.targetEntityId.get -> 1f)
+
+    val events = eventsRDD(appName, eventNames, interval)
+    events.map { e => (e.targetEntityId, e.event) }
+      .groupByKey()
+      .map { case (itemID, itEvents) => (itemID.get, itEvents.size.toFloat) }
       .reduceByKey(_ + _) // make this a double in Elaseticsearch)
   }
 
