@@ -5,7 +5,6 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "name": "sample-handmade-data4.txt",
       "appName": "default-rank",
       "eventNames": ["show", "like"]
     }
@@ -20,27 +19,17 @@
   },
   "algorithms": [
     {
-      "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
       "name": "ur",
       "params": {
-        "comment": "must have data for the first event or the model will not build, other events are optional",
         "appName": "default-rank",
         "indexName": "urindex",
         "typeName": "items",
+        "recsModel": "backfill",
         "eventNames": ["show", "like"],
         "rankings":[
           {
-            "name": "popularRank",
-            "type": "popular",
-            "eventNames": ["show", "like"],
-            "duration": "3650 days",
-            "endDate": "ISO8601-date"
-          },{
             "name": "defaultRank",
             "type": "userDefined"
-          },{
-            "name": "uniqueRank",
-            "type": "random"
           }
         ]
       }

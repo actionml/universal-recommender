@@ -18,7 +18,6 @@
 package org.template
 
 import io.prediction.controller.PPreparator
-import io.prediction.data.storage.PropertyMap
 import org.apache.mahout.math.indexeddataset.{ BiDictionary, IndexedDataset }
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
@@ -58,11 +57,14 @@ class Preparator
       }
     } getOrElse Seq.empty
 
-    PreparedData(rowAdjustedIds, trainingData.fieldsRDD)
+    val fieldsRDD: RDD[(ItemID, ItemProps)] = trainingData.fieldsRDD.map {
+      case (itemId, propMap) => itemId -> propMap.fields
+    }
+    PreparedData(rowAdjustedIds, fieldsRDD)
   }
 
 }
 
 case class PreparedData(
   actions: Seq[(ActionID, IndexedDataset)],
-  fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable
+  fieldsRDD: RDD[(ItemID, ItemProps)]) extends Serializable

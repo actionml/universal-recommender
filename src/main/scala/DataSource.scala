@@ -25,6 +25,7 @@ import io.prediction.core.{ EventWindow, SelfCleaningDataSource }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.template.conversions.{ ActionID, ItemID }
+import org.template.conversions._
 
 /** Taken from engine.json these are passed in to the DataSource constructor
  *
@@ -45,10 +46,16 @@ class DataSource(val dsp: DataSourceParams)
     extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult]
     with SelfCleaningDataSource {
 
-  @transient override lazy val logger: Logger = Logger[this.type]
+  @transient override lazy implicit val logger: Logger = Logger[this.type]
 
   override def appName: String = dsp.appName
   override def eventWindow: Option[EventWindow] = dsp.eventWindow
+
+  drawInfo("Init DataSource", Seq(
+    ("══════════════════════════════", "════════════════════════════"),
+    ("App name", appName),
+    ("Event window", eventWindow),
+    ("Event names", dsp.eventNames)))
 
   /** Reads events from PEventStore and create and RDD for each */
   override def readTraining(sc: SparkContext): TrainingData = {
@@ -62,7 +69,7 @@ class DataSource(val dsp: DataSourceParams)
       targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
 
     // now separate the events by event name
-    val actionRDDs = eventNames.map { eventName =>
+    val actionRDDs: List[(ActionID, RDD[(UserID, ItemID)])] = eventNames.map { eventName =>
       val actionRDD = eventsRDD.filter { event =>
         require(eventNames.contains(event.event), s"Unexpected event $event is read.") // is this really needed?
         require(event.entityId.nonEmpty && event.targetEntityId.get.nonEmpty, "Empty user or item ID")
@@ -74,10 +81,13 @@ class DataSource(val dsp: DataSourceParams)
       (eventName, actionRDD)
     } filterNot { case (_, actionRDD) => actionRDD.isEmpty() }
 
+    logger.debug(s"Received actions for events ${actionRDDs.map(_._1)}")
+
     // aggregating all $set/$unsets for metadata fields, which are attached to items
     val fieldsRDD: RDD[(ItemID, PropertyMap)] = PEventStore.aggregateProperties(
       appName = dsp.appName,
       entityType = "item")(sc)
+    //    logger.debug(s"FieldsRDD\n${fieldsRDD.take(25).mkString("\n")}")
 
     // Have a list of (actionName, RDD), for each action
     // todo: some day allow data to be content, which requires rethinking how to use EventStore
@@ -91,7 +101,7 @@ class DataSource(val dsp: DataSourceParams)
  *  @param fieldsRDD RDD of item keyed PropertyMap for item metadata
  */
 case class TrainingData(
-    actions: Seq[(ActionID, RDD[(String, String)])],
+    actions: Seq[(ActionID, RDD[(UserID, ItemID)])],
     fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable {
 
   override def toString: String = {

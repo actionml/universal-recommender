@@ -28,50 +28,48 @@ def import_events(client, file):
   expire_date = event_date + datetime.timedelta(days=2)
   print "Importing data..."
 
+  items = set()
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
     # For demonstration purpose action names are taken from input along with secondary actions on
     # For the UR add some item metadata
 
-    if data[1] == "show":
-      client.create_event(
-        event=data[1],
-        entity_type="user",
-        entity_id=data[0],
-        target_entity_type="item",
-        target_entity_id=data[2],
-        event_time = current_date
-      )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
-            " current_date: " + current_date.isoformat()
-    elif data[1] == "like":  # assumes other event type is 'view'
-      client.create_event(
-        event=data[1],
-        entity_type="user",
-        entity_id=data[0],
-        target_entity_type="item",  # type of item in this action
-        target_entity_id=data[2],
-        event_time=current_date
-      )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
-            " current_date: " + current_date.isoformat()
-    elif data[1] == "$set":  # must be a set event
-      properties = data[2].split(PROPERTIES_DELIMITER)
-      prop_name = properties.pop(0)
-      prop_value = properties if not prop_name == 'defaultRank' else float(properties[0])
-      client.create_event(
-        event=data[1],
-        entity_type="item",
-        entity_id=data[0],
-        event_time=current_date,
-        properties={prop_name: prop_value}
-      )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/"+prop_name+": " + str(prop_value) + \
-          " current_date: " + current_date.isoformat()
+    action = data[1]
+    if action in ('$set', '$unset', '$delete'):
+        item_id = data[0]
+        items.add(item_id)
+        properties = data[2].split(PROPERTIES_DELIMITER)
+        prop_name = properties.pop(0)
+        prop_value = properties if not prop_name == 'defaultRank' else float(
+            properties[0])
+        client.create_event(
+            event=action,
+            entity_type="item",
+            entity_id=item_id,
+            event_time=current_date,
+            properties={prop_name: prop_value}
+        )
+        print(
+            'Event: {0} entity_id: {1} properties/{2}: {3} current_date: {4}'.format(
+                action, item_id, prop_name, str(prop_value),current_date.isoformat()))
+
+    else:
+        user_id = data[0]
+        item_id = data[2]
+        client.create_event(
+            event=action,
+            entity_type="user",
+            entity_id=user_id,
+            target_entity_type="item",
+            target_entity_id=item_id,
+            event_time=current_date
+        )
+        print(
+            'Event: {0} entity_id: {1} target_entity_id: {2} current_date: {3}'
+            .format(action, item_id, item_id, current_date.isoformat()))
     count += 1
     current_date += event_time_increment
 
-  items = ['product-1', 'product-2', 'product-3', 'product-4', 'product-5', 'product-6', 'product-7']
   print "All items: " + str(items)
   for item in items:
 

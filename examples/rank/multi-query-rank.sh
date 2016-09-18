@@ -21,7 +21,6 @@ curl -H "Content-Type: application/json" -d '
 }' http://localhost:8000/queries.json
 echo ""
 
-
 echo ""
 echo "Recommendations for user: user-2"
 echo ""
@@ -30,7 +29,6 @@ curl -H "Content-Type: application/json" -d '
     "user": "user-2"
 }' http://localhost:8000/queries.json
 echo ""
-
 
 echo ""
 echo "Recommendations for user: user-3"
@@ -41,7 +39,6 @@ curl -H "Content-Type: application/json" -d '
 }' http://localhost:8000/queries.json
 echo ""
 
-
 echo ""
 echo "Recommendations for user: user-4"
 echo ""
@@ -50,7 +47,6 @@ curl -H "Content-Type: application/json" -d '
     "user": "user-4"
 }' http://localhost:8000/queries.json
 echo ""
-
 
 echo ""
 echo "Recommendations for user: user-5"

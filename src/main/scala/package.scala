@@ -18,17 +18,22 @@
 package org.template
 
 import grizzled.slf4j.Logger
+
 import scala.collection.JavaConversions._
 import org.apache.mahout.sparkbindings.SparkDistributedContext
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.mahout.sparkbindings._
 import org.apache.spark.rdd.RDD
+import org.json4s._
 
 /** Utility conversions for IndexedDatasetSpark */
 package object conversions {
 
-  type ItemID = String
+  type UserID = String
   type ActionID = String
+  type ItemID = String
+  // Item properties (fieldName, fieldValue)
+  type ItemProps = Map[String, JValue]
 
   def drawActionML(implicit logger: Logger): Unit = {
     val actionML =
@@ -75,7 +80,7 @@ package object conversions {
   }
 
   implicit class IndexedDatasetConversions(val indexedDataset: IndexedDatasetSpark) {
-    def toStringMapRDD(actionName: String): RDD[(String, Map[String, Seq[String]])] = {
+    def toStringMapRDD(actionName: ActionID): RDD[(ItemID, ItemProps)] = {
       @transient lazy val logger = Logger[this.type]
 
       //val matrix = indexedDataset.matrix.checkpoint()
@@ -88,7 +93,7 @@ package object conversions {
 
       // may want to mapPartition and create bulk updates as a slight optimization
       // creates an RDD of (itemID, Map[correlatorName, list-of-correlator-values])
-      indexedDataset.matrix.rdd.map[(String, Map[String, Seq[String]])] {
+      indexedDataset.matrix.rdd.map[(ItemID, ItemProps)] {
         case (rowNum, itemVector) =>
 
           // turn non-zeros into list for sorting
@@ -106,15 +111,15 @@ package object conversions {
             require(vector.nonEmpty, s"No values so skipping item $rowNum")
 
             // create a list of element ids
-            val values = vector.map { item =>
-              columnIDDictionary_bcast.value.inverse.getOrElse(item._1, "") // should always be in the dictionary
-            }
+            val values = JArray(vector.map { item =>
+              JString(columnIDDictionary_bcast.value.inverse.getOrElse(item._1, "")) // should always be in the dictionary
+            })
 
             (itemID, Map(actionName -> values))
 
           } catch {
             case cce: IllegalArgumentException => //non-fatal, ignore line
-              null.asInstanceOf[(String, Map[String, Seq[String]])]
+              null.asInstanceOf[(ItemID, ItemProps)]
           }
 
       }.filter(_ != null)

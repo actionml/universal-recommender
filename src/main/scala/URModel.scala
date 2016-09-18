@@ -26,15 +26,14 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
-import org.template.conversions.{ IndexedDatasetConversions, ItemID }
+import org.template.conversions.{ IndexedDatasetConversions, ItemID, ItemProps }
 
 /** Universal Recommender models to save in ES */
 class URModel(
     coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
-    fieldsRDD: RDD[(String, DataMap)],
-    propertiesRDD: RDD[Map[String, Any]],
+    propertiesRDDs: Seq[RDD[(ItemID, ItemProps)]] = Seq.empty,
     typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
-    nullModel: Boolean = false) {
+    nullModel: Boolean = false)(implicit sc: SparkContext) {
 
   @transient lazy val logger: Logger = Logger[this.type]
 
@@ -47,111 +46,45 @@ class URModel(
    */
   def save(dateNames: Seq[String], esIndex: String, esType: String): Boolean = {
 
+    logger.debug(s"Start save model")
+
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
     // for ES we need to create the entire index in an rdd of maps, one per item so we'll use
     // convert cooccurrence matrices into correlators as RDD[(itemID, (actionName, Seq[itemID])]
     // do they need to be in Elasticsearch format
     logger.info("Converting cooccurrence matrices into correlators")
-    val correlators: Seq[RDD[(ItemID, Map[String, Any])]] = coocurrenceMatrices.map {
+    val correlatorRDDs: Seq[RDD[(ItemID, ItemProps)]] = coocurrenceMatrices.map {
       case (actionName, dataset) =>
-        dataset.asInstanceOf[IndexedDatasetSpark].toStringMapRDD(actionName).asInstanceOf[RDD[(ItemID, Map[String, Any])]]
+        dataset.asInstanceOf[IndexedDatasetSpark].toStringMapRDD(actionName)
     }
 
-    logger.info(s"Ready to pass date fields names to closure $dateNames")
-    // convert the PropertyMap into Map[String, Seq[String]] for ES
-    logger.info("Converting PropertyMap into Elasticsearch style rdd")
+    logger.info("Group all properties RDD")
+    val groupedRDD: RDD[(ItemID, ItemProps)] = groupAll(correlatorRDDs ++ propertiesRDDs)
+    //    logger.debug(s"Grouped RDD\n${groupedRDD.take(25).mkString("\n")}")
 
-    val properties: RDD[(ItemID, Map[String, Any])] = fieldsRDD.map {
-      case (item, dataMap) => (item, dataMap.fields.collect {
-        case (fieldName, jvalue) =>
-          jvalue match {
-            case JArray(list) => fieldName -> list.collect { case JString(s) => s }
-            case JString(s) => // name for this field is in engine params
-              if (dateNames.contains(fieldName)) {
-                // one of the date fields
-                val date: java.util.Date = new DateTime(s).toDate
-                fieldName -> date
-              } else if (RankingFieldName.toSeq.contains(fieldName)) {
-                fieldName -> s.toDouble
-              } else {
-                fieldName -> s
-              }
-            case JDouble(rank) => // only the ranking double from PopModel should be here
-              fieldName -> rank
-            case JInt(someInt) => // not sure what this is but pass it on
-              fieldName -> someInt
-            case _ => fieldName -> ""
+    val esRDD: RDD[Map[String, Any]] = groupedRDD.mapPartitions { iter =>
+      iter map {
+        case (itemId, itemProps) =>
+          val propsMap = itemProps.map {
+            case (propName, propValue) =>
+              propName -> URModel.extractJvalue(dateNames, propName, propValue)
           }
-      } /*filter { case (_, value) => value.isInstanceOf[String] && value.asInstanceOf[String].nonEmpty }*/ )
-    }
-
-    // getting action names since they will be ES fields
-    logger.info(s"Getting a list of action name strings")
-    val allActions = coocurrenceMatrices.map { case (actionName, dataset) => actionName }
-
-    val allPropKeys: List[String] = properties
-      .flatMap { case (item, fieldMap) => fieldMap.keySet }
-      .distinct.collect().toList
-
-    // these need to be indexed with "not_analyzed" and no norms so have to
-    // collect all field names before ES index create
-    val allFields = (allActions ++ allPropKeys).distinct.toList // shouldn't need distinct but it's fast
-
-    if (propertiesRDD.isEmpty) {
-      // Elasticsearch takes a Map with all fields, not a tuple
-      logger.info("Grouping all correlators into doc + fields for writing to index")
-      logger.info(s"Finding non-empty RDDs from a list of ${correlators.length} correlators and " +
-        s"${properties.isEmpty()} properties")
-      val esRDDs: Seq[RDD[(String, Map[String, Any])]] =
-        //(correlators ::: properties).filterNot(c => c.isEmpty())// for some reason way too slow
-        correlators :+ properties
-      //c.take(1).length == 0
-      if (esRDDs.nonEmpty) {
-        val esFields = groupAll(esRDDs).map {
-          case (item, map) =>
-            // todo: every map's items must be checked for value type and converted before writing to ES
-            val esMap = map + ("id" -> item)
-            esMap
-        }
-        // create a new index then hot-swap the new index by re-aliasing to it then delete old index
-        logger.info("New data to index, performing a hot swap of the index.")
-        EsClient.hotSwap(
-          esIndex,
-          esType,
-          esFields.asInstanceOf[RDD[Map[String, Any]]],
-          allFields,
-          typeMappings)
-      } else {
-        logger.warn("No data to write. May have been caused by a failed or stopped `pio train`, try running it again")
+          propsMap + ("id" -> itemId)
       }
-
-    } else {
-      // this happens when updating only the popularity backfill model
-      // but to do a hotSwap we need to dup the entire index
-
-      // create a new index then hot-swap the new index by re-aliasing to it then delete old index
-      EsClient.hotSwap(esIndex, esType, propertiesRDD, allFields, typeMappings)
     }
+    //    logger.debug(s"ES RDD\n${esRDD.take(25).mkString("\n")}")
+
+    val esFields: List[String] = esRDD.flatMap(_.keySet).distinct().collect.toList
+    logger.info(s"ES fields[${esFields.size}]: $esFields")
+
+    EsClient.hotSwap(esIndex, esType, esRDD, esFields, typeMappings)
     true
   }
 
-  def groupAll(fields: Seq[RDD[(ItemID, (Map[String, Any]))]]): RDD[(ItemID, (Map[String, Any]))] = {
-    //if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
-    if (fields.size > 1) {
-      fields.head.cogroup[Map[String, Any]](groupAll(fields.drop(1))).map {
-        case (key, pairMapSeqs) =>
-          // to be safe merge all maps but should only be one per rdd element
-          val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Any])(_ ++ _)
-          val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Any])(_ ++ _)
-          val fullMap = rdd1Maps ++ rdd2Maps
-          (key, fullMap)
-      }
-    } else {
-      fields.head
-    }
+  def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
+    fields.fold(sc.emptyRDD[(ItemID, ItemProps)])(_ ++ _).reduceByKey(_ ++ _)
   }
-
 }
 
 object URModel {
@@ -167,9 +100,23 @@ object URModel {
    */
   def apply(id: String, params: URAlgorithmParams, sc: Option[SparkContext]): URModel = {
     // todo: need changes in PIO to remove the need for this
-    val urm = new URModel(null, null, null, null, nullModel = true)
-    logger.info("Created dummy null model")
-    urm
+    new URModel(null, null, null, nullModel = true)(sc.get)
+  }
+
+  def extractJvalue(dateNames: Seq[String], key: String, value: Any): Any = value match {
+    case JArray(list) => list.map(extractJvalue(dateNames, key, _))
+    case JString(s) =>
+      if (dateNames.contains(key)) {
+        new DateTime(s).toDate
+      } else if (RankingFieldName.toSeq.contains(key)) {
+        s.toDouble
+      } else {
+        s
+      }
+    case JDouble(double) => double
+    case JInt(int)       => int
+    case JBool(bool)     => bool
+    case _               => value
   }
 
 }

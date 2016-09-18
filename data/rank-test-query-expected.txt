@@ -82,7 +82,7 @@ Recommendations for no user no item, all from popularity, red color boost, S siz
 
 Recommendations for user: user-1
 
-{"itemScores":[{"item":"product-3","score":0.3595937192440033},{"item":"product-5","score":0.06365098059177399}]}
+{"itemScores":[{"item":"product-5","score":0.06365098059177399},{"item":"product-6","score":0.0}]}
 
 ============ query with item and user *EXPERIMENTAL* ============
 

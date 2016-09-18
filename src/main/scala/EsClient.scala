@@ -20,7 +20,7 @@ package org.template
 import java.util
 
 import grizzled.slf4j.Logger
-import io.prediction.data.storage.{ Storage, StorageClientConfig, elasticsearch }
+import io.prediction.data.storage._
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -37,6 +37,8 @@ import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
 import org.elasticsearch.node.NodeBuilder._
 import org.elasticsearch.search.SearchHits
+import org.json4s.JValue
+import org.template.conversions.{ ItemID, ItemProps }
 
 import scala.collection.immutable
 import scala.collection.parallel.mutable
@@ -137,6 +139,7 @@ object EsClient {
           mappings += (fieldName + mappingsField("string"))
       }
       mappings += mappingsTail // any other string is not_analyzed
+      //      logger.debug(s"ES mapping: $mappings")
 
       val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
       val create = client.admin().indices().create(cir).actionGet()
@@ -169,9 +172,12 @@ object EsClient {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
+
+    logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
     createIndex(newIndex, typeName, fieldNames, typeMappings)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
+    //    logger.debug(s"Save to ES[$newIndexURI]:\n${indexRDD.take(25).mkString("\n")}")
     indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
     //refreshIndex(newIndex)
 
@@ -272,9 +278,9 @@ object EsClient {
 
   def getRDD(
     alias: String,
-    typeName: String)(implicit sc: SparkContext): RDD[(String, Map[String, AnyRef])] = {
+    typeName: String)(implicit sc: SparkContext): RDD[(String, ItemProps)] = {
     getIndexName(alias)
-      .map(index => sc.esRDD(alias + "/" + typeName) map { case (key, map) => key -> map.toMap })
+      .map(index => sc.esJsonRDD(alias + "/" + typeName) map { case (itemId, json) => itemId -> DataMap(json).fields })
       .getOrElse(sc.emptyRDD)
   }
 }

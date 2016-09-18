@@ -17,8 +17,9 @@
 
 package org.template
 
+import grizzled.slf4j.Logger
 import io.prediction.controller.{ EmptyActualResult, EmptyEvaluationInfo, Engine, EngineFactory }
-import org.template.conversions.ItemID
+import org.template.conversions._
 
 /** This file contains case classes that are used with reflection to specify how query and config
  *  JSON is to be parsed. the Query case class, for instance defines the way a JSON query is to be
@@ -69,6 +70,10 @@ case class ItemScore(
   ranks: Option[Map[String, Double]] = None) extends Serializable
 
 object RecommendationEngine extends EngineFactory {
+
+  @transient lazy implicit val logger: Logger = Logger[this.type]
+  drawActionML
+
   def apply(): Engine[TrainingData, EmptyEvaluationInfo, PreparedData, Query, PredictedResult, EmptyActualResult] = {
     new Engine(
       classOf[DataSource],
