@@ -203,8 +203,7 @@ A full list of tuning and config parameters is below. See the field description 
                 },
                 {
                     "name": "uniqueRank"
-                    "type": "random",
-                    "eventNames": ["buy", "view"]
+                    "type": "random"
                 },
                 {
                     "name": "weightRank"
