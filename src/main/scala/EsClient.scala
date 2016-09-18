@@ -278,7 +278,7 @@ object EsClient {
 
   def getRDD(
     alias: String,
-    typeName: String)(implicit sc: SparkContext): RDD[(String, ItemProps)] = {
+    typeName: String)(implicit sc: SparkContext): RDD[(ItemID, ItemProps)] = {
     getIndexName(alias)
       .map(index => sc.esJsonRDD(alias + "/" + typeName) map { case (itemId, json) => itemId -> DataMap(json).fields })
       .getOrElse(sc.emptyRDD)
