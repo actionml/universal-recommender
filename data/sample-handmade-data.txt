@@ -93,3 +93,10 @@ Ipad-retina,$set,countries:United States:Estados Unidos Mexicanos
 Nexus,$set,countries:United States:Canada
 Galaxy,$set,countries:United States
 Surface,$set,countries:United States:Canada
+Iphone 6,$set,defaultRank:7
+Iphone 5,$set,defaultRank:6
+Iphone 4,$set,defaultRank:5
+Nexus,$set,defaultRank:4
+Ipad-retina,$set,defaultRank:3
+Galaxy,$set,defaultRank:2
+Surface,$set,defaultRank:1
