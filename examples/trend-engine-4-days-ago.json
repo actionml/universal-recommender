@@ -28,14 +28,14 @@
         "typeName": "items",
         "eventNames": ["purchase", "view"],
         "recsModel": "backfill",
-        "backfillField": {
+        "rankings": [{
           "name": "trendRank",
-          "backfillType": "trending",
+          "type": "trending",
           "eventNames": ["purchase", "view"],
           "duration": 259200,
           "comment": "VERY IMPORTANT that the line below be set to today - 4 days for integration-test-pop-model",
           "offsetDate": "2016-01-19T11:55:07Z"
-        }
+        }]
       }
     }
   ]

@@ -1,3 +1,7 @@
+import scalariform.formatter.preferences._
+import com.typesafe.sbt.SbtScalariform
+import com.typesafe.sbt.SbtScalariform.ScalariformKeys
+
 name := "template-scala-parallel-universal-recommendation"
 
 version := "0.3.0"
@@ -29,6 +33,14 @@ libraryDependencies ++= Seq(
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
 resolvers += Resolver.mavenLocal
+
+SbtScalariform.scalariformSettings
+
+ScalariformKeys.preferences := ScalariformKeys.preferences.value
+  .setPreference(AlignSingleLineCaseStatements, true)
+  .setPreference(DoubleIndentClassDeclaration, true)
+  .setPreference(DanglingCloseParenthesis, Prevent)
+  .setPreference(MultilineScaladocCommentsStartOnFirstLine, true)
 
 assemblyMergeStrategy in assembly := {
   case "plugin.properties" => MergeStrategy.discard

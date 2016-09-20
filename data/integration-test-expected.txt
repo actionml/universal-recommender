@@ -2,6 +2,7 @@
 Queries to illustrate many use cases on a small standard dataset and for an automated integration test.
 
 WARNING: for this to produce the correct result you must:
+  1. Import data with
      $ python examples/import_handmade.py --access_key <your-app-accesskey>
   2. Copy handmade-engine.json to engine.json.
   3. Run 'pio build', 'pio train', and 'pio deploy'

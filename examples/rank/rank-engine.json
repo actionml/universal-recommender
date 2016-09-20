@@ -5,14 +5,8 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "name": "sample-handmade-data.txt",
-      "appName": "handmade",
-      "eventNames": ["purchase", "view"],
-      "eventWindow": {
-        "duration": "24 days",
-        "removeDuplicates":true,
-        "compressProperties":true
-      }
+      "appName": "default-rank",
+      "eventNames": ["show", "like"]
     }
   },
   "sparkConf": {
@@ -28,15 +22,27 @@
       "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
       "name": "ur",
       "params": {
-        "appName": "handmade",
+        "comment": "must have data for the first event or the model will not build, other events are optional",
+        "appName": "default-rank",
         "indexName": "urindex",
         "typeName": "items",
-        "comment": "must have data for the first event or the model will not build, other events are optional",
-        "eventNames": ["purchase", "view"],
-        "availableDateName": "available",
-        "expireDateName": "expires",
-        "dateName": "date",
-        "num": 4
+        "recsModel": "all",
+        "eventNames": ["show", "like"],
+        "rankings":[
+          {
+            "name": "popularRank",
+            "type": "popular",
+            "eventNames": ["show", "like"],
+            "duration": "3650 days",
+            "endDate": "ISO8601-date"
+          },{
+            "name": "defaultRank",
+            "type": "userDefined"
+          },{
+            "name": "uniqueRank",
+            "type": "random"
+          }
+        ]
       }
     }
   ]
