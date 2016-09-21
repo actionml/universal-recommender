@@ -8,6 +8,11 @@
       "name": "sample-handmade-data.txt",
       "appName": "handmade",
       "eventNames": ["purchase", "view"]
+      "eventWindow": {
+        "duration": "24 days",
+        "removeDuplicates":true,
+        "compressProperties":true
+      }
     }
   },
   "sparkConf": {
@@ -15,7 +20,6 @@
     "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
     "spark.kryo.referenceTracking": "false",
     "spark.kryoserializer.buffer": "300m",
-    "spark.executor.memory": "4g",
     "es.index.auto.create": "true"
   },
   "algorithms": [
@@ -27,16 +31,16 @@
         "indexName": "urindex",
         "typeName": "items",
         "comment": "must have data for the first event or the model will not build, other events are optional",
-        "eventNames": ["purchase", "view"],
-        "indicators":[
+        "indicators": [
           {
-            "eventName": "purchase"
-          },
-          {
-            "eventName": "view",
-            "maxCorrelatorsPerItem": 1
+            "name": "purchase"
+          },{
+            "name": "view"
           }
         ],
+        "availableDateName": "available",
+        "expireDateName": "expires",
+        "dateName": "date",
         "num": 4
       }
     }
