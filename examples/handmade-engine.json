@@ -35,7 +35,8 @@
           {
             "name": "purchase"
           },{
-            "name": "view"
+            "name": "view",
+            "maxCorrelatorsPerItem": 50
           }
         ],
         "availableDateName": "available",

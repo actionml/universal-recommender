@@ -109,7 +109,7 @@ case class BackfillField(
   // to use in calculation of backfill
 
 case class IndicatorParams(
-  eventName: String, // must match one in eventNames
+  name: String, // must match one in eventNames
   maxItemsPerUser: Option[Int], // defaults to maxEventsPerEventType
   maxCorrelatorsPerItem: Option[Int], // defaults to maxCorrelatorsPerEventType
   minLLR: Option[Double]) // defaults to none, takes precendence over maxCorrelatorsPerItem
@@ -164,7 +164,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   } else {
     var eventNames = List.empty[String]
     ap.indicators.get.foreach { indicator =>
-      eventNames = eventNames :+ indicator.eventName
+      eventNames = eventNames :+ indicator.name
     }
     eventNames
   }
