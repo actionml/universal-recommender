@@ -32,3 +32,4 @@ product-2,$set,size:SX:XL
 product-3,$set,size:XL:X
 product-4,$set,size:X:XL:S
 product-5,$set,size:M:S:XS
+product-9,$set,size:M:S:XS

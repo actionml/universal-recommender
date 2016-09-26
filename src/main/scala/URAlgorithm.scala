@@ -23,7 +23,8 @@ import grizzled.slf4j.Logger
 import io.prediction.controller.{ P2LAlgorithm, Params }
 import io.prediction.data.storage.{ DataMap, Event, NullModel, PropertyMap }
 import io.prediction.data.store.LEventStore
-import org.apache.mahout.math.cf.SimilarityAnalysis
+import org.apache.mahout.math.cf.{ DownsamplableCrossOccurrenceDataset, SimilarityAnalysis }
+import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
@@ -38,7 +39,7 @@ import scala.concurrent.duration.Duration
 import scala.language.{ implicitConversions, postfixOps }
 
 /** Available value for algorithm param "RecsModel" */
-object RecsModel {
+object RecsModel { // todo: replace this with rankings
   val All = "all"
   val CF = "collabFiltering"
   val BF = "backfill"
@@ -124,12 +125,18 @@ case class RankingParams(
   }
 }
 
+case class IndicatorParams(
+  name: String, // must match one in eventNames
+  maxItemsPerUser: Option[Int], // defaults to maxEventsPerEventType
+  maxCorrelatorsPerItem: Option[Int], // defaults to maxCorrelatorsPerEventType
+  minLLR: Option[Double]) // defaults to none, takes precendence over maxCorrelatorsPerItem
+
 case class URAlgorithmParams(
   appName: String, // filled in from engine.json
   indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
   recsModel: Option[String] = None, // "all", "collabFiltering", "backfill"
-  eventNames: Seq[String], // names used to ID all user actions
+  eventNames: Option[Seq[String]], // names used to ID all user actions
   blacklistEvents: Option[Seq[String]] = None, // None means use the primary event, empty array means no filter
   // number of events in user-based recs query
   maxQueryEvents: Option[Int] = None,
@@ -148,8 +155,9 @@ case class URAlgorithmParams(
   expireDateName: Option[String] = None,
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
-  seed: Option[Long] = None // seed is not used presently
-) extends Params //fixed default make it reproducible unless supplied
+  indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
+  seed: Option[Long] = None) // seed is not used presently
+    extends Params //fixed default make it reproducible unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
  *  [[org.apache.mahout.math.cf.SimilarityAnalysis]] The analysis part of the recommender is
@@ -172,7 +180,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   val appName: String = ap.appName
   val recsModel: String = ap.recsModel.getOrElse(defaultURAlgorithmParams.DefaultRecsModel)
-  val eventNames: Seq[String] = ap.eventNames
+  //val eventNames: Seq[String] = ap.eventNames
 
   val userBias: Float = ap.userBias.getOrElse(1f)
   val itemBias: Float = ap.itemBias.getOrElse(1f)
@@ -189,11 +197,23 @@ class URAlgorithm(val ap: URAlgorithmParams)
   val maxEventsPerEventType: Int = ap.maxEventsPerEventType
     .getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType)
 
+  lazy val modelEventNames = if (ap.indicators.isEmpty) {
+    if (ap.eventNames.isEmpty) {
+      throw new IllegalArgumentException("No eventNames or indicators in engine.json and one of these is required")
+    } else ap.eventNames.get
+  } else {
+    var eventNames = Seq.empty[String]
+    ap.indicators.get.foreach { indicator =>
+      eventNames = eventNames :+ indicator.name
+    }
+    eventNames
+  }
+
   // Unique by 'type' ranking params, if collision get first.
-  val rankingsParams: Seq[RankingParams] = ap.rankings.getOrElse(Seq(RankingParams(
+  lazy val rankingsParams: Seq[RankingParams] = ap.rankings.getOrElse(Seq(RankingParams(
     name = Some(defaultURAlgorithmParams.DefaultBackfillFieldName),
     `type` = Some(defaultURAlgorithmParams.DefaultBackfillType),
-    eventNames = Some(eventNames.take(1)),
+    eventNames = Some(modelEventNames.take(1)),
     offsetDate = None,
     endDate = None,
     duration = Some(defaultURAlgorithmParams.DefaultBackfillDuration)))).groupBy(_.`type`).map(_._2.head).toSeq
@@ -218,7 +238,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ("ES index name", esIndex),
     ("ES type name", esType),
     ("RecsModel", recsModel),
-    ("Event names", eventNames),
+    ("Event names", modelEventNames),
     ("══════════════════════════════", "════════════════════════════"),
     ("Random seed", randomSeed),
     ("MaxCorrelatorsPerEventType", maxCorrelatorsPerEventType),
@@ -259,12 +279,37 @@ class URAlgorithm(val ap: URAlgorithmParams)
          |Please check if DataSource generates TrainingData
          |and Preparator generates PreparedData correctly.""".stripMargin)
 
+    //val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
+    //val nonDefaultMappings = Map(backfillParams.name.getOrElse(defaultURAlgorithmParams.DefaultBackfillFieldName) -> "float")
+
     logger.info("Actions read now creating correlators")
-    val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
-      indexedDatasets = data.actions.map(_._2).toArray,
-      randomSeed = randomSeed,
-      maxInterestingItemsPerThing = maxCorrelatorsPerEventType,
-      maxNumInteractions = maxEventsPerEventType) // strip action names
+    val cooccurrenceIDSs = if (ap.indicators.isEmpty) { // using one global set of algo params
+      SimilarityAnalysis.cooccurrencesIDSs(
+        data.actions.map(_._2).toArray,
+        randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
+        maxInterestingItemsPerThing = ap.maxCorrelatorsPerEventType
+          .getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+        maxNumInteractions = ap.maxEventsPerEventType.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType))
+        .map(_.asInstanceOf[IndexedDatasetSpark])
+    } else { // using params per matrix pair, these take the place of eventNames, maxCorrelatorsPerEventType,
+      // and maxEventsPerEventType!
+      val indicators = ap.indicators.get
+      val iDs = data.actions.map(_._2).toSeq
+      val datasets = iDs.zipWithIndex.map {
+        case (iD, i) =>
+          new DownsamplableCrossOccurrenceDataset(
+            iD,
+            indicators(i).maxItemsPerUser.getOrElse(defaultURAlgorithmParams.DefaultMaxEventsPerEventType),
+            indicators(i).maxCorrelatorsPerItem.getOrElse(defaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+            indicators(i).minLLR)
+      }.toList
+
+      SimilarityAnalysis.crossOccurrenceDownsampled(
+        datasets,
+        ap.seed.getOrElse(System.currentTimeMillis()).toInt)
+        .map(_.asInstanceOf[IndexedDatasetSpark])
+    }
+
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     val propertiesRDD: RDD[(ItemID, ItemProps)] = if (calcPopular) {
@@ -402,7 +447,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
    */
   def predict(model: NullModel, query: Query): PredictedResult = {
 
-    queryEventNames = query.eventNames.getOrElse(eventNames) // eventNames in query take precedence for the query
+    queryEventNames = query.eventNames.getOrElse(modelEventNames) // eventNames in query take precedence
 
     val (queryStr, blacklist) = buildQuery(ap, query, rankingFieldNames)
     val searchHitsOpt = EsClient.search(queryStr, esIndex)
@@ -439,9 +484,10 @@ class URAlgorithm(val ap: URAlgorithmParams)
     predictedResult
   }
 
-  /** Calc rank fields.
-   *  @param fieldsRDD
-   *  @param sc
+  /** Calculate all fields and items needed for ranking.
+   *
+   *  @param fieldsRDD all items with their fields
+   *  @param sc the current Spark context
    *  @return
    */
   def getRanksRDD(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext): RDD[(ItemID, ItemProps)] = {
@@ -451,7 +497,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val rankingFieldName = rankingParams.name.getOrElse(PopModel.nameByType(rankingType))
       val durationAsString = rankingParams.duration.getOrElse(defaultURAlgorithmParams.DefaultBackfillDuration)
       val duration = Duration(durationAsString).toSeconds.toInt
-      val backfillEvents = rankingParams.eventNames.getOrElse(eventNames.take(1))
+      val backfillEvents = rankingParams.eventNames.getOrElse(modelEventNames.take(1))
       val offsetDate = rankingParams.offsetDate
       val rankRdd = popModel.calc(modelName = rankingType, eventNames = backfillEvents, appName, duration, offsetDate)
       rankingFieldName -> rankRdd
@@ -597,7 +643,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val blacklistedItems = userEvents.filter { event =>
       // either a list or an empty list of filtering events so honor them
       blacklistEvents match {
-        case Nil => eventNames.head equals event.event
+        case Nil => modelEventNames.head equals event.event
         case _   => blacklistEvents contains event.event
       }
     }.map(_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrEmpty.distinct
@@ -621,7 +667,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       if (m != null) {
         val itemEventBias = query.itemBias.getOrElse(itemBias)
         val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
-        eventNames.map { action =>
+        modelEventNames.map { action =>
           val items: Seq[String] = try {
             if (m.containsKey(action) && m.get(action) != null) {
               m.get(action).asInstanceOf[util.ArrayList[String]].asScala
@@ -676,7 +722,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     val userEventBias = query.userBias.getOrElse(userBias)
     val userEventsBoost = if (userEventBias > 0 && userEventBias != 1) Some(userEventBias) else None
-    //val rActions = ap.eventNames.map { action =>
     val rActions = queryEventNames.map { action =>
       var items = Seq.empty[String]
 

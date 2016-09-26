@@ -43,8 +43,8 @@ case class Query(
   // to what is in the algorithm params or false
   num: Option[Int] = None, // default: whatever is in algorithm params, which itself has a default--probably 20
   eventNames: Option[List[String]], // names used to ID all user actions
-  withRanks: Option[Boolean] = None // Add to ItemScore rank fields values, default fasle
-) extends Serializable
+  withRanks: Option[Boolean] = None) // Add to ItemScore rank fields values, default fasle
+    extends Serializable
 
 /** Used to specify how Fields are represented in engine.json */
 case class Field( // no optional values for fields, whne specified
@@ -58,11 +58,13 @@ case class Field( // no optional values for fields, whne specified
 case class DateRange(
   name: String, // name of item property for the date comparison
   before: Option[String], // empty strings means no filter
-  after: Option[String] // both empty should be ignored
-) extends Serializable
+  after: Option[String]) // both empty should be ignored
+    extends Serializable
 
-/** results of a MMRAlgoritm.predict */
-case class PredictedResult(itemScores: Array[ItemScore]) extends Serializable
+/** results of a URAlgoritm.predict */
+case class PredictedResult(
+  itemScores: Array[ItemScore])
+    extends Serializable
 
 case class ItemScore(
   item: ItemID, // item id

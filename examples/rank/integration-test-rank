@@ -54,7 +54,7 @@ echo -e "${LINE}${NC}"
 cp -n engine.json user-engine.json
 
 echo -e "${GREEN}${LINE}"
-echo -e "THE FIRST SERIAS OF TESTS"
+echo -e "THE FIRST SERIES OF TESTS"
 echo -e "${LINE}${NC}"
 
 echo -e "${GREEN}${LINE}"
@@ -79,7 +79,8 @@ pio build
 pio train -- --executor-memory 1g --driver-memory 1g --master local
 
 echo -e "${GREEN}${LINE}"
-echo -e "Model will remain deployed after this test"
+echo -e "WARNING the model will be undeployed after this test, "
+echo -e "so any running PredictionServer will be stopped"
 nohup pio deploy > deploy-rank.out &
 echo -e "Waiting 30 seconds for the server to start"
 echo -e "${LINE}${NC}"
@@ -97,7 +98,7 @@ mv user-engine.json engine.json
 
 deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
 echo -e "${GREEN}${LINE}"
-echo -e "Killing the deployed test PredictionServer"
+echo -e "Killing the deployed PredictionServer"
 echo -e "${LINE}${NC}"
 kill "$deploy_pid"
 
