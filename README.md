@@ -16,6 +16,10 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Version Changelog
 
+## v0.5.0
+
+ - Uses the minimum dataset required for training and all data available for queries. This may reduce memory needs for training, without a change in quality.
+
 ## v0.4.0
 
  - This version requires PredictionIO-0.9.7-aml found [here](http://actionml/docs/install).
