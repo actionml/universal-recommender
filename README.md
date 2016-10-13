@@ -16,6 +16,10 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Version Changelog
 
+## v0.4.1
+
+ - Fixes a `pio build` failure triggered by the release of Apache PIO. If you have problems building v0.4.0 use this version. It is meant to be used with PredictionIO-0.9.7-aml. 
+
 ## v0.4.0
 
  - This version requires PredictionIO-0.9.7-aml found [here](http://actionml/docs/install).
