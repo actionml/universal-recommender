@@ -8,11 +8,6 @@
       "name": "sample-handmade-data.txt",
       "appName": "handmade",
       "eventNames": ["purchase", "view"],
-      "eventWindow": {
-        "duration": "24 days",
-        "removeDuplicates":true,
-        "compressProperties":true
-      }
     }
   },
   "sparkConf": {
@@ -38,11 +33,7 @@
             "name": "view",
             "maxCorrelatorsPerItem": 50
           }
-        ],
-        "availableDateName": "available",
-        "expireDateName": "expires",
-        "dateName": "date",
-        "num": 4
+        ]
       }
     }
   ]
