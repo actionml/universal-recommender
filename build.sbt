@@ -4,11 +4,11 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "template-scala-parallel-universal-recommendation"
 
-version := "0.4.1"
+version := "0.4.2"
 
 organization := "io.prediction"
 
-val mahoutVersion = "0.13.0-SNAPSHOT"
+val mahoutVersion = "0.13.0-pat"
 
 val pioVersion = "0.9.7-aml"
 
