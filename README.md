@@ -16,6 +16,11 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Version Changelog
 
+## v0.4.2 **Replaces 0.4.1**
+
+ - Fixes a `pio build` failure triggered by the release of Apache PIO. If you have problems building v0.4.0 use this version. It is meant to be used with PredictionIO-0.9.7-aml.
+ - **Requires a custom build of Apache Mahout**: instructions on the [doc site](http://actionml.com/docs/ur_quickstart) This is temporary until the next Mahout release, when we will update to 0.4.3 (uses predicitonio-0.9.7-aml) and 0.5.0 (which uses predictionio-0.10.0 from Apache)
+
 ## v0.4.0
 
  - This version requires PredictionIO-0.9.7-aml found [here](http://actionml/docs/install).
