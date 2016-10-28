@@ -8,7 +8,7 @@ version := "0.4.2"
 
 organization := "io.prediction"
 
-val mahoutVersion = "0.13.0-pat"
+val mahoutVersion = "0.13.0-SNAPSHOT"
 
 val pioVersion = "0.9.7-aml"
 
