@@ -4,7 +4,7 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "template-scala-parallel-universal-recommendation"
 
-version := "0.4.1"
+version := "0.4.2"
 
 organization := "io.prediction"
 
