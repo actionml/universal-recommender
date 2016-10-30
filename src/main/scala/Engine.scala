@@ -19,7 +19,7 @@ package org.template
 
 import java.util.Date
 
-import io.prediction.controller.{EngineFactory, Engine}
+import org.apache.predictionio.controller.{EngineFactory, Engine}
 
 /** This file contains case classes that are used with reflection to specify how query and config
   * JSON is to be parsed. the Query case class, for instance defines the way a JSON query is to be

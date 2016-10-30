@@ -21,7 +21,7 @@ import java.util.Date
 
 import grizzled.slf4j.Logger
 
-import io.prediction.data.storage.PropertyMap
+import org.apache.predictionio.data.storage.PropertyMap
 import org.apache.mahout.math.indexeddataset.IndexedDataset
 import org.apache.spark.rdd.RDD
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark

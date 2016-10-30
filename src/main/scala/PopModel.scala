@@ -18,10 +18,10 @@
 package org.template
 
 import grizzled.slf4j.Logger
-import io.prediction.data.storage.Event
+import org.apache.predictionio.data.storage.Event
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import io.prediction.data.store.PEventStore
+import org.apache.predictionio.data.store.PEventStore
 import org.joda.time.format.ISODateTimeFormat
 import org.joda.time.{DateTime, Interval}
 

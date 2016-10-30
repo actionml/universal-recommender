@@ -18,11 +18,11 @@
 package org.template
 
 import java.util
-import io.prediction.controller.P2LAlgorithm
-import io.prediction.controller.Params
-import io.prediction.data
-import io.prediction.data.storage.{NullModel, PropertyMap, Event}
-import io.prediction.data.store.LEventStore
+import org.apache.predictionio.controller.P2LAlgorithm
+import org.apache.predictionio.controller.Params
+import org.apache.predictionio.data
+import org.apache.predictionio.data.storage.{NullModel, PropertyMap, Event}
+import org.apache.predictionio.data.store.LEventStore
 import org.apache.mahout.math.cf.SimilarityAnalysis
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.rdd.RDD

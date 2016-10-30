@@ -1,13 +1,15 @@
-name := "template-scala-parallel-universal-recommendation"
+name := "universal-recommender"
 
-version := "0.3.0"
+version := "0.5.0"
 
-organization := "io.prediction"
+organization := "com.actionml"
 
-val mahoutVersion = "0.11.2"
+val mahoutVersion = "0.13.0-SNAPSHOT"
+
+val pioVersion = "0.10.0-incubating"
 
 libraryDependencies ++= Seq(
-  "io.prediction"    %% "core" % pioVersion.value % "provided",
+  "org.apache.predictionio"    %% "core" % pioVersion % "provided",
   "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
