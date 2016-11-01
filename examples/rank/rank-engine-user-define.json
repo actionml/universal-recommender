@@ -1,12 +1,12 @@
 {
-  "id": "popularity-only",
+  "comment":" This config file uses default settings for all but the required values see README.md for docs",
+  "id": "default",
   "description": "Default settings",
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "name": "sample-handmade-data.txt",
-      "appName": "handmade",
-      "eventNames": ["purchase"]
+      "appName": "default-rank",
+      "eventNames": ["show", "like"]
     }
   },
   "sparkConf": {
@@ -19,19 +19,20 @@
   },
   "algorithms": [
     {
-      "comment": "setup to only calculate a popularity model for *hot* and add it to the existing model for backfill",
       "name": "ur",
       "params": {
-        "appName": "handmade",
+        "appName": "default-rank",
         "indexName": "urindex",
         "typeName": "items",
-        "eventNames": ["purchase"],
-        "rankings": [{
-          "type": "hot",
-          "duration": 259200
-        }]
+        "recsModel": "backfill",
+        "eventNames": ["show", "like"],
+        "rankings":[
+          {
+            "name": "defaultRank",
+            "type": "userDefined"
+          }
+        ]
       }
     }
   ]
 }
-

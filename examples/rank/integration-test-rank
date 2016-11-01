@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+APP_NAME='default-rank'
+APP_ACCESS_KEY='123456789'
+
+LINE="=================================================================="
+# exit on any error
+#set -e
+
+check_file () {
+    if [ ! -f $1 ]; then
+        echo -e "${RED}File not found: $1${NC}"
+        exit 1
+    fi
+}
+
+echo -e "${GREEN}${LINE}"
+echo -e "Integration test [Rank] for The Universal Recommender."
+echo -e "If some step fails check that your engine.json file has been restored or look for it in 'user-engine.json'"
+echo -e "${LINE}${NC}"
+
+echo -e "${GREEN}${LINE}"
+echo -e "Checking for needed files"
+echo -e "${LINE}${NC}"
+
+if [ -f user-engine.json ]; then
+    echo -e "${RED}File user-engine.json found, this may be an error so we cannot replace engine.json${NC}"
+    exit 1
+fi
+
+check_file examples/rank/rank-engine.json
+check_file data/sample-rank-data.txt
+check_file data/rank-test-query-expected.txt
+
+echo -e "${GREEN}${LINE}"
+echo -e "Checking status, should exit if pio is not running."
+echo -e "${LINE}${NC}"
+pio status
+pio app new ${APP_NAME} --access-key ${APP_ACCESS_KEY} || true
+
+echo -e "${GREEN}${LINE}"
+echo -e "Checking to see if ${APP_NAME} app exists, should exit if not."
+echo -e "${LINE}${NC}"
+pio app show default-rank
+
+echo -e "${GREEN}${LINE}"
+echo -e "Moving engine.json to user-engine.json"
+echo -e "${LINE}${NC}"
+cp -n engine.json user-engine.json
+
+echo -e "${GREEN}${LINE}"
+echo -e "THE FIRST SERIES OF TESTS"
+echo -e "${LINE}${NC}"
+
+echo -e "${GREEN}${LINE}"
+echo -e "Moving examples/rank/rank-engine.json to engine.json for integration test."
+echo -e "${LINE}${NC}"
+cp examples/rank/rank-engine.json engine.json
+
+echo -e "${GREEN}${LINE}"
+echo -e "Deleting ${APP_NAME} app data since the test is date dependent"
+echo -e "${LINE}${NC}"
+pio app data-delete ${APP_NAME} -f
+
+echo -e "${GREEN}${LINE}"
+echo -e "Importing data for integration test"
+echo -e "${LINE}${NC}"
+python examples/rank/import_rank.py --access_key ${APP_ACCESS_KEY} --file './data/sample-rank-data.txt'
+
+echo -e "${GREEN}${LINE}"
+echo -e "Building and delpoying model"
+echo -e "${LINE}${NC}"
+pio build
+pio train -- --executor-memory 1g --driver-memory 1g --master local
+
+echo -e "${GREEN}${LINE}"
+echo -e "WARNING the model will be undeployed after this test, "
+echo -e "so any running PredictionServer will be stopped"
+nohup pio deploy > deploy-rank.out &
+echo -e "Waiting 30 seconds for the server to start"
+echo -e "${LINE}${NC}"
+sleep 30
+
+echo -e "${GREEN}${LINE}"
+echo -e "Running test query."
+echo -e "${LINE}${NC}"
+./examples/rank/multi-query-rank.sh > rank-query-test-result.out
+
+echo -e "${GREEN}${LINE}"
+echo -e "Restoring engine.json"
+echo -e "${LINE}${NC}"
+mv user-engine.json engine.json
+
+deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
+echo -e "${GREEN}${LINE}"
+echo -e "Killing the deployed PredictionServer"
+echo -e "${LINE}${NC}"
+kill "$deploy_pid"
+
+DIFF_RESULT=`diff data/rank-test-query-expected.txt rank-query-test-result.out`
+
+if [[ -z "${DIFF_RESULT// }" ]]; then
+    echo -e "${GREEN}${LINE}"
+    echo -e "ALL TESTS PASS SUCCESS$"
+    rm rank-query-test-result.out
+    rm deploy-rank.out
+else
+    echo -e "${RED}${LINE}"
+    echo -e "ONE OR MORE TESTS FAILURE:"
+    echo -e "${LINE}"
+    echo ${DIFF_RESULT}
+fi
+echo -e "${LINE}${NC}"
+
+
+
+

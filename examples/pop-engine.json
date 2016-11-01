@@ -28,12 +28,12 @@
         "typeName": "items",
         "eventNames": ["purchase", "view"],
         "recsModel": "backfill",
-        "backfillField": {
+        "rankings": [{
           "name": "popRank",
-          "backfillType": "popular",
+          "type": "popular",
           "eventNames": ["purchase", "view"],
           "duration": 259200
-        }
+        }]
       }
     }
   ]

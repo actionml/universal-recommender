@@ -1,0 +1,91 @@
+
+Queries to illustrate many use cases on a small standard dataset and for an automated integration test.
+
+WARNING: for this to produce the correct result you must:
+  1. Import data with
+     $ python examples/import_rank.py --access_key <your-app-accesskey>
+  2. Copy rank-engine.json to engine.json.
+  3. Run 'pio build', 'pio train', and 'pio deploy'
+  4. The queries must be run the same day as the import was done because date filters are part of the test.
+
+============ simple user recs ============
+
+Recommendations for user: user-1
+
+{"itemScores":[{"item":"product-3","score":0.3595937192440033},{"item":"product-2","score":0.10758151859045029},{"item":"product-5","score":0.06365098059177399},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for user: user-2
+
+{"itemScores":[{"item":"product-4","score":0.6799420118331909},{"item":"product-1","score":0.2569144368171692},{"item":"product-6","score":0.0},{"item":"product-5","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for user: user-3
+
+{"itemScores":[{"item":"product-2","score":0.3595937192440033},{"item":"product-1","score":0.3595937192440033},{"item":"product-5","score":0.017842993140220642},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for user: user-4
+
+{"itemScores":[{"item":"product-1","score":0.2559533715248108},{"item":"product-3","score":0.0944056436419487},{"item":"product-2","score":0.0},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for user: user-5
+
+{"itemScores":[{"item":"product-3","score":0.0},{"item":"product-4","score":0.0},{"item":"product-2","score":0.0},{"item":"product-1","score":0.0},{"item":"product-6","score":0.0},{"item":"product-5","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+============ simple similar item recs ============
+
+Recommendations for item: product-1
+
+{"itemScores":[{"item":"product-3","score":0.40796521306037903},{"item":"product-4","score":0.3626357316970825},{"item":"product-5","score":0.07773856818675995},{"item":"product-2","score":0.0770743265748024},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for item: product-2
+
+{"itemScores":[{"item":"product-4","score":0.8485281467437744},{"item":"product-3","score":0.20341692864894867},{"item":"product-1","score":0.20341692864894867},{"item":"product-6","score":0.0},{"item":"product-5","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for item: product-3
+
+{"itemScores":[{"item":"product-4","score":0.28767499327659607},{"item":"product-1","score":0.21575623750686646},{"item":"product-2","score":0.06454890966415405},{"item":"product-5","score":0.010705795139074326},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for item: product-4
+
+{"itemScores":[{"item":"product-2","score":0.07302875816822052},{"item":"product-3","score":0.07302875071763992},{"item":"product-1","score":0.07302875071763992},{"item":"product-5","score":0.029496734961867332},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for item: product-5
+
+{"itemScores":[{"item":"product-4","score":0.4954302906990051},{"item":"product-1","score":0.28767499327659607},{"item":"product-3","score":0.1290978193283081},{"item":"product-2","score":0.0},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+============ popular item recs only ============
+
+query with no item or user id, ordered by popularity
+
+{"itemScores":[{"item":"product-3","score":0.0},{"item":"product-4","score":0.0},{"item":"product-2","score":0.0},{"item":"product-1","score":0.0},{"item":"product-6","score":0.0},{"item":"product-5","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for non-existant user: xyz, all from popularity
+
+{"itemScores":[{"item":"product-3","score":0.0},{"item":"product-4","score":0.0},{"item":"product-2","score":0.0},{"item":"product-1","score":0.0},{"item":"product-6","score":0.0},{"item":"product-5","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for non-existant item: xyz, all from popularity
+
+{"itemScores":[{"item":"product-3","score":0.0},{"item":"product-4","score":0.0},{"item":"product-2","score":0.0},{"item":"product-1","score":0.0},{"item":"product-6","score":0.0},{"item":"product-5","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for no user no item, all from popularity, red color filter
+
+{"itemScores":[{"item":"product-3","score":0.0},{"item":"product-1","score":0.0}]}
+
+Recommendations for no user no item, all from popularity, green boost
+
+{"itemScores":[{"item":"product-4","score":0.5},{"item":"product-2","score":0.5},{"item":"product-3","score":0.0},{"item":"product-1","score":0.0},{"item":"product-6","score":0.0},{"item":"product-5","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}
+
+Recommendations for no user no item, all from popularity, red color boost, S size filter
+
+{"itemScores":[{"item":"product-1","score":0.6000000238418579},{"item":"product-4","score":0.0},{"item":"product-5","score":0.0},{"item":"product-9","score":0.0}]}
+
+============ dateRange filter ============
+
+Recommendations for user: user-1
+
+{"itemScores":[{"item":"product-6","score":0.0},{"item":"product-7","score":0.0}]}
+
+============ query with item and user *EXPERIMENTAL* ============
+
+Recommendations for user-1 & product-1
+
+{"itemScores":[{"item":"product-3","score":0.7042884230613708},{"item":"product-2","score":0.14845967292785645},{"item":"product-5","score":0.12810268998146057},{"item":"product-6","score":0.0},{"item":"product-8","score":0.0},{"item":"product-7","score":0.0},{"item":"product-9","score":0.0}]}

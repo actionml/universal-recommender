@@ -17,50 +17,51 @@
 
 package org.template
 
-import _root_.org.apache.predictionio.controller.PDataSource
-import _root_.org.apache.predictionio.controller.EmptyEvaluationInfo
-import _root_.org.apache.predictionio.controller.EmptyActualResult
-import _root_.org.apache.predictionio.controller.Params
-import _root_.org.apache.predictionio.data.storage.{PropertyMap, Event}
+import _root_.org.apache.predictionio.controller.{ EmptyActualResult, EmptyEvaluationInfo, PDataSource, Params }
+import _root_.org.apache.predictionio.data.storage.PropertyMap
 import _root_.org.apache.predictionio.data.store.PEventStore
-import org.apache.predictionio.core.{EventWindow, SelfCleaningDataSource}
-import org.apache.mahout.math.indexeddataset.{BiDictionary, IndexedDataset}
+import grizzled.slf4j.Logger
+import org.apache.predictionio.core.{ EventWindow, SelfCleaningDataSource }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import grizzled.slf4j.Logger
+import org.template.conversions.{ ActionID, ItemID }
+import org.template.conversions._
 
 /** Taken from engine.json these are passed in to the DataSource constructor
-  *
-  * @param appName registered name for the app
-  * @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
-  *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
-  */
+ *
+ *  @param appName registered name for the app
+ *  @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
+ *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
+ */
 case class DataSourceParams(
-   appName: String,
-   eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
-   eventWindow: Option[EventWindow])
-extends Params
+  appName: String,
+  eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
+  eventWindow: Option[EventWindow]) extends Params
 
 /** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
-  * are sent to the Preparator for further processing.
-  * @param dsp parameters taken from engine.json
-  */
+ *  are sent to the Preparator for further processing.
+ *  @param dsp parameters taken from engine.json
+ */
 class DataSource(val dsp: DataSourceParams)
-  extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult] with SelfCleaningDataSource {
+    extends PDataSource[TrainingData, EmptyEvaluationInfo, Query, EmptyActualResult]
+    with SelfCleaningDataSource {
 
-  @transient override lazy val logger = Logger[this.type]
+  @transient override lazy implicit val logger: Logger = Logger[this.type]
 
-  override def appName = dsp.appName
-  override def eventWindow = dsp.eventWindow
+  override def appName: String = dsp.appName
+  override def eventWindow: Option[EventWindow] = dsp.eventWindow
+
+  drawInfo("Init DataSource", Seq(
+    ("══════════════════════════════", "════════════════════════════"),
+    ("App name", appName),
+    ("Event window", eventWindow),
+    ("Event names", dsp.eventNames)))
 
   /** Reads events from PEventStore and create and RDD for each */
-  override
-  def readTraining(sc: SparkContext): TrainingData = {
+  override def readTraining(sc: SparkContext): TrainingData = {
 
     val eventNames = dsp.eventNames
-
     cleanPersistedPEvents(sc)
-
     val eventsRDD = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("user"),
@@ -68,43 +69,42 @@ class DataSource(val dsp: DataSourceParams)
       targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
 
     // now separate the events by event name
-    val actionRDDs = eventNames.map { eventName =>
+    val actionRDDs: List[(ActionID, RDD[(UserID, ItemID)])] = eventNames.map { eventName =>
       val actionRDD = eventsRDD.filter { event =>
-
-        require(eventNames.contains(event.event), s"Unexpected event ${event} is read.") // is this really needed?
+        require(eventNames.contains(event.event), s"Unexpected event $event is read.") // is this really needed?
         require(event.entityId.nonEmpty && event.targetEntityId.get.nonEmpty, "Empty user or item ID")
-
         eventName.equals(event.event)
-
       }.map { event =>
         (event.entityId, event.targetEntityId.get)
-      }.cache()
+      }
 
       (eventName, actionRDD)
-    }
+    } filterNot { case (_, actionRDD) => actionRDD.isEmpty() }
+
+    logger.debug(s"Received actions for events ${actionRDDs.map(_._1)}")
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
-    val fieldsRDD = PEventStore.aggregateProperties(
-      appName= dsp.appName,
-      entityType=  "item")(sc)
+    val fieldsRDD: RDD[(ItemID, PropertyMap)] = PEventStore.aggregateProperties(
+      appName = dsp.appName,
+      entityType = "item")(sc)
+    //    logger.debug(s"FieldsRDD\n${fieldsRDD.take(25).mkString("\n")}")
 
     // Have a list of (actionName, RDD), for each action
     // todo: some day allow data to be content, which requires rethinking how to use EventStore
-    new TrainingData(actionRDDs, fieldsRDD)
+    TrainingData(actionRDDs, fieldsRDD)
   }
 }
 
 /** Low level RDD based representation of the data ready for the Preparator
-  *
-  * @param actions List of Tuples (actionName, actionRDD)qw
-  * @param fieldsRDD RDD of item keyed PropertyMap for item metadata
-  */
-class TrainingData(
-    val actions: List[(String, RDD[(String, String)])],
-    val fieldsRDD: RDD[(String, PropertyMap)])
-  extends Serializable {
+ *
+ *  @param actions List of Tuples (actionName, actionRDD)qw
+ *  @param fieldsRDD RDD of item keyed PropertyMap for item metadata
+ */
+case class TrainingData(
+    actions: Seq[(ActionID, RDD[(UserID, ItemID)])],
+    fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable {
 
-  override def toString = {
+  override def toString: String = {
     val a = actions.map { t =>
       s"${t._1} actions: [count:${t._2.count()}] + sample:${t._2.take(2).toList} "
     }.toString()
