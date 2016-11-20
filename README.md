@@ -16,11 +16,6 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Version Changelog
 
-## v0.5.0 Apache-PIO Compatible
-
- - Works only with verisons of PIO from Apache Software Foundation (namespace org.apache not io.prediction)
- - Supports Apache-PIO's SSL features for the PredictionServer optionally
-
 ## v0.4.2 **Replaces 0.4.1**
 
  - Fixes a `pio build` failure triggered by the release of Apache PIO. If you have problems building v0.4.0 use this version. It is meant to be used with PredictionIO-0.9.7-aml.

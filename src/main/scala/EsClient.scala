@@ -139,7 +139,6 @@ object EsClient {
           mappings += (fieldName + mappingsField("string"))
       }
       mappings += mappingsTail // any other string is not_analyzed
-      //      logger.debug(s"ES mapping: $mappings")
 
       val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
       val create = client.admin().indices().create(cir).actionGet()
@@ -177,7 +176,6 @@ object EsClient {
     createIndex(newIndex, typeName, fieldNames, typeMappings)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
-    //    logger.debug(s"Save to ES[$newIndexURI]:\n${indexRDD.take(25).mkString("\n")}")
     indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
     //refreshIndex(newIndex)
 
@@ -220,6 +218,7 @@ object EsClient {
    */
   def search(query: String, indexName: String): Option[SearchHits] = {
     val sr = client.prepareSearch(indexName).setSource(query).get()
+
     if (!sr.isTimedOut) {
       Some(sr.getHits)
     } else {

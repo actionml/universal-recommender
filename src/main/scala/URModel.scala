@@ -73,7 +73,6 @@ class URModel(
           propsMap + ("id" -> itemId)
       }
     }
-    //    logger.debug(s"ES RDD\n${esRDD.take(25).mkString("\n")}")
 
     val esFields: List[String] = esRDD.flatMap(_.keySet).distinct().collect.toList
     logger.info(s"ES fields[${esFields.size}]: $esFields")
