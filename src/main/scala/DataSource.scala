@@ -61,7 +61,10 @@ class DataSource(val dsp: DataSourceParams)
   override def readTraining(sc: SparkContext): TrainingData = {
 
     val eventNames = dsp.eventNames
-    cleanPersistedPEvents(sc)
+
+    // beware! the following call most likely will alter the event stream in the DB!
+    // cleanPersistedPEvents(sc) // broken in apache-pio v0.10.0-incubating it erases all data!!!!!!
+
     val eventsRDD = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("user"),
@@ -69,8 +72,8 @@ class DataSource(val dsp: DataSourceParams)
       targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
 
     // now separate the events by event name
-    val actionRDDs: List[(ActionID, RDD[(UserID, ItemID)])] = eventNames.map { eventName =>
-      val actionRDD = eventsRDD.filter { event =>
+    val eventRDDs: List[(ActionID, RDD[(UserID, ItemID)])] = eventNames.map { eventName =>
+      val singleEventRDD = eventsRDD.filter { event =>
         require(eventNames.contains(event.event), s"Unexpected event $event is read.") // is this really needed?
         require(event.entityId.nonEmpty && event.targetEntityId.get.nonEmpty, "Empty user or item ID")
         eventName.equals(event.event)
@@ -78,20 +81,21 @@ class DataSource(val dsp: DataSourceParams)
         (event.entityId, event.targetEntityId.get)
       }
 
-      (eventName, actionRDD)
-    } filterNot { case (_, actionRDD) => actionRDD.isEmpty() }
+      (eventName, singleEventRDD)
+    } filterNot { case (_, singleEventRDD) => singleEventRDD.isEmpty() }
 
-    logger.debug(s"Received actions for events ${actionRDDs.map(_._1)}")
+    logger.info(s"Received events ${eventRDDs.map(_._1)}")
+    logger.info(s"Number of events ${eventRDDs.map(_._1.length)}")
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
     val fieldsRDD: RDD[(ItemID, PropertyMap)] = PEventStore.aggregateProperties(
       appName = dsp.appName,
-      entityType = "item")(sc)
+      entityType = "item")(sc).repartition(sc.defaultParallelism)
     //    logger.debug(s"FieldsRDD\n${fieldsRDD.take(25).mkString("\n")}")
 
     // Have a list of (actionName, RDD), for each action
     // todo: some day allow data to be content, which requires rethinking how to use EventStore
-    TrainingData(actionRDDs, fieldsRDD)
+    TrainingData(eventRDDs, fieldsRDD)
   }
 }
 

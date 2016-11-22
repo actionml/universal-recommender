@@ -49,11 +49,12 @@ class Preparator
     }
 
     // now make sure all matrices have identical row space since this corresponds to all users
-    // todo: check to see that there are events in primary event IndexedDataset and abort if not.
+    // with the primary event since other users do not contribute to the math
     val rowAdjustedIds = userDictionary map { userDict =>
       indexedDatasets.map {
         case (eventName, eventIDS) =>
-          (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs).newRowCardinality(userDict.size))
+          (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs)
+            .newRowCardinality(userDict.size)) // force row cardinality and sharing userDict
       }
     } getOrElse Seq.empty
 

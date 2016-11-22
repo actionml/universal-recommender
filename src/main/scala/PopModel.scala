@@ -191,7 +191,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
       appName = appName,
       startTime = Some(interval.getStart),
       untilTime = Some(interval.getEnd),
-      eventNames = if (eventNames.nonEmpty) Some(eventNames) else None)(sc)
+      eventNames = if (eventNames.nonEmpty) Some(eventNames) else None)(sc).repartition(sc.defaultParallelism)
   }
 
 }

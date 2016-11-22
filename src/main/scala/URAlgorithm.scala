@@ -201,13 +201,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     if (ap.eventNames.isEmpty) {
       throw new IllegalArgumentException("No eventNames or indicators in engine.json and one of these is required")
     } else ap.eventNames.get
-  } else {
-    var eventNames = Seq.empty[String]
-    ap.indicators.get.foreach { indicator =>
-      eventNames = eventNames :+ indicator.name
-    }
-    eventNames
-  }
+  } else ap.indicators.get.map(_.name)
 
   // Unique by 'type' ranking params, if collision get first.
   lazy val rankingsParams: Seq[RankingParams] = ap.rankings.getOrElse(Seq(RankingParams(
@@ -273,11 +267,10 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     // No one likes empty training data.
     require(
-      data.actions.take(1).nonEmpty,
+      data.actions.head._2.asInstanceOf[IndexedDatasetSpark].rowIDs.size != 0,
       s"""
-         |Primary action in PreparedData cannot be empty.
-         |Please check if DataSource generates TrainingData
-         |and Preparator generates PreparedData correctly.""".stripMargin)
+         |There are no users with the primary / conversion event and this is not allowed
+         |Check to see that your dataset contains the primary event.""".stripMargin)
 
     //val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
     //val nonDefaultMappings = Map(backfillParams.name.getOrElse(defaultURAlgorithmParams.DefaultBackfillFieldName) -> "float")
