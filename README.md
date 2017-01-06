@@ -16,6 +16,16 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Version Changelog
 
+## v0.5.1
+
+ - Adds item-set based queries for shopping carts, favorites, and watch-list type recommendations. This is sometimes called "complimentary purchase"
+recommendations. Ideally the model is trained on item-sets (shopping-carts) but this also works with the same model created for user-based
+queries, See advanced config for more on the model-type trade-offs.
+
+## v0.5.0
+
+ - The first UR version compatible with Apache PredictionIO-0.10.0-incubating. All past versions do not work and should be upgraded.
+
 ## v0.4.2 **Replaces 0.4.1**
 
  - Fixes a `pio build` failure triggered by the release of Apache PIO. If you have problems building v0.4.0 use this version. It is meant to be used with PredictionIO-0.9.7-aml.

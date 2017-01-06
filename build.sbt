@@ -6,7 +6,7 @@ name := "universal-recommender"
 
 name := "template-scala-parallel-universal-recommendation"
 
-version := "0.5.0"
+version := "0.5.1"
 
 organization := "com.actionml"
 

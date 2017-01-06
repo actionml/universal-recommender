@@ -171,7 +171,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   @transient lazy implicit val logger: Logger = Logger[this.type]
 
-  case class BoostableCorrelators(actionName: String, itemIDs: Seq[ItemID], boost: Option[Float]) {
+  case class BoostableCorrelators(actionName: String, itemIDs: Seq[ItemID], boost: Option[Float] = None) {
     def toFilterCorrelators: FilterCorrelators = {
       FilterCorrelators(actionName, itemIDs)
     }
@@ -446,7 +446,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val searchHitsOpt = EsClient.search(queryStr, esIndex)
 
     val withRanks = query.withRanks.getOrElse(false)
-    val predictedResult = searchHitsOpt match {
+    val predictedResults = searchHitsOpt match {
       case Some(searchHits) =>
         val recs = searchHits.getHits.map { hit =>
           if (withRanks) {
@@ -464,17 +464,20 @@ class URAlgorithm(val ap: URAlgorithmParams)
           }
         }
         logger.info(s"Results: ${searchHits.getHits.length} retrieved of a possible ${searchHits.totalHits()}")
-        PredictedResult(recs)
+        recs
 
       case _ =>
         logger.info(s"No results for query ${parse(queryStr)}")
-        PredictedResult(Array.empty[ItemScore])
+        Array.empty[ItemScore]
     }
+
+    if (recsModel == RecsModel.CF) {
+      PredictedResult(predictedResults.filter(_.score != 0.0))
+    } else PredictedResult(predictedResults)
 
     // should have all blacklisted items excluded
     // todo: need to add dithering, mean, sigma, seed required, make a seed that only changes on some fixed time
     // period so the recs ordering stays fixed for that time period.
-    predictedResult
   }
 
   /** Calculate all fields and items needed for ranking.
@@ -562,8 +565,19 @@ class URAlgorithm(val ap: URAlgorithmParams)
       Seq.empty
     }
 
+    // this only makes sense when you train on (item-set-id, event-name, item-id) aka
+    // shopping carts. We do not enforce this in the query nor throw an exception but a
+    // WARN: is logged
+    val itemSet: Seq[BoostableCorrelators] = if (query.itemSet.nonEmpty) {
+      if (query.item.nonEmpty || query.user.nonEmpty)
+        logger.warn("Item-sets should not be mixed with user or item-based queries")
+      Seq(BoostableCorrelators(modelEventNames.head, query.itemSet.get, query.itemSetBias))
+    } else {
+      Seq.empty
+    }
+
     val boostedMetadata = getBoostedMetadata(query)
-    val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata
+    val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata ++ itemSet
 
     val shouldFields: Seq[JValue] = allBoostedCorrelators.map {
       case BoostableCorrelators(actionName, itemIDs, boost) =>
@@ -639,15 +653,19 @@ class URAlgorithm(val ap: URAlgorithmParams)
         case Nil => modelEventNames.head equals event.event
         case _   => blacklistEvents contains event.event
       }
-    }.map(_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrEmpty.distinct
+    }.map(_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrEmpty
+
+    // exclude items in the itemSet query
+
+    val itemSetExcludes = query.itemSet.getOrEmpty
 
     // Now conditionally add the query item itself
     val includeSelf = query.returnSelf.getOrElse(returnSelf)
     val allExcludedItems = if (!includeSelf && query.item.nonEmpty) {
-      blacklistedItems :+ query.item.get
+      (blacklistedItems :+ query.item.get) ++ itemSetExcludes
     } // add the query item to be excuded
     else {
-      blacklistedItems
+      blacklistedItems ++ itemSetExcludes
     }
     allExcludedItems.distinct
   }

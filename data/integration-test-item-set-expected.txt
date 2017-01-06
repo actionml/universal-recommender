@@ -1,0 +1,40 @@
+
+Queries to illustrate many use cases on a small standard dataset and for an automated integration test.
+
+WARNING: for this to produce the correct result you must:
+  1. Import data with
+     $ python examples/import_handmade.py --access_key <your-app-accesskey>
+  2. Copy handmade-engine.json to engine.json.
+  3. Run 'pio build', 'pio train', and 'pio deploy'
+  4. The queries must be run the same day as the import was done because date filters are part of the test.
+NOTE: due to available and expire dates you should never see the Iphone 5 or Iphone 6.
+
+============ simple item-set recs ============
+
+Recommendations for user: iPhone 6
+
+{"itemScores":[{"item":"iPhone earbuds","score":1.1287648677825928},{"item":"iPhone 6 charging cradle","score":0.204568549990654},{"item":"iPhone 6 case","score":0.204568549990654}]}
+
+Recommendations for user: iPhone 7
+
+{"itemScores":[{"item":"AirPods","score":0.9369767904281616}]}
+
+Recommendations for user: Nexus 6p
+
+{"itemScores":[]}
+
+Recommendations for user: AirPods
+
+{"itemScores":[{"item":"iPhone 7","score":1.1287648677825928}]}
+
+Recommendations for user: USB type-C cable
+
+{"itemScores":[{"item":"Nexus 6p case","score":1.1287648677825928},{"item":"Nexus 6p","score":0.9369767904281616}]}
+
+Recommendations for user: iPhone 6 charging cradle
+
+{"itemScores":[{"item":"iPhone earbuds","score":1.1287648677825928},{"item":"iPhone 6","score":0.9369767904281616},{"item":"iPhone 6 case","score":0.204568549990654}]}
+
+Recommendations for user: iPhone earbuds and iPhone 6 case
+
+{"itemScores":[{"item":"iPhone 6","score":1.3250854015350342},{"item":"iPhone 6 charging cradle","score":0.28930360078811646}]}
