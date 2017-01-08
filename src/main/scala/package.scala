@@ -105,25 +105,14 @@ package object conversions {
           val vector = itemList.sortBy { elem => -elem._2 }
 
           val itemID = rowIDDictionary_bcast.value.inverse.getOrElse(rowNum, "INVALID_ITEM_ID")
-          try {
 
-            require(itemID != "INVALID_ITEM_ID", s"Bad row number in  matrix, skipping item $rowNum")
-            require(vector.nonEmpty, s"No values so skipping item $rowNum")
+          // create a list of element ids
+          val values = JArray(vector.map { item =>
+            JString(columnIDDictionary_bcast.value.inverse.getOrElse(item._1, "")) // should always be in the dictionary
+          })
 
-            // create a list of element ids
-            val values = JArray(vector.map { item =>
-              JString(columnIDDictionary_bcast.value.inverse.getOrElse(item._1, "")) // should always be in the dictionary
-            })
-
-            (itemID, Map(actionName -> values))
-
-          } catch {
-            case cce: IllegalArgumentException => //non-fatal, ignore line
-              null.asInstanceOf[(ItemID, ItemProps)]
-          }
-
-      }.filter(_ != null)
+          (itemID, Map(actionName -> values))
+      }
     }
   }
-
 }

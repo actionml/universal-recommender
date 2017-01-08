@@ -81,9 +81,25 @@ class URModel(
     true
   }
 
+  // Something in the second def of this function hangs on some data, reverting so this ***disables ranking***
   def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
-    fields.fold(sc.emptyRDD[(ItemID, ItemProps)])(_ ++ _).reduceByKey(_ ++ _)
+    //def groupAll( fields: Seq[RDD[(String, (Map[String, Any]))]]): RDD[(String, (Map[String, Any]))] = {
+    //if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
+    if (fields.size > 1) {
+      fields.head.cogroup[ItemProps](groupAll(fields.drop(1))).map {
+        case (key, pairMapSeqs) =>
+          // to be safe merge all maps but should only be one per rdd element
+          val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Any].asInstanceOf[ItemProps])(_ ++ _)
+          val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Any].asInstanceOf[ItemProps])(_ ++ _)
+          val fullMap = rdd1Maps ++ rdd2Maps
+          (key, fullMap)
+      }
+    } else fields.head
   }
+
+  /*def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
+    fields.fold(sc.emptyRDD[(ItemID, ItemProps)])(_ ++ _).reduceByKey(_ ++ _)
+  }*/
 }
 
 object URModel {
