@@ -101,6 +101,7 @@ package object conversions {
           for (ve <- itemVector.nonZeroes) {
             itemList = itemList :+ (ve.index, ve.get)
           }
+
           //sort by highest strength value descending(-)
           val vector = itemList.sortBy { elem => -elem._2 }
 
