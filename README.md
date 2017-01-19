@@ -18,32 +18,33 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 ## v0.5.1
 
- - Adds item-set based queries for shopping carts, favorites, and watch-list type recommendations. This is sometimes called "complimentary purchase"
-recommendations. Ideally the model is trained on item-sets (shopping-carts) but this also works with the same model created for user-based
-queries, See advanced config for more on the model-type trade-offs.
+ - **Adds item-set based queries**: for shopping carts, favorites, and watch-list type recommendations. This is sometimes called "complimentary purchase"
+recommendations.
+- **Exclusion rules**: Previous versions allowed business rules to include (filter) or boost items by their properties, now items can be excluded by their properties too. 
+- **Major Speedup**: Some tests show this version is 43% faster than previous versions. 
 
 ## v0.5.0
 
- - The first UR version compatible with Apache PredictionIO-0.10.0-incubating. All past versions do not work and should be upgraded.
+ - **Apache PIO Compatible**: The first UR version compatible with Apache PredictionIO-0.10.0-incubating. All past versions do not work and should be upgraded.
 
 ## v0.4.2 **Replaces 0.4.1**
 
- - Fixes a `pio build` failure triggered by the release of Apache PIO. If you have problems building v0.4.0 use this version. It is meant to be used with PredictionIO-0.9.7-aml.
+ - **Fixes bug** when a `pio build` failure triggered by the release of Apache PIO. If you have problems building v0.4.0 use this version. It is meant to be used with PredictionIO-0.9.7-aml.
  - **Requires a custom build of Apache Mahout**: instructions on the [doc site](http://actionml.com/docs/ur_quickstart) This is temporary until the next Mahout release, when we will update to 0.4.3 (uses predicitonio-0.9.7-aml) and 0.5.0 (which uses predictionio-0.10.0 from Apache)
 
 ## v0.4.0
 
  - This version requires PredictionIO-0.9.7-aml found [here](http://actionml/docs/install).
- - New tuning params are now available for each "indicator" type, making indicators with a small number of possible values much more useful&mdash;things like gender or category-preference. See docs for [configuring the UR](http://actionml.com/docs/ur_config) and look for the `indicators` parameter.
- - New forms of recommendations backfill allow all items to be recommended even if they have no user events yet. Backfill types include random and user defined. See docs for [configuring the UR](http://actionml.com/docs/ur_config) and look for the `rankings` parameter.
+ - **New tuning params** are now available for each "indicator" type, making indicators with a small number of possible values much more useful&mdash;things like gender or category-preference. See docs for [configuring the UR](http://actionml.com/docs/ur_config) and look for the `indicators` parameter.
+ - **New forms of recommendations backfill** allow all items to be recommended even if they have no user events yet. Backfill types include random and user defined. See docs for [configuring the UR](http://actionml.com/docs/ur_config) and look for the `rankings` parameter.
 
 ## v0.3.0
 
- - This version require PredictionIO-0.9.7-aml from the ActionML repo [here](http://actionml/docs/install).
- - Now supports the `SelfCleanedDataSource` trait. Adding params to the `DataSource` part of `engine.json` allows control of de-duplication, property event compaction, and a time window of event. The time window is used to age out the oldest events. Note: this only works with the ActionML fork of PredictionIO found in the repo mentioned above.
- - changed `backfillField: duration` to accept Scala Duration strings. This will require changes to all engine.json files that were using the older # of seconds duration.
- - added support for indicator predictiveness testing with the MAP@k tool
- - fixed a bug which requires that in the engine.json the `typeName` is required to be `"items"`, with this release the type can be more descriptive.
+ - This version requires PredictionIO-0.9.7-aml from the ActionML repo [here](http://actionml/docs/install).
+ - **Implements a moving time window if events**: Now supports the `SelfCleanedDataSource` trait. Adding params to the `DataSource` part of `engine.json` allows control of de-duplication, property event compaction, and a time window of event. The time window is used to age out the oldest events. Note: this only works with the ActionML fork of PredictionIO found in the repo mentioned above.
+ - **Parameter changed**: `backfillField: duration` to accept Scala Duration strings. This will require changes to all engine.json files that were using the older # of seconds duration.
+ - **Event-types used in queries**: added support for indicator predictiveness testing with the MAP@k tool. This is so only certain mixes of user events are used at query time.
+ - **Bug fix**: which requires that the `typeName` in engine.json is required be `"items"`, with this release the type can be any string.
 
 ## v0.2.3
 

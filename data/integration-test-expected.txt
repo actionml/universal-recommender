@@ -19,6 +19,9 @@ Recommendations for user: U 2
 
 {"itemScores":[{"item":"Iphone 4","score":0.3830534517765045},{"item":"Ipad-retina","score":0.08661800622940063},{"item":"Surface","score":0.0}]}
 
+{"itemScores":[{"item":"Iphone 6","score":0.4893450438976288},{"item":"Iphone 4","score":0.3830534517765045},{"item":"Ipad-retina","score":0.08661800622940063},{"item":"Surface","score":0.0}]}
+
+
 Recommendations for user: u-3
 
 {"itemScores":[{"item":"Galaxy","score":0.0},{"item":"Iphone 4","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}

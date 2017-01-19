@@ -177,6 +177,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     }
   }
   case class FilterCorrelators(actionName: String, itemIDs: Seq[ItemID])
+  case class ExclusionFields(propertyName: String, values: Seq[String])
 
   val appName: String = ap.appName
   val recsModel: String = ap.recsModel.getOrElse(defaultURAlgorithmParams.DefaultRecsModel)
@@ -584,6 +585,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
         render("terms" -> (actionName -> itemIDs) ~ ("boost" -> boost))
     }
 
+    // todo: this should not be sent if there are no rankings, causes 0 scores to be returned as backfill even
+    // with no other ranking. Currently the 0 score results are filtered out for no active ranking.
     val shouldScore: JValue = parse(
       """
         |{
@@ -629,8 +632,24 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   /** Build not must query part */
   def buildQueryMustNot(query: Query, events: Seq[Event]): JValue = {
-    val mustNotFields: JValue = render("ids" -> ("values" -> getExcludedItems(events, query)) ~ ("boost" -> 0))
-    mustNotFields
+
+    // first get the excluded items
+    val mustNotItems: JValue = render(
+      "ids" ->
+        ("values" -> getExcludedItems(events, query)) ~
+        ("boost" -> 0))
+
+    // then get the properties used in must_not clause
+    val exclusionFields = query.fields.getOrElse(Seq.empty).filter(_.bias == 0)
+    val exclusionProperties: Seq[JValue] = exclusionFields.map {
+      case Field(name, value, bias) =>
+        render(
+          "terms" ->
+            (name -> value) ~
+            ("boost" -> 0))
+    }
+
+    exclusionProperties :+ mustNotItems
   }
 
   /** Build sort query part */
@@ -764,6 +783,16 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     (queryFilterFields ++ paramsFilterFields)
       .map(field => FilterCorrelators(field.name, field.values))
+      .distinct // de-dup and favor query fields
+  }
+
+  /** get all metadata fields that are filters (not boosts) */
+  def getExcludingMetadata(query: Query): Seq[ExclusionFields] = {
+    val paramsFilterFields = fields.filter(_.bias == 0f)
+    val queryFilterFields = query.fields.getOrEmpty.filter(_.bias == 0f)
+
+    (queryFilterFields ++ paramsFilterFields)
+      .map(field => ExclusionFields(field.name, field.values))
       .distinct // de-dup and favor query fields
   }
 
