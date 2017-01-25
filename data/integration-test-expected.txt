@@ -19,9 +19,6 @@ Recommendations for user: U 2
 
 {"itemScores":[{"item":"Iphone 4","score":0.3830534517765045},{"item":"Ipad-retina","score":0.08661800622940063},{"item":"Surface","score":0.0}]}
 
-{"itemScores":[{"item":"Iphone 6","score":0.4893450438976288},{"item":"Iphone 4","score":0.3830534517765045},{"item":"Ipad-retina","score":0.08661800622940063},{"item":"Surface","score":0.0}]}
-
-
 Recommendations for user: u-3
 
 {"itemScores":[{"item":"Galaxy","score":0.0},{"item":"Iphone 4","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
@@ -93,3 +90,33 @@ Recommendations for user: u1
 Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter
 
 {"itemScores":[{"item":"Nexus","score":0.43929141759872437},{"item":"Surface","score":0.0}]}
+
+============ Advanced business rules ============
+
+Recommendations for user: u-3
+
+{"itemScores":[{"item":"Galaxy","score":0.0},{"item":"Iphone 4","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
+
+Recommendations for user: u-3, Tablets filter
+
+{"itemScores":[{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
+
+Recommendations for user: u-3, Tablets boost
+
+{"itemScores":[{"item":"Nexus","score":0.9317973852157593},{"item":"Ipad-retina","score":0.19934424757957458},{"item":"Galaxy","score":0.0},{"item":"Iphone 4","score":0.0}]}
+
+Recommendations for user: u-3, Tablets excluded
+
+{"itemScores":[{"item":"Galaxy","score":0.0},{"item":"Iphone 4","score":0.0}]}
+
+Recommendations for user: u-3, Tablets excluded, Estados Unidos Mexicanos boosted
+
+{"itemScores":[{"item":"Iphone 4","score":0.8631545305252075},{"item":"Galaxy","score":0.0}]}
+
+Recommendations for user: u-3, Tablets and Samsung excluded, Estados Unidos Mexicanos boosted, phones included
+
+{"itemScores":[{"item":"Iphone 4","score":0.9248083829879761}]}
+
+Recommendations for user: u-3, Tablets and Samsung boosted, Estados Unidos Mexicanos excluded, phones included
+
+{"itemScores":[{"item":"Galaxy","score":0.34009209275245667}]}

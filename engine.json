@@ -34,9 +34,6 @@
             "maxCorrelatorsPerItem": 50
           }
         ],
-        "availableDateName": "available",
-        "expireDateName": "expires",
-        "dateName": "date",
         "num": 4
       }
     }

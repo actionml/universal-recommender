@@ -227,20 +227,20 @@ echo "============ Advanced business rules ============"
 echo ""
 
 
-echo "Recommendations for user: u1"
+echo "Recommendations for user: u-3"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1"
+    "user": "u-3"
 }' http://localhost:8000/queries.json
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, Tablets filter"
+echo "Recommendations for user: u-3, Tablets filter"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1",
+    "user": "u-3",
     "fields": [{
         "name": "categories",
         "values": ["Tablets"],
@@ -250,11 +250,11 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, Tablets boost"
+echo "Recommendations for user: u-3, Tablets boost"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1",
+    "user": "u-3",
     "fields": [{
         "name": "categories",
         "values": ["Tablets"],
@@ -264,11 +264,11 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, Tablets excluded"
+echo "Recommendations for user: u-3, Tablets excluded"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1",
+    "user": "u-3",
     "fields": [{
         "name": "categories",
         "values": ["Tablets"],
@@ -278,11 +278,11 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, Tablets excluded, Estados Unidos Mexicanos boosted"
+echo "Recommendations for user: u-3, Tablets excluded, Estados Unidos Mexicanos boosted"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1",
+    "user": "u-3",
     "fields": [{
         "name": "categories",
         "values": ["Tablets"],
@@ -296,11 +296,11 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, Tablets and Samsung excluded, Estados Unidos Mexicanos boosted, phones included"
+echo "Recommendations for user: u-3, Tablets and Samsung excluded, Estados Unidos Mexicanos boosted, phones included"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1",
+    "user": "u-3",
     "fields": [{
         "name": "categories",
         "values": ["Tablets", "Samsung"],
@@ -318,11 +318,11 @@ curl -H "Content-Type: application/json" -d '
 echo ""
 
 echo ""
-echo "Recommendations for user: u1, Tablets and Samsung boosted, Estados Unidos Mexicanos excluded, phones included"
+echo "Recommendations for user: u-3, Tablets and Samsung boosted, Estados Unidos Mexicanos excluded, phones included"
 echo ""
 curl -H "Content-Type: application/json" -d '
 {
-    "user": "u1",
+    "user": "u-3",
     "fields": [{
         "name": "categories",
         "values": ["Tablets", "Samsung"],
