@@ -94,12 +94,15 @@ class URModel(
           val fullMap = rdd1Maps ++ rdd2Maps
           (key, fullMap)
       }
-    } else fields.head
+    } else {
+      fields.head
+    }
   }
 
-  /*def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
+  /*  def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
     fields.fold(sc.emptyRDD[(ItemID, ItemProps)])(_ ++ _).reduceByKey(_ ++ _)
-  }*/
+  }
+*/
 }
 
 object URModel {

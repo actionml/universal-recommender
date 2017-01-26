@@ -76,7 +76,7 @@ echo -e "${GREEN}${LINE}"
 echo -e "Building and delpoying model"
 echo -e "${LINE}${NC}"
 pio build
-pio train -- --executor-memory 1g --driver-memory 1g --master local
+pio train -- --executor-memory 4g --driver-memory 4g
 
 echo -e "${GREEN}${LINE}"
 echo -e "WARNING the model will be undeployed after this test, "

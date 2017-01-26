@@ -267,11 +267,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
     calcPopular: Boolean = true)(implicit sc: SparkContext): NullModel = {
 
     // No one likes empty training data.
-    require(
+    /*    require(
       data.actions.head._2.asInstanceOf[IndexedDatasetSpark].rowIDs.size != 0,
       s"""
          |There are no users with the primary / conversion event and this is not allowed
          |Check to see that your dataset contains the primary event.""".stripMargin)
+*/
 
     //val backfillParams = ap.backfillField.getOrElse(defaultURAlgorithmParams.DefaultBackfillParams)
     //val nonDefaultMappings = Map(backfillParams.name.getOrElse(defaultURAlgorithmParams.DefaultBackfillFieldName) -> "float")
