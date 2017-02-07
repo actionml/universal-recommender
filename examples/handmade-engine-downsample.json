@@ -5,9 +5,10 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "name": "sample-handmade-data.txt",
-      "appName": "handmade",
-      "eventNames": ["purchase", "view"]
+      "name": "sample-handmade-downsample.txt",
+      "appName": "downsample",
+      "eventNames": ["purchase", "view"],
+      "minEventsPerUser": 6
     }
   },
   "sparkConf": {
@@ -22,22 +23,19 @@
       "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
       "name": "ur",
       "params": {
-        "appName": "handmade",
-        "indexName": "urindex",
+        "appName": "downsample",
+        "indexName": "ur-downsample-index",
         "typeName": "items",
         "comment": "must have data for the first event or the model will not build, other events are optional",
         "indicators": [
           {
             "name": "purchase"
-          },{
-            "name": "view",
-            "maxCorrelatorsPerItem": 50
+          },
+          {
+            "name": "view"
           }
         ],
-        "availableDateName": "available",
-        "expireDateName": "expires",
-        "dateName": "date",
-        "num": 4
+        "num": 20
       }
     }
   ]

@@ -17,9 +17,9 @@
 
 package org.template
 
-import _root_.org.apache.predictionio.controller.{ EmptyActualResult, EmptyEvaluationInfo, PDataSource, Params }
-import _root_.org.apache.predictionio.data.storage.PropertyMap
-import _root_.org.apache.predictionio.data.store.PEventStore
+import org.apache.predictionio.controller.{ EmptyActualResult, EmptyEvaluationInfo, PDataSource, Params }
+import org.apache.predictionio.data.storage.PropertyMap
+import org.apache.predictionio.data.store.PEventStore
 import grizzled.slf4j.Logger
 import org.apache.predictionio.core.{ EventWindow, SelfCleaningDataSource }
 import org.apache.spark.SparkContext
@@ -36,7 +36,8 @@ import org.template.conversions._
 case class DataSourceParams(
   appName: String,
   eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
-  eventWindow: Option[EventWindow]) extends Params
+  eventWindow: Option[EventWindow],
+  minEventsPerUser: Option[Int]) extends Params
 
 /** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
  *  are sent to the Preparator for further processing.
@@ -55,7 +56,8 @@ class DataSource(val dsp: DataSourceParams)
     ("══════════════════════════════", "════════════════════════════"),
     ("App name", appName),
     ("Event window", eventWindow),
-    ("Event names", dsp.eventNames)))
+    ("Event names", dsp.eventNames),
+    ("Min events per user", dsp.minEventsPerUser)))
 
   /** Reads events from PEventStore and create and RDD for each */
   override def readTraining(sc: SparkContext): TrainingData = {
@@ -63,7 +65,7 @@ class DataSource(val dsp: DataSourceParams)
     val eventNames = dsp.eventNames
 
     // beware! the following call most likely will alter the event stream in the DB!
-    // cleanPersistedPEvents(sc) // broken in apache-pio v0.10.0-incubating it erases all data!!!!!!
+    cleanPersistedPEvents(sc) // broken in apache-pio v0.10.0-incubating it erases all data!!!!!!
 
     val eventsRDD = PEventStore.find(
       appName = dsp.appName,
@@ -95,7 +97,7 @@ class DataSource(val dsp: DataSourceParams)
 
     // Have a list of (actionName, RDD), for each action
     // todo: some day allow data to be content, which requires rethinking how to use EventStore
-    TrainingData(eventRDDs, fieldsRDD)
+    TrainingData(eventRDDs, fieldsRDD, dsp.minEventsPerUser)
   }
 }
 
@@ -106,7 +108,8 @@ class DataSource(val dsp: DataSourceParams)
  */
 case class TrainingData(
     actions: Seq[(ActionID, RDD[(UserID, ItemID)])],
-    fieldsRDD: RDD[(ItemID, PropertyMap)]) extends Serializable {
+    fieldsRDD: RDD[(ItemID, PropertyMap)],
+    minEventsPerUser: Option[Int] = None) extends Serializable {
 
   override def toString: String = {
     val a = actions.map { t =>
