@@ -74,6 +74,8 @@ class URModel(
       }
     }
 
+    // todo: this could be replaced with an optional list of properties in the params json because now it
+    // goes through every element to find it's property name
     val esFields: List[String] = esRDD.flatMap(_.keySet).distinct().collect.toList
     logger.info(s"ES fields[${esFields.size}]: $esFields")
 

@@ -29,19 +29,13 @@ import org.elasticsearch.action.admin.indices.create.CreateIndexRequest
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
-import org.elasticsearch.action.get.GetResponse
-import org.elasticsearch.client.transport.TransportClient
 import org.elasticsearch.common.settings.{ ImmutableSettings, Settings }
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
-import org.elasticsearch.node.NodeBuilder._
 import org.elasticsearch.search.SearchHits
 import org.json4s.JValue
 import org.template.conversions.{ ItemID, ItemProps }
-
-import scala.collection.immutable
-import scala.collection.parallel.mutable
 
 /** Elasticsearch notes:
  *  1) every query clause wil laffect scores unless it has a constant_score and boost: 0
@@ -55,12 +49,13 @@ import scala.collection.parallel.mutable
 object EsClient {
   @transient lazy val logger: Logger = Logger[this.type]
 
-  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
+  private lazy val client = if (Storage.getConfig("ELASTICSEARCH5").nonEmpty)
+    new elasticsearch5.StorageClient(Storage.getConfig("ELASTICSEARCH5").get).client
+  else if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
     new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
   else
     throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
       "proper configuration settings")
-
   // wrong way that uses only default settings, which will be a localhost ES sever.
   //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
 

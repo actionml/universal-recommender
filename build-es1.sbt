@@ -4,18 +4,18 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "universal-recommender"
 
+name := "template-scala-parallel-universal-recommendation"
+
 version := "0.5.1"
 
 organization := "com.actionml"
 
 val mahoutVersion = "0.13.0-SNAPSHOT"
 
-val elasticsearchVersion = "5.1.2"
-
-val pioVersion = "0.11.0-SNAPSHOT"
+val pioVersion = "0.10.0-incubating"
 
 libraryDependencies ++= Seq(
-  "org.apache.predictionio" %% "apache-predictionio-core" % "0.11.0-SNAPSHOT" % "provided",
+  "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
   "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
@@ -30,7 +30,7 @@ libraryDependencies ++= Seq(
   // other external libs
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
-  "org.elasticsearch"       %% "elasticsearch-spark-13" % elasticsearchVersion
+  "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.2"
     exclude("org.apache.spark", "spark-catalyst_2.10")
     exclude("org.apache.spark", "spark-sql_2.10"),
   "org.json4s" %% "json4s-native" % "3.2.10")
