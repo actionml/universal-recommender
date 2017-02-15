@@ -49,13 +49,21 @@ import org.template.conversions.{ ItemID, ItemProps }
 object EsClient {
   @transient lazy val logger: Logger = Logger[this.type]
 
-  private lazy val client = if (Storage.getConfig("ELASTICSEARCH5").nonEmpty)
+  /*  private lazy val client = if (Storage.getConfig("ELASTICSEARCH5").nonEmpty)
     new elasticsearch5.StorageClient(Storage.getConfig("ELASTICSEARCH5").get).client
   else if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
     new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
   else
     throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
       "proper configuration settings")
+*/
+
+  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
+    new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
+  else
+    throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
+      "proper configuration settings")
+
   // wrong way that uses only default settings, which will be a localhost ES sever.
   //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
 
