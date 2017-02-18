@@ -24,7 +24,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.format.ISODateTimeFormat
 import org.joda.time.{ DateTime, Interval }
-import org.template.conversions.{ ItemID, ItemProps }
+import org.template.helpers.{ ItemID, ItemProps }
 
 import scala.language.postfixOps
 import scala.util.Random

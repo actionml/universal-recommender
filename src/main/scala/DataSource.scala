@@ -24,8 +24,8 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.core.{ EventWindow, SelfCleaningDataSource }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.template.conversions.{ ActionID, ItemID }
-import org.template.conversions._
+import org.template.helpers.{ ActionID, ItemID }
+import org.template.helpers._
 
 /** Taken from engine.json these are passed in to the DataSource constructor
  *

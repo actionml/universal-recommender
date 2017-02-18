@@ -32,7 +32,7 @@ import org.json4s.JValue
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
-import org.template.conversions._
+import org.template.helpers._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration

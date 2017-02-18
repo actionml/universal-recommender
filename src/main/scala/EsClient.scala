@@ -35,7 +35,7 @@ import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
 import org.elasticsearch.search.SearchHits
 import org.json4s.JValue
-import org.template.conversions.{ ItemID, ItemProps }
+import org.template.helpers.{ ItemID, ItemProps }
 
 /** Elasticsearch notes:
  *  1) every query clause wil laffect scores unless it has a constant_score and boost: 0

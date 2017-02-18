@@ -26,7 +26,7 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
-import org.template.conversions.{ IndexedDatasetConversions, ItemID, ItemProps }
+import org.template.helpers.{ IndexedDatasetConversions, ItemID, ItemProps }
 
 /** Universal Recommender models to save in ES */
 class URModel(

@@ -27,7 +27,7 @@ import org.apache.mahout.math.indexeddataset.{ DefaultIndexedDatasetWriteSchema,
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.template.conversions._
+import org.template.helpers._
 
 class Preparator
     extends PPreparator[TrainingData, PreparedData] {
