@@ -20,6 +20,10 @@ package org.template
 import java.util
 
 import grizzled.slf4j.Logger
+import org.apache.http.util.EntityUtils
+
+// storage package isolate from data
+// import org.apache.predictionio.data.storage._
 import org.apache.predictionio.data.storage._
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
@@ -31,7 +35,11 @@ import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsReques
 import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 import org.elasticsearch.action.get.GetResponse
 import org.elasticsearch.client.transport.TransportClient
+import org.elasticsearch.client.RestClient
 import org.elasticsearch.common.settings.{ ImmutableSettings, Settings }
+import org.apache.http.entity.ContentType
+import org.apache.http.entity.StringEntity
+import org.apache.http.nio.entity.NStringEntity
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
@@ -42,6 +50,7 @@ import org.template.conversions.{ ItemID, ItemProps }
 
 import scala.collection.immutable
 import scala.collection.parallel.mutable
+import scala.collection.JavaConverters._
 
 /** Elasticsearch notes:
  *  1) every query clause wil laffect scores unless it has a constant_score and boost: 0
@@ -66,14 +75,19 @@ object EsClient {
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
    *  the changes will not be reflected.
-   *  @param indexName will delete all types under this index, types are not used by the UR
+    *
+    *  @param indexName will delete all types under this index, types are not used by the UR
    *  @param refresh
    *  @return true if all is well
    */
+  @deprecated
   def deleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
     //val debug = client.connectedNodes()
+    // インデックスが存在するかどうかを問合せる
     if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
+      // 削除を実行する
       val delete = client.admin().indices().delete(new DeleteIndexRequest(indexName)).actionGet()
+      // 削除のレスポンスオブジェクトから成否を取得
       if (!delete.isAcknowledged) {
         logger.info(s"Index $indexName wasn't deleted, but may have quietly failed.")
       } else {
@@ -88,8 +102,41 @@ object EsClient {
     }
   }
 
+  def ddeleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
+    val restClient = client.open()
+    val result = try {
+      restClient.performRequest(
+        "HEAD",
+        s"/$indexName",
+        Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+        case 404 =>
+          logger.warn(s"Elasticsearch index: $indexName wasn't deleted because it didn't exist. This may be an error.")
+          false
+        case 200 =>
+          restClient.performRequest(
+            "DELETE",
+            s"/$indexName",
+            Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+            case 200 =>
+              if (refresh) refreshIndex(indexName)
+            case _ =>
+              logger.info(s"Index $indexName wasn't deleted, but may have quietly failed.")
+          }
+          true
+        case _ =>
+          throw new IllegalStateException()
+          false
+      }
+    } finally {
+      restClient.close()
+      false
+    }
+    true
+  }
+
   /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
-   *  @param indexName elasticsearch name
+    *
+    *  @param indexName elasticsearch name
    *  @param indexType names the type of index, usually use the item name
    *  @param fieldNames ES field names
    *  @param typeMappings indicates which ES fields are to be not_analyzed without norms
@@ -156,9 +203,97 @@ object EsClient {
     }
   }
 
+  def ccreateIndex(
+    indexName: String,
+    indexType: String,
+    fieldNames: List[String],
+    typeMappings: Map[String, String] = Map.empty,
+    refresh: Boolean = false): Boolean = {
+    val restClient = client.open()
+    val result = try {
+      restClient.performRequest(
+        "HEAD",
+        s"/$indexName",
+        Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+        case 404 => {
+          var mappings = """
+            |{
+            |  "properties": {
+            """.stripMargin.replace("\n", "")
+
+          def mappingsField(`type`: String) = {
+            s"""
+            |    : {
+            |      "type": "${`type`}",
+            |      "index": "not_analyzed",
+            |      "norms" : {
+            |        "enabled" : false
+            |      }
+            |    },
+            """.stripMargin.replace("\n", "")
+          }
+
+          val mappingsTail = """
+            |    "id": {
+            |      "type": "string",
+            |      "index": "not_analyzed",
+            |      "norms" : {
+            |        "enabled" : false
+            |      }
+            |    }
+            |  }
+            |}
+          """.stripMargin.replace("\n", "")
+
+          fieldNames.foreach { fieldName =>
+            if (typeMappings.contains(fieldName))
+              mappings += (fieldName + mappingsField(typeMappings(fieldName)))
+            else // unspecified fields are treated as not_analyzed strings
+              mappings += (fieldName + mappingsField("string"))
+          }
+          mappings += mappingsTail // any other string is not_analyzed
+          val entity = new NStringEntity(mappings, ContentType.APPLICATION_JSON)
+          restClient.performRequest(
+            "PUT",
+            s"/$indexName",
+            Map.empty[String, String].asJava,
+            entity
+          ).getStatusLine.getStatusCode match {
+            case 200 =>
+              // now refresh to get it 'committed'
+              // todo: should do this after the new index is created so no index downtime
+              if (refresh) refreshIndex(indexName)
+            case _ =>
+              logger.info(s"Index $indexName wasn't created, but may have quietly failed.")
+          }
+          true
+        }
+        case 200 =>
+          logger.warn(s"Elasticsearch index: $indexName wasn't created because it already exists. This may be an error.")
+          false
+        case _ =>
+          throw new IllegalStateException(s"/$indexName is invalid.")
+          false
+      }
+    } finally {
+      restClient.close()
+      false
+    }
+    result
+  }
+
   /** Commits any pending changes to the index */
   def refreshIndex(indexName: String): Unit = {
     client.admin().indices().refresh(new RefreshRequest(indexName)).actionGet()
+  }
+
+  def rrefreshIndex(indexName: String): Unit = {
+    val restClient = client.open()
+    restClient.performRequest(
+      "POST",
+      s"/$indexName/_refresh",
+      Map.empty[String, String].asJava
+    )
   }
 
   /** Create new index and hot-swap the new after it's indexed and ready to take over, then delete the old */
@@ -210,6 +345,15 @@ object EsClient {
 
   }
 
+  def hhotSwap(
+    alias: String,
+    typeName: String,
+    indexRDD: RDD[Map[String, Any]],
+    fieldNames: List[String],
+    typeMappings: Map[String, String] = Map.empty): Unit = {
+
+  }
+
   /** Performs a search using the JSON query String
    *
    *  @param query the JSON query string parable by Elasticsearch
@@ -226,6 +370,20 @@ object EsClient {
     }
   }
 
+  // TODO SearchHits is a response type of Transport Client?
+  def ssearch(query: String, indexName: String): Option[SearchHits] = {
+    val restClient = client.open()
+    try {
+      val response = restClient.performRequest(
+        "POST",
+        s"/$indexName/_search",
+        Map.empty[String, String].asJava
+      )
+    } finally {
+      restClient.close()
+    }
+  }
+
   /** Gets the "source" field of an Elasticsearch document
    *
    *  @param indexName index that contains the doc/item
@@ -237,6 +395,23 @@ object EsClient {
     client.prepareGet(indexName, typeName, doc)
       .execute()
       .actionGet().getSource
+  }
+
+  def ggetSource(indexName: String, typeName: String, doc: String): util.Map[String, AnyRef] = {
+    val restClient = client.open()
+    try {
+      val response = restClient.performRequest(
+        "GET",
+        s"/$indexName/$typeName/$doc",
+        Map.empty[String, String].asJava
+      )
+      val responseJValue = parse(EntityUtils.toString(response.getEntity))
+      (responseJValue \ "_hits" \ "hits" \ "_source").extract[T]
+
+      ???
+    } finally {
+      restClient.close()
+    }
   }
 
   /*
@@ -273,6 +448,20 @@ object EsClient {
       }
       None // if more than one abort, need to clean up bad aliases
     }
+  }
+
+  def ggetIndexName(alias: String): Option[String] = {
+    val restClient = client.open()
+    try {
+      restClient.performRequest(
+        "GET",
+        s"/_alias/$alias",
+        Map.empty[String, String].asJava
+      )
+    } finally {
+      restClient.close()
+    }
+    ???
   }
 
   def getRDD(

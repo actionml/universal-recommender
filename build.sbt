@@ -10,9 +10,11 @@ version := "0.5.0"
 
 organization := "com.actionml"
 
-val mahoutVersion = "0.13.0-SNAPSHOT"
+// val mahoutVersion = "0.13.0-SNAPSHOT"
+val mahoutVersion = "0.13.0"
 
-val pioVersion = "0.10.0-incubating"
+//val pioVersion = "0.10.0-incubating"
+val pioVersion = "0.11.0-v1-SNAPSHOT"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
