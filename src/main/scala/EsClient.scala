@@ -104,7 +104,7 @@ object EsClient {
 
   def ddeleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
     val restClient = client.open()
-    val result = try {
+    try {
       restClient.performRequest(
         "HEAD",
         s"/$indexName",
@@ -131,7 +131,6 @@ object EsClient {
       restClient.close()
       false
     }
-    true
   }
 
   /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
@@ -225,7 +224,6 @@ object EsClient {
             s"""
             |    : {
             |      "type": "${`type`}",
-            |      "index": "not_analyzed",
             |      "norms" : {
             |        "enabled" : false
             |      }
@@ -235,8 +233,7 @@ object EsClient {
 
           val mappingsTail = """
             |    "id": {
-            |      "type": "string",
-            |      "index": "not_analyzed",
+            |      "type": "keyword",
             |      "norms" : {
             |        "enabled" : false
             |      }
@@ -249,7 +246,8 @@ object EsClient {
             if (typeMappings.contains(fieldName))
               mappings += (fieldName + mappingsField(typeMappings(fieldName)))
             else // unspecified fields are treated as not_analyzed strings
-              mappings += (fieldName + mappingsField("string"))
+              // mappings += (fieldName + mappingsField("string"))
+              mappings += (fieldName + mappingsField("keyword"))
           }
           mappings += mappingsTail // any other string is not_analyzed
           val entity = new NStringEntity(mappings, ContentType.APPLICATION_JSON)
@@ -304,13 +302,16 @@ object EsClient {
     fieldNames: List[String],
     typeMappings: Map[String, String] = Map.empty): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
+    // エイリアスに紐付いたインデックスを取得、
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
+    // あたらしい
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
 
     logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
     createIndex(newIndex, typeName, fieldNames, typeMappings)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
+    // TODO ESHadoopのインタフェースで"es.mapping.id" -> "id"が機能するか確認
     indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
     //refreshIndex(newIndex)
 
@@ -325,6 +326,7 @@ object EsClient {
         .execute().actionGet()
       deleteIndex(oldIndex) // now can safely delete the old one since it's not used
     } else { // todo: could be more than one index with 'alias' so
+      // メタデータがない状態ってなんだ？
       // no alias so add one
       //to clean up any indexes that exist with the alias name
       val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
@@ -351,6 +353,64 @@ object EsClient {
     indexRDD: RDD[Map[String, Any]],
     fieldNames: List[String],
     typeMappings: Map[String, String] = Map.empty): Unit = {
+    // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
+    val newIndex = alias + "_" + DateTime.now().getMillis.toString
+
+    logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
+    createIndex(newIndex, typeName, fieldNames, typeMappings)
+
+    val newIndexURI = "/" + newIndex + "/" + typeName
+    // TODO ESHadoopのインタフェースで"es.mapping.id" -> "id"が機能するか確認
+    indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
+    //refreshIndex(newIndex)
+
+    val restClient = client.open()
+    try {
+      // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
+      val response = restClient.performRequest(
+        "GET",
+        s"/_alias/$alias",
+        Map.empty[String, String].asJava
+      )
+      val responseJValue = parse(EntityUtils.toString(response.getEntity))
+      // TODO to use keys
+      val oldIndexSet = responseJValue.extract[Map[String, JValue]].keys
+      val deleteOldIndexQuery = oldIndexSet.map(oldIndex => {
+        s"""{ "remove_index": { "index": "${oldIndex}"}}"""
+      }).mkString(",", ",", "")
+
+      val aliasQuery =
+        s"""
+           |{
+           |    "actions" : [
+           |        { "add":  { "index": "${newIndex}", "alias": "${alias}" } }
+        """ + deleteOldIndexQuery +
+        """
+           |    ]
+           |}
+          """.stripMargin.replace("\n", "")
+      val entity = new NStringEntity(aliasQuery, ContentType.APPLICATION_JSON)
+      if (!oldIndexSet.isEmpty) {
+        restClient.performRequest(
+          "HEAD",
+          s"/${alias}",
+          Map.empty[String, String].asJava
+        ).getStatusLine.getStatusCode match {
+          case 200 => deleteIndex(alias)
+        }
+      }
+      restClient.performRequest(
+        "POST",
+        "/_aliases",
+        Map.empty[String, String].asJava,
+        entity
+      )
+      if (!oldIndexSet.isEmpty) deleteIndex(oldIndexSet.head)
+
+    } finally {
+      restClient.close()
+    }
+
 
   }
 
@@ -370,8 +430,7 @@ object EsClient {
     }
   }
 
-  // TODO SearchHits is a response type of Transport Client?
-  def ssearch(query: String, indexName: String): Option[SearchHits] = {
+  def ssearch(query: String, indexName: String): Option[JValue] = {
     val restClient = client.open()
     try {
       val response = restClient.performRequest(
@@ -379,8 +438,14 @@ object EsClient {
         s"/$indexName/_search",
         Map.empty[String, String].asJava
       )
+      response.getStatusLine.getStatusCode match {
+        case 200 => Some(parse(EntityUtils.toString(response.getEntity)))
+        case _ => None
+      }
+
     } finally {
       restClient.close()
+      None
     }
   }
 
@@ -453,15 +518,28 @@ object EsClient {
   def ggetIndexName(alias: String): Option[String] = {
     val restClient = client.open()
     try {
-      restClient.performRequest(
+      val response = restClient.performRequest(
         "GET",
         s"/_alias/$alias",
         Map.empty[String, String].asJava
       )
+      val responseJValue = parse(EntityUtils.toString(response.getEntity))
+      val allIndicesMap = responseJValue.extract[Map[String, JValue]]
+      if (allIndicesMap.size == 1) {
+        allIndicesMap.headOption.map(_._1)
+      } else {
+        // delete all the indices that are pointed to by the alias, they can't be used
+        logger.warn("There is no 1-1 mapping of index to alias so deleting the old indexes that are referenced by the " +
+          "alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
+        if (!allIndicesMap.isEmpty) {
+          allIndicesMap.keys.foreach(indexName => deleteIndex(indexName, refresh = true))
+        }
+        None // if more than one abort, need to clean up bad aliases
+      }
     } finally {
       restClient.close()
+      None
     }
-    ???
   }
 
   def getRDD(
