@@ -80,29 +80,7 @@ object EsClient {
    *  @param refresh
    *  @return true if all is well
    */
-  @deprecated
   def deleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
-    //val debug = client.connectedNodes()
-    // インデックスが存在するかどうかを問合せる
-    if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
-      // 削除を実行する
-      val delete = client.admin().indices().delete(new DeleteIndexRequest(indexName)).actionGet()
-      // 削除のレスポンスオブジェクトから成否を取得
-      if (!delete.isAcknowledged) {
-        logger.info(s"Index $indexName wasn't deleted, but may have quietly failed.")
-      } else {
-        // now refresh to get it 'committed'
-        // todo: should do this after the new index is created so no index downtime
-        if (refresh) refreshIndex(indexName)
-      }
-      true
-    } else {
-      logger.warn(s"Elasticsearch index: $indexName wasn't deleted because it didn't exist. This may be an error.")
-      false
-    }
-  }
-
-  def ddeleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
     val restClient = client.open()
     try {
       restClient.performRequest(
@@ -110,7 +88,7 @@ object EsClient {
         s"/$indexName",
         Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
         case 404 =>
-          logger.warn(s"Elasticsearch index: $indexName wasn't deleted because it didn't exist. This may be an error.")
+          logger.warn("Elasticsearch index: $indexName wasn't deleted because it didn't exist. This may be an error.")
           false
         case 200 =>
           restClient.performRequest(
@@ -143,66 +121,6 @@ object EsClient {
    *  @return true if all is well
    */
   def createIndex(
-    indexName: String,
-    indexType: String,
-    fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty,
-    refresh: Boolean = false): Boolean = {
-    if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
-      var mappings = """
-        |{
-        |  "properties": {
-        """.stripMargin.replace("\n", "")
-
-      def mappingsField(`type`: String) = {
-        s"""
-        |    : {
-        |      "type": "${`type`}",
-        |      "index": "not_analyzed",
-        |      "norms" : {
-        |        "enabled" : false
-        |      }
-        |    },
-        """.stripMargin.replace("\n", "")
-      }
-
-      val mappingsTail = """
-        |    "id": {
-        |      "type": "string",
-        |      "index": "not_analyzed",
-        |      "norms" : {
-        |        "enabled" : false
-        |      }
-        |    }
-        |  }
-        |}
-      """.stripMargin.replace("\n", "")
-
-      fieldNames.foreach { fieldName =>
-        if (typeMappings.contains(fieldName))
-          mappings += (fieldName + mappingsField(typeMappings(fieldName)))
-        else // unspecified fields are treated as not_analyzed strings
-          mappings += (fieldName + mappingsField("string"))
-      }
-      mappings += mappingsTail // any other string is not_analyzed
-
-      val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
-      val create = client.admin().indices().create(cir).actionGet()
-      if (!create.isAcknowledged) {
-        logger.info(s"Index $indexName wasn't created, but may have quietly failed.")
-      } else {
-        // now refresh to get it 'committed'
-        // todo: should do this after the new index is created so no index downtime
-        if (refresh) refreshIndex(indexName)
-      }
-      true
-    } else {
-      logger.warn(s"Elasticsearch index: $indexName wasn't created because it already exists. This may be an error.")
-      false
-    }
-  }
-
-  def ccreateIndex(
     indexName: String,
     indexType: String,
     fieldNames: List[String],
@@ -245,8 +163,7 @@ object EsClient {
           fieldNames.foreach { fieldName =>
             if (typeMappings.contains(fieldName))
               mappings += (fieldName + mappingsField(typeMappings(fieldName)))
-            else // unspecified fields are treated as not_analyzed strings
-              // mappings += (fieldName + mappingsField("string"))
+            else // unspecified fields are treated as not_analyzed keyword
               mappings += (fieldName + mappingsField("keyword"))
           }
           mappings += mappingsTail // any other string is not_analyzed
@@ -282,10 +199,6 @@ object EsClient {
 
   /** Commits any pending changes to the index */
   def refreshIndex(indexName: String): Unit = {
-    client.admin().indices().refresh(new RefreshRequest(indexName)).actionGet()
-  }
-
-  def rrefreshIndex(indexName: String): Unit = {
     val restClient = client.open()
     restClient.performRequest(
       "POST",
@@ -302,65 +215,13 @@ object EsClient {
     fieldNames: List[String],
     typeMappings: Map[String, String] = Map.empty): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
-    // エイリアスに紐付いたインデックスを取得、
-    val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
-    // あたらしい
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
 
     logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
     createIndex(newIndex, typeName, fieldNames, typeMappings)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
-    // TODO ESHadoopのインタフェースで"es.mapping.id" -> "id"が機能するか確認
-    indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
-    //refreshIndex(newIndex)
-
-    if (!aliasMetadata.isEmpty
-      && aliasMetadata.get(alias) != null
-      && aliasMetadata.get(alias).get(0) != null) { // was alias so remove the old one
-      //append the DateTime to the alias to create an index name
-      val oldIndex = aliasMetadata.get(alias).get(0).getIndexRouting
-      client.admin().indices().prepareAliases()
-        .removeAlias(oldIndex, alias)
-        .addAlias(newIndex, alias)
-        .execute().actionGet()
-      deleteIndex(oldIndex) // now can safely delete the old one since it's not used
-    } else { // todo: could be more than one index with 'alias' so
-      // メタデータがない状態ってなんだ？
-      // no alias so add one
-      //to clean up any indexes that exist with the alias name
-      val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
-      if (indices.contains(alias)) {
-        //refreshIndex(alias)
-        deleteIndex(alias) // index named like the new alias so delete it
-      }
-      // slight downtime, but only for one case of upgrading the UR engine from v0.1.x to v0.2.0+
-      client.admin().indices().prepareAliases()
-        .addAlias(newIndex, alias)
-        .execute().actionGet()
-    }
-    // clean out any old indexes that were the product of a failed train?
-    val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
-    indices.map { index =>
-      if (index.contains(alias) && index != newIndex) deleteIndex(index) //clean out any old orphaned indexes
-    }
-
-  }
-
-  def hhotSwap(
-    alias: String,
-    typeName: String,
-    indexRDD: RDD[Map[String, Any]],
-    fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty): Unit = {
-    // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
-    val newIndex = alias + "_" + DateTime.now().getMillis.toString
-
-    logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
-    createIndex(newIndex, typeName, fieldNames, typeMappings)
-
-    val newIndexURI = "/" + newIndex + "/" + typeName
-    // TODO ESHadoopのインタフェースで"es.mapping.id" -> "id"が機能するか確認
+    // TODO check if {"es.mapping.id": "id"} work on ESHadoop Interface of ESv5
     indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
     //refreshIndex(newIndex)
 
@@ -405,12 +266,11 @@ object EsClient {
         Map.empty[String, String].asJava,
         entity
       )
-      if (!oldIndexSet.isEmpty) deleteIndex(oldIndexSet.head)
+      oldIndexSet.foreach(deleteIndex(_))
 
     } finally {
       restClient.close()
     }
-
 
   }
 
@@ -420,17 +280,7 @@ object EsClient {
    *  @param indexName the index to search
    *  @return a [PredictedResults] collection
    */
-  def search(query: String, indexName: String): Option[SearchHits] = {
-    val sr = client.prepareSearch(indexName).setSource(query).get()
-
-    if (!sr.isTimedOut) {
-      Some(sr.getHits)
-    } else {
-      None
-    }
-  }
-
-  def ssearch(query: String, indexName: String): Option[JValue] = {
+  def search(query: String, indexName: String): Option[JValue] = {
     val restClient = client.open()
     try {
       val response = restClient.performRequest(
@@ -456,13 +306,7 @@ object EsClient {
    *  @param doc for UR the item id
    *  @return source [java.util.Map] of field names to any valid field values or null if empty
    */
-  def getSource(indexName: String, typeName: String, doc: String): util.Map[String, AnyRef] = {
-    client.prepareGet(indexName, typeName, doc)
-      .execute()
-      .actionGet().getSource
-  }
-
-  def ggetSource(indexName: String, typeName: String, doc: String): util.Map[String, AnyRef] = {
+  def getSource(indexName: String, typeName: String, doc: String): util.Map[String, JValue] = {
     val restClient = client.open()
     try {
       val response = restClient.performRequest(
@@ -471,9 +315,7 @@ object EsClient {
         Map.empty[String, String].asJava
       )
       val responseJValue = parse(EntityUtils.toString(response.getEntity))
-      (responseJValue \ "_hits" \ "hits" \ "_source").extract[T]
-
-      ???
+      (responseJValue \ "_hits" \ "hits" \ "_source").extract[Map[String, JValue]].asJava
     } finally {
       restClient.close()
     }
@@ -492,30 +334,6 @@ object EsClient {
 }
    */
   def getIndexName(alias: String): Option[String] = {
-
-    val allIndicesMap = client.admin().indices().getAliases(new GetAliasesRequest(alias)).actionGet().getAliases
-
-    if (allIndicesMap.size() == 1) { // must be a 1-1 mapping of alias <-> index
-      var indexName: String = ""
-      val itr = allIndicesMap.keysIt()
-      while (itr.hasNext)
-        indexName = itr.next()
-      Some(indexName) // the one index the alias points to
-    } else {
-      // delete all the indices that are pointed to by the alias, they can't be used
-      logger.warn("There is no 1-1 mapping of index to alias so deleting the old indexes that are referenced by the " +
-        "alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
-      if (!allIndicesMap.isEmpty) {
-        val i = allIndicesMap.keys().toArray.asInstanceOf[Array[String]]
-        for (indexName <- i) {
-          deleteIndex(indexName, refresh = true)
-        }
-      }
-      None // if more than one abort, need to clean up bad aliases
-    }
-  }
-
-  def ggetIndexName(alias: String): Option[String] = {
     val restClient = client.open()
     try {
       val response = restClient.performRequest(
