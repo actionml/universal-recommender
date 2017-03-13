@@ -29,6 +29,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JValue
+import org.json4s.DefaultFormats
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -170,6 +171,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
     extends P2LAlgorithm[PreparedData, NullModel, Query, PredictedResult] {
 
   @transient lazy implicit val logger: Logger = Logger[this.type]
+
+  implicit val formats = DefaultFormats
 
   case class BoostableCorrelators(actionName: String, itemIDs: Seq[ItemID], boost: Option[Float]) {
     def toFilterCorrelators: FilterCorrelators = {
@@ -448,22 +451,23 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val withRanks = query.withRanks.getOrElse(false)
     val predictedResult = searchHitsOpt match {
       case Some(searchHits) =>
-        val recs = searchHits.getHits.map { hit =>
+        val hits = (searchHits \ "hits" \ "hits").extract[Seq[JValue]]
+        val recs = hits.map { hit =>
           if (withRanks) {
-            val source = hit.getSource
+            val source = hit \ "source"
             val ranks: Map[String, Double] = rankingsParams map { backfillParams =>
               val backfillType = backfillParams.`type`.getOrElse(defaultURAlgorithmParams.DefaultBackfillType)
               val backfillFieldName = backfillParams.name.getOrElse(PopModel.nameByType(backfillType))
-              backfillFieldName -> source.get(backfillFieldName).asInstanceOf[Double]
+              backfillFieldName -> (source \ backfillFieldName).extract[Double]
             } toMap
 
-            ItemScore(hit.getId, hit.getScore.toDouble,
+            ItemScore((hit \ "_id").extract[String], (hit \ "_score").extract[Double],
               ranks = if (ranks.nonEmpty) Some(ranks) else None)
           } else {
-            ItemScore(hit.getId, hit.getScore.toDouble)
+            ItemScore((hit \ "_id").extract[String], (hit \ "_score").extract[Double])
           }
-        }
-        logger.info(s"Results: ${searchHits.getHits.length} retrieved of a possible ${searchHits.totalHits()}")
+        }.toArray
+        logger.info(s"Results: ${hits.length} retrieved of a possible ${(searchHits \ "hits" \ "total").extract[Long]}")
         PredictedResult(recs)
 
       case _ =>
