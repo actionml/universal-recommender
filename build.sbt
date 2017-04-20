@@ -14,10 +14,13 @@ organization := "com.actionml"
 val mahoutVersion = "0.13.0"
 
 //val pioVersion = "0.10.0-incubating"
-val pioVersion = "0.11.0-v1-SNAPSHOT"
+val pioVersion = "0.11.0-SNAPSHOT"
+
+val elasticsearchVersion = "5.2.1"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
+  "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch" % pioVersion % "provided",
   "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
@@ -32,9 +35,9 @@ libraryDependencies ++= Seq(
   // other external libs
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
-//  "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.2"
-//    exclude("org.apache.spark", "spark-catalyst_2.10")
-//    exclude("org.apache.spark", "spark-sql_2.10"),
+  "org.elasticsearch" % "elasticsearch-spark-20_2.10" % elasticsearchVersion
+    exclude("org.apache.spark", "spark-catalyst_2.10")
+    exclude("org.apache.spark", "spark-sql_2.10"),
   "org.json4s" %% "json4s-native" % "3.2.10")
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 

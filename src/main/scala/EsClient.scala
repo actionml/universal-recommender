@@ -23,7 +23,7 @@ import grizzled.slf4j.Logger
 import org.apache.http.util.EntityUtils
 
 // storage package isolate from data
-// import org.apache.predictionio.data.storage._
+import org.apache.predictionio.data.storage.elasticsearch
 import org.apache.predictionio.data.storage._
 //import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
@@ -35,7 +35,7 @@ import org.apache.spark.rdd.RDD
 //import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
 //import org.elasticsearch.action.get.GetResponse
 //import org.elasticsearch.client.transport.TransportClient
-//import org.elasticsearch.client.RestClient
+import org.elasticsearch.client.RestClient
 //import org.elasticsearch.common.settings.{ ImmutableSettings, Settings }
 import org.apache.http.entity.ContentType
 import org.apache.http.entity.StringEntity
