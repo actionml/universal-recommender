@@ -136,38 +136,32 @@ object EsClient {
         s"/$indexName",
         Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
           case 404 => {
-            var mappings = """
-            |{
+            var mappings = s"""
+            |{ "mappings": { "$indexType": {
             |  "properties": {
             """.stripMargin.replace("\n", "")
 
             def mappingsField(`type`: String) = {
               s"""
             |    : {
-            |      "type": "${`type`}",
-            |      "norms" : {
-            |        "enabled" : false
-            |      }
+            |      "type": "${`type`}"
             |    },
             """.stripMargin.replace("\n", "")
             }
 
             val mappingsTail = """
             |    "id": {
-            |      "type": "keyword",
-            |      "norms" : {
-            |        "enabled" : false
-            |      }
+            |      "type": "keyword"
             |    }
             |  }
-            |}
+            |}}}
           """.stripMargin.replace("\n", "")
 
             fieldNames.foreach { fieldName =>
               if (typeMappings.contains(fieldName))
-                mappings += (fieldName + mappingsField(typeMappings(fieldName)))
+                mappings += (s""""$fieldName"""" + mappingsField(typeMappings(fieldName)))
               else // unspecified fields are treated as not_analyzed keyword
-                mappings += (fieldName + mappingsField("keyword"))
+                mappings += (s""""$fieldName"""" + mappingsField("keyword"))
             }
             mappings += mappingsTail // any other string is not_analyzed
             val entity = new NStringEntity(mappings, ContentType.APPLICATION_JSON)
@@ -219,7 +213,7 @@ object EsClient {
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
 
     logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
-    createIndex(newIndex, typeName, fieldNames, typeMappings)
+    createIndex(newIndex, typeName, fieldNames, typeMappings, true)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
     // TODO check if {"es.mapping.id": "id"} work on ESHadoop Interface of ESv5
