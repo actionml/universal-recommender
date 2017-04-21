@@ -21,7 +21,7 @@ import java.util
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.data.storage._
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
+//import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest
@@ -49,26 +49,27 @@ import org.template.helpers.{ ItemID, ItemProps }
 object EsClient {
   @transient lazy val logger: Logger = Logger[this.type]
 
-  /*  private lazy val client = if (Storage.getConfig("ELASTICSEARCH5").nonEmpty)
+  /*  This returns 2 incompatible objects of TransportClient and RestClient
+
+  private lazy val client = if (Storage.getConfig("ELASTICSEARCH5").nonEmpty)
     new elasticsearch5.StorageClient(Storage.getConfig("ELASTICSEARCH5").get).client
   else if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
     new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
   else
     throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
       "proper configuration settings")
-*/
+  */
 
-  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
+  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty) {
     new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
-  else
+  } else {
     throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
       "proper configuration settings")
-
-  // wrong way that uses only default settings, which will be a localhost ES sever.
-  //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
+  }
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
    *  the changes will not be reflected.
+   *
    *  @param indexName will delete all types under this index, types are not used by the UR
    *  @param refresh
    *  @return true if all is well
@@ -92,6 +93,7 @@ object EsClient {
   }
 
   /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
+   *
    *  @param indexName elasticsearch name
    *  @param indexType names the type of index, usually use the item name
    *  @param fieldNames ES field names

@@ -87,7 +87,6 @@ class DataSource(val dsp: DataSourceParams)
     } filterNot { case (_, singleEventRDD) => singleEventRDD.isEmpty() }
 
     logger.info(s"Received events ${eventRDDs.map(_._1)}")
-    logger.info(s"Number of events ${eventRDDs.map(_._1.length)}")
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
     val fieldsRDD: RDD[(ItemID, PropertyMap)] = PEventStore.aggregateProperties(
