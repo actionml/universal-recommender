@@ -10,10 +10,8 @@ version := "0.5.0"
 
 organization := "com.actionml"
 
-// val mahoutVersion = "0.13.0-SNAPSHOT"
 val mahoutVersion = "0.13.0"
 
-//val pioVersion = "0.10.0-incubating"
 val pioVersion = "0.11.0-SNAPSHOT"
 
 val elasticsearchVersion = "5.2.1"
@@ -35,9 +33,6 @@ libraryDependencies ++= Seq(
   // other external libs
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
-  "org.elasticsearch" % "elasticsearch-spark-20_2.10" % elasticsearchVersion
-    exclude("org.apache.spark", "spark-catalyst_2.10")
-    exclude("org.apache.spark", "spark-sql_2.10"),
   "org.json4s" %% "json4s-native" % "3.2.10")
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 

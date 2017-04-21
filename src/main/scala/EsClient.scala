@@ -21,36 +21,22 @@ import java.util
 
 import grizzled.slf4j.Logger
 import org.apache.http.util.EntityUtils
+import org.elasticsearch.client.RestClient
 
 // storage package isolate from data
 import org.apache.predictionio.data.storage.elasticsearch
 import org.apache.predictionio.data.storage._
-//import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-//import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest
-//import org.elasticsearch.action.admin.indices.create.CreateIndexRequest
-//import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
-//import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest
-//import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
-//import org.elasticsearch.action.get.GetResponse
-//import org.elasticsearch.client.transport.TransportClient
-import org.elasticsearch.client.RestClient
-//import org.elasticsearch.common.settings.{ ImmutableSettings, Settings }
 import org.apache.http.entity.ContentType
-import org.apache.http.entity.StringEntity
 import org.apache.http.nio.entity.NStringEntity
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
-//import org.elasticsearch.node.NodeBuilder._
-//import org.elasticsearch.search.SearchHits
 import org.json4s.JValue
 import org.json4s.DefaultFormats
 import org.template.conversions.{ ItemID, ItemProps }
 
-import scala.collection.immutable
-import scala.collection.parallel.mutable
 import scala.collection.JavaConverters._
 
 /** Elasticsearch notes:
@@ -129,7 +115,7 @@ object EsClient {
     fieldNames: List[String],
     typeMappings: Map[String, String] = Map.empty,
     refresh: Boolean = false): Boolean = {
-    val restClient = client.open()
+    val restClient: RestClient = client.open()
     val result = try {
       restClient.performRequest(
         "HEAD",
