@@ -105,21 +105,22 @@ object EsClient {
     indexName: String,
     indexType: String,
     fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty,
+    typeMappings: Map[String, (String, Boolean)] = Map.empty,
     refresh: Boolean = false): Boolean = {
+
     if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
       var mappings = """
         |{
         |  "properties": {
         """.stripMargin.replace("\n", "")
 
-      def mappingsField(`type`: String) = {
+      def mappingsField(`type`: String, `normsEnabled`: Boolean) = {
         s"""
         |    : {
         |      "type": "${`type`}",
         |      "index": "not_analyzed",
         |      "norms" : {
-        |        "enabled" : false
+        |        "enabled" : "${`normsEnabled`}"
         |      }
         |    },
         """.stripMargin.replace("\n", "")
@@ -139,11 +140,11 @@ object EsClient {
 
       fieldNames.foreach { fieldName =>
         if (typeMappings.contains(fieldName))
-          mappings += (fieldName + mappingsField(typeMappings(fieldName)))
+          mappings += (fieldName + mappingsField(typeMappings(fieldName)._1, typeMappings(fieldName)._2))
         else // unspecified fields are treated as not_analyzed strings
-          mappings += (fieldName + mappingsField("string"))
+          mappings += (fieldName + (mappingsField("string", false)))
       }
-      mappings += mappingsTail // any other string is not_analyzed
+      mappings += mappingsTail // "id" string is not_analyzed and does not use norms
 
       val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
       val create = client.admin().indices().create(cir).actionGet()
@@ -172,7 +173,7 @@ object EsClient {
     typeName: String,
     indexRDD: RDD[Map[String, Any]],
     fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty): Unit = {
+    typeMappings: Map[String, (String, Boolean)] = Map.empty): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString

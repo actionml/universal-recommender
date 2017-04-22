@@ -39,7 +39,7 @@ import scala.concurrent.duration.Duration
 import scala.language.{ implicitConversions, postfixOps }
 
 /** Available value for algorithm param "RecsModel" */
-object RecsModel { // todo: replace this with rankings
+object RecsModels { // todo: replace this with rankings
   val All = "all"
   val CF = "collabFiltering"
   val BF = "backfill"
@@ -49,46 +49,46 @@ object RecsModel { // todo: replace this with rankings
 /** Setting the option in the params case class doesn't work as expected when the param is missing from
  *  engine.json so set these for use in the algorithm when they are not present in the engine.json
  */
-object DefaultURAlgorithmParams {
-  val DefaultMaxEventsPerEventType = 500
-  val DefaultNum = 20
-  val DefaultMaxCorrelatorsPerEventType = 50
-  val DefaultMaxQueryEvents = 100 // default number of user history events to use in recs query
+object DefaultURAlgoParams {
+  val MaxEventsPerEventType = 500
+  val NumResults = 20
+  val MaxCorrelatorsPerEventType = 50
+  val MaxQueryEvents = 100 // default number of user history events to use in recs query
 
-  val DefaultExpireDateName = "expireDate" // default name for the expire date property of an item
-  val DefaultAvailableDateName = "availableDate" //defualt name for and item's available after date
-  val DefaultDateName = "date" // when using a date range in the query this is the name of the item's date
-  val DefaultRecsModel = RecsModel.All // use CF + backfill
-  val DefaultRankingParams = RankingParams()
-  val DefaultBackfillFieldName = RankingFieldName.PopRank
-  val DefaultBackfillType = RankingType.Popular
-  val DefaultBackfillDuration = "3650 days" // for all time
+  val ExpireDateName = "expireDate" // default name for the expire date property of an item
+  val AvailableDateName = "availableDate" //defualt name for and item's available after date
+  val DateName = "date" // when using a date range in the query this is the name of the item's date
+  val RecsModel = RecsModels.All // use CF + backfill
+  //val RankingParams = RankingParams()
+  val BackfillFieldName = RankingFieldName.PopRank
+  val BackfillType = RankingType.Popular
+  val BackfillDuration = "3650 days" // for all time
 
-  val DefaultReturnSelf = false
+  val ReturnSelf = false
 }
 
 /* default values must be set in code not the case class declaration
 case class BackfillField(
-  name: Option[String] = Some(DefaultURAlgorithmParams.DefaultBackfillFieldName),
-  backfillType: Option[String] = Some(DefaultURAlgorithmParams.DefaultBackfillType), // may be 'hot', or 'trending' also
+  name: Option[String] = Some(DefaultURAlgoParams.BackfillFieldName),
+  backfillType: Option[String] = Some(DefaultURAlgoParams.BackfillType), // may be 'hot', or 'trending' also
   eventNames: Option[Seq[String]] = None, // None means use the algo eventNames list, otherwise a list of events
   offsetDate: Option[String] = None, // used only for tests, specifies the offset date to start the duration so the most
   // recent date for events going back by from the more recent offsetDate - duration
-  duration: Option[String] = Some(DefaultURAlgorithmParams.DefaultBackfillDuration)) // duration worth of events
+  duration: Option[String] = Some(DefaultURAlgoParams.BackfillDuration)) // duration worth of events
   // to use in calculation of backfill
 
 case class URAlgorithmParams(
   appName: String, // filled in from engine.json
   indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
-  recsModel: Option[String] = Some(DefaultURAlgorithmParams.DefaultRecsModel), // "all", "collabFiltering", "backfill"
+  recsModel: Option[String] = Some(DefaultURAlgoParams.RecsModel), // "all", "collabFiltering", "backfill"
   eventNames: Seq[String], // names used to ID all user actions
   blacklistEvents: Option[Seq[String]] = None,// None means use the primary event, empty array means no filter
   // number of events in user-based recs query
-  maxQueryEvents: Option[Int] = Some(DefaultURAlgorithmParams.DefaultMaxQueryEvents),
-  maxEventsPerEventType: Option[Int] = Some(DefaultURAlgorithmParams.DefaultMaxEventsPerEventType),
-  maxCorrelatorsPerEventType: Option[Int] = Some(DefaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
-  num: Option[Int] = Some(DefaultURAlgorithmParams.DefaultNum), // default max # of recs requested
+  maxQueryEvents: Option[Int] = Some(DefaultURAlgoParams.MaxQueryEvents),
+  maxEventsPerEventType: Option[Int] = Some(DefaultURAlgoParams.MaxEventsPerEventType),
+  maxCorrelatorsPerEventType: Option[Int] = Some(DefaultURAlgoParams.MaxCorrelatorsPerEventType),
+  num: Option[Int] = Some(DefaultURAlgoParams.NumResults), // default max # of recs requested
   userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
   itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
   returnSelf: Option[Boolean] = None, // query building logic defaults this to false
@@ -96,11 +96,11 @@ case class URAlgorithmParams(
   // leave out for default or popular
   backfillField: Option[BackfillField] = None,
   // name of date property field for when the item is available
-  availableDateName: Option[String] = Some(DefaultURAlgorithmParams.DefaultAvailableDateName),
+  availableDateName: Option[String] = Some(DefaultURAlgoParams.AvailableDateName),
   // name of date property field for when an item is no longer available
-  expireDateName: Option[String] = Some(DefaultURAlgorithmParams.DefaultExpireDateName),
+  expireDateName: Option[String] = Some(DefaultURAlgoParams.ExpireDateName),
   // used as the subject of a dateRange in queries, specifies the name of the item property
-  dateName: Option[String] = Some(DefaultURAlgorithmParams.DefaultDateName),
+  dateName: Option[String] = Some(DefaultURAlgoParams.DateName),
   seed: Option[Long] = None) // seed is not used presently
   extends Params //fixed default make it reproducible unless supplied
   */
@@ -124,6 +124,12 @@ case class RankingParams(
        |""".stripMargin
   }
 }
+
+case class DefaultIndicatorParams(
+  maxItemsPerUser: Int = DefaultURAlgoParams.MaxQueryEvents, // defaults to maxEventsPerEventType
+  maxCorrelatorsPerItem: Int = DefaultURAlgoParams.MaxCorrelatorsPerEventType,
+  // defaults to maxCorrelatorsPerEventType
+  minLLR: Option[Double] = None) // defaults to none, takes precendence over maxCorrelatorsPerItem
 
 case class IndicatorParams(
   name: String, // must match one in eventNames
@@ -180,7 +186,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   case class ExclusionFields(propertyName: String, values: Seq[String])
 
   val appName: String = ap.appName
-  val recsModel: String = ap.recsModel.getOrElse(DefaultURAlgorithmParams.DefaultRecsModel)
+  val recsModel: String = ap.recsModel.getOrElse(DefaultURAlgoParams.RecsModel)
   //val eventNames: Seq[String] = ap.eventNames
 
   val userBias: Float = ap.userBias.getOrElse(1f)
@@ -188,7 +194,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   // get max total user history events for the ES query
   lazy val maxQueryEvents = if (ap.indicators.isEmpty) {
-    ap.maxQueryEvents.getOrElse(DefaultURAlgorithmParams.DefaultMaxQueryEvents)
+    ap.maxQueryEvents.getOrElse(DefaultURAlgoParams.MaxQueryEvents)
   } else { // using the indicator method of setting query events
     ap.indicators.get.foldLeft[Int](0) { (previous, indicator) =>
       previous + indicator.maxItemsPerUser.getOrElse(0)
@@ -197,17 +203,32 @@ class URAlgorithm(val ap: URAlgorithmParams)
     // not ideal but avoids one query to the event store per event type
   }
 
-  val limit: Int = ap.num.getOrElse(DefaultURAlgorithmParams.DefaultNum)
+  lazy val indicatorParams = if (ap.eventNames.nonEmpty) { // using eventNames shortcut
+    ap.eventNames.get.map { eventName =>
+      eventName -> DefaultIndicatorParams()
+    }.toMap
+  } else if (ap.indicators.nonEmpty) { // using indicators for fined tuned control
+    ap.indicators.get.map { indicatorParams =>
+      indicatorParams.name -> DefaultIndicatorParams(
+        maxItemsPerUser = indicatorParams.maxItemsPerUser.getOrElse(DefaultURAlgoParams.MaxEventsPerEventType),
+        maxCorrelatorsPerItem = indicatorParams.maxCorrelatorsPerItem.getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType),
+        minLLR = indicatorParams.minLLR)
+    }.toMap
+  } else {
+    throw new IllegalArgumentException("Must have either \"eventNames\" or \"indicators\" in algorithm parameters.")
+  }
+
+  val limit: Int = ap.num.getOrElse(DefaultURAlgoParams.NumResults)
 
   val blacklistEvents: Seq[String] = ap.blacklistEvents.getOrEmpty
-  val returnSelf: Boolean = ap.returnSelf.getOrElse(DefaultURAlgorithmParams.DefaultReturnSelf)
+  val returnSelf: Boolean = ap.returnSelf.getOrElse(DefaultURAlgoParams.ReturnSelf)
   val fields: Seq[Field] = ap.fields.getOrEmpty
 
   val randomSeed: Int = ap.seed.getOrElse(System.currentTimeMillis()).toInt
   val maxCorrelatorsPerEventType: Int = ap.maxCorrelatorsPerEventType
-    .getOrElse(DefaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType)
+    .getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType)
   val maxEventsPerEventType: Int = ap.maxEventsPerEventType
-    .getOrElse(DefaultURAlgorithmParams.DefaultMaxEventsPerEventType)
+    .getOrElse(DefaultURAlgoParams.MaxEventsPerEventType)
 
   lazy val modelEventNames = if (ap.indicators.isEmpty) {
     if (ap.eventNames.isEmpty) {
@@ -217,15 +238,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   // Unique by 'type' ranking params, if collision get first.
   lazy val rankingsParams: Seq[RankingParams] = ap.rankings.getOrElse(Seq(RankingParams(
-    name = Some(DefaultURAlgorithmParams.DefaultBackfillFieldName),
-    `type` = Some(DefaultURAlgorithmParams.DefaultBackfillType),
+    name = Some(DefaultURAlgoParams.BackfillFieldName),
+    `type` = Some(DefaultURAlgoParams.BackfillType),
     eventNames = Some(modelEventNames.take(1)),
     offsetDate = None,
     endDate = None,
-    duration = Some(DefaultURAlgorithmParams.DefaultBackfillDuration)))).groupBy(_.`type`).map(_._2.head).toSeq
+    duration = Some(DefaultURAlgoParams.BackfillDuration)))).groupBy(_.`type`).map(_._2.head).toSeq
 
   val rankingFieldNames: Seq[String] = rankingsParams map { rankingParams =>
-    val rankingType = rankingParams.`type`.getOrElse(DefaultURAlgorithmParams.DefaultBackfillType)
+    val rankingType = rankingParams.`type`.getOrElse(DefaultURAlgoParams.BackfillType)
     val rankingFieldName = rankingParams.name.getOrElse(PopModel.nameByType(rankingType))
     rankingFieldName
   }
@@ -260,15 +281,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
   def train(sc: SparkContext, data: PreparedData): NullModel = {
 
     recsModel match {
-      case RecsModel.All => calcAll(data)(sc)
-      case RecsModel.CF  => calcAll(data, calcPopular = false)(sc)
-      case RecsModel.BF  => calcPop(data)(sc)
+      case RecsModels.All => calcAll(data)(sc)
+      case RecsModels.CF  => calcAll(data, calcPopular = false)(sc)
+      case RecsModels.BF  => calcPop(data)(sc)
       // error, throw an exception
       case unknownRecsModel =>
         throw new IllegalArgumentException(
           s"""
              |Bad algorithm param recsModel=[$unknownRecsModel] in engine definition params, possibly a bad json value.
-             |Use one of the available parameter values ($RecsModel).""".stripMargin)
+             |Use one of the available parameter values ($recsModel).""".stripMargin)
     }
   }
 
@@ -285,8 +306,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
          |Check to see that your dataset contains the primary event.""".stripMargin)
 */
 
-    //val backfillParams = ap.backfillField.getOrElse(DefaultURAlgorithmParams.DefaultBackfillParams)
-    //val nonDefaultMappings = Map(backfillParams.name.getOrElse(DefaultURAlgorithmParams.DefaultBackfillFieldName) -> "float")
+    //val backfillParams = ap.backfillField.getOrElse(DefaultURAlgoParams.DefaultBackfillParams)
+    //val nonDefaultMappings = Map(backfillParams.name.getOrElse(DefaultURAlgoParams.BackfillFieldName) -> "float")
 
     logger.info("Actions read now creating correlators")
     val cooccurrenceIDSs = if (ap.indicators.isEmpty) { // using one global set of algo params
@@ -294,8 +315,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
         data.actions.map(_._2).toArray,
         randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
         maxInterestingItemsPerThing = ap.maxCorrelatorsPerEventType
-          .getOrElse(DefaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
-        maxNumInteractions = ap.maxEventsPerEventType.getOrElse(DefaultURAlgorithmParams.DefaultMaxEventsPerEventType))
+          .getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType),
+        maxNumInteractions = ap.maxEventsPerEventType.getOrElse(DefaultURAlgoParams.MaxEventsPerEventType))
         .map(_.asInstanceOf[IndexedDatasetSpark])
     } else { // using params per matrix pair, these take the place of eventNames, maxCorrelatorsPerEventType,
       // and maxEventsPerEventType!
@@ -305,8 +326,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
         case (iD, i) =>
           new DownsamplableCrossOccurrenceDataset(
             iD,
-            indicators(i).maxItemsPerUser.getOrElse(DefaultURAlgorithmParams.DefaultMaxEventsPerEventType),
-            indicators(i).maxCorrelatorsPerItem.getOrElse(DefaultURAlgorithmParams.DefaultMaxCorrelatorsPerEventType),
+            indicators(i).maxItemsPerUser.getOrElse(DefaultURAlgoParams.MaxEventsPerEventType),
+            indicators(i).maxCorrelatorsPerItem.getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType),
             indicators(i).minLLR)
       }.toList
 
@@ -334,7 +355,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     new URModel(
       coocurrenceMatrices = cooccurrenceCorrelators,
       propertiesRDDs = Seq(propertiesRDD),
-      typeMappings = getRankingMapping).save(dateNames, esIndex, esType)
+      typeMappings = getMappings).save(dateNames, esIndex, esType)
     new NullModel
   }
 
@@ -364,7 +385,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     // returns the existing model plus new popularity ranking
     new URModel(
       propertiesRDDs = Seq(fieldsRDD.cache(), propertiesRDD.cache()),
-      typeMappings = getRankingMapping).save(dateNames, esIndex, esType)
+      typeMappings = getMappings).save(dateNames, esIndex, esType)
     new NullModel
   }
 
@@ -465,7 +486,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
           if (withRanks) {
             val source = hit.getSource
             val ranks: Map[String, Double] = rankingsParams map { backfillParams =>
-              val backfillType = backfillParams.`type`.getOrElse(DefaultURAlgorithmParams.DefaultBackfillType)
+              val backfillType = backfillParams.`type`.getOrElse(DefaultURAlgoParams.BackfillType)
               val backfillFieldName = backfillParams.name.getOrElse(PopModel.nameByType(backfillType))
               backfillFieldName -> source.get(backfillFieldName).asInstanceOf[Double]
             } toMap
@@ -484,7 +505,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         Array.empty[ItemScore]
     }
 
-    if (recsModel == RecsModel.CF) {
+    if (recsModel == RecsModels.CF) {
       PredictedResult(predictedResults.filter(_.score != 0.0))
     } else PredictedResult(predictedResults)
 
@@ -502,9 +523,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
   def getRanksRDD(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext): RDD[(ItemID, ItemProps)] = {
     val popModel = PopModel(fieldsRDD)
     val rankRDDs: Seq[(String, RDD[(ItemID, Double)])] = rankingsParams map { rankingParams =>
-      val rankingType = rankingParams.`type`.getOrElse(DefaultURAlgorithmParams.DefaultBackfillType)
+      val rankingType = rankingParams.`type`.getOrElse(DefaultURAlgoParams.BackfillType)
       val rankingFieldName = rankingParams.name.getOrElse(PopModel.nameByType(rankingType))
-      val durationAsString = rankingParams.duration.getOrElse(DefaultURAlgorithmParams.DefaultBackfillDuration)
+      val durationAsString = rankingParams.duration.getOrElse(DefaultURAlgoParams.BackfillDuration)
       val duration = Duration(durationAsString).toSeconds.toInt
       val backfillEvents = rankingParams.eventNames.getOrElse(modelEventNames.take(1))
       val offsetDate = rankingParams.offsetDate
@@ -617,7 +638,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   /** Build must query part */
   def buildQueryMust(query: Query, boostable: Seq[BoostableCorrelators]): Seq[JValue] = {
 
-    // create a lsit of all query correlators that are to be used to filter results
+    // create a list of all query correlators that are to be used to filter results
     val recentUserHistoryFilter: Seq[FilterCorrelators] = if (userBias < 0f) {
       // strip any boosts
       boostable.map(_.toFilterCorrelators).slice(0, maxQueryEvents - 1)
@@ -665,7 +686,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   }
 
   /** Build sort query part */
-  def buildQuerySort(): Seq[JValue] = if (recsModel == RecsModel.All || recsModel == RecsModel.BF) {
+  def buildQuerySort(): Seq[JValue] = if (recsModel == RecsModels.All || recsModel == RecsModels.BF) {
     val sortByScore: Seq[JValue] = Seq(parse("""{"_score": {"order": "desc"}}"""))
     val sortByRanks: Seq[JValue] = rankingFieldNames map { fieldName =>
       parse(s"""{ "$fieldName": { "unmapped_type": "double", "order": "desc" } }""")
@@ -736,7 +757,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
   def getBiasedRecentUserActions(query: Query): (Seq[BoostableCorrelators], Seq[Event]) = {
 
     val recentEvents = try {
-      val maxEvents =
       LEventStore.findByEntity(
         appName = appName,
         // entityType and entityId is specified for fast lookup
@@ -745,12 +765,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
         // one query per eventName is not ideal, maybe one query for lots of events then split by eventName
         // eventNames = Some(Seq(action)),// get all and separate later
         eventNames = Some(queryEventNames), // get all and separate later
-        targetEntityType = None,
-        limit = Some(maxQueryEvents), // this will get all history then each action can be limited before using in
+        // targetEntityType = None,
+        // limit = Some(maxQueryEvents), // this will get all history then each action can be limited before using in
         // the query
         latest = true,
         // set time limit to avoid super long DB access
-        timeout = Duration(200, "millis")).toList
+        timeout = Duration(200, "millis")).toSeq
     } catch {
       case e: scala.concurrent.TimeoutException =>
         logger.error(s"Timeout when read recent events. Empty list is used. $e")
@@ -768,12 +788,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val rActions = queryEventNames.map { action =>
       var items = Seq.empty[String]
 
-      for (event <- recentEvents)
-        if (event.event == action && items.size < maxQueryEvents) {
+      for (event <- recentEvents) { // todo: use indidatorParams for each indicator type
+        if (event.event == action && items.size < indicatorParams(action).maxItemsPerUser) {
           items = event.targetEntityId.get +: items
           // todo: may throw exception and we should ignore the event instead of crashing
         }
-      // userBias may be None, which will cause no JSON output for this
+        // userBias may be None, which will cause no JSON output for this
+      }
       BoostableCorrelators(action, items.distinct, userEventsBoost)
     }
     (rActions, recentEvents)
@@ -897,8 +918,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
     json
   }
 
-  def getRankingMapping: Map[String, String] = rankingFieldNames map { fieldName =>
-    fieldName -> "float"
-  } toMap
+  def getMappings: Map[String, (String, Boolean)] = {
+    rankingFieldNames.map { fieldName =>
+      fieldName -> ("float", false)
+    }.toMap ++ // create mappings for correlators, where the Boolean says to not use norms
+      modelEventNames.map { correlator =>
+        correlator -> ("string", true) // use norms with correlators to get closer to cosine similarity.
+      }.toMap
+  }
 
 }

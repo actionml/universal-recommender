@@ -18,7 +18,7 @@ val elasticsearch1Version = "1.7.5"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
-  "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch1" % pioVersion,
+  "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch1" % pioVersion % "provided",
   "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
@@ -45,6 +45,8 @@ libraryDependencies ++= Seq(
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
 resolvers += Resolver.mavenLocal
+
+resolvers += "rc parts for PIO" at "https://repository.apache.org/content/repositories/orgapachepredictionio-1016"
 
 SbtScalariform.scalariformSettings
 

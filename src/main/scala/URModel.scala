@@ -32,7 +32,7 @@ import org.template.helpers.{ IndexedDatasetConversions, ItemID, ItemProps }
 class URModel(
     coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
     propertiesRDDs: Seq[RDD[(ItemID, ItemProps)]] = Seq.empty,
-    typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
+    typeMappings: Map[String, (String, Boolean)] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
     nullModel: Boolean = false)(implicit sc: SparkContext) {
 
   @transient lazy val logger: Logger = Logger[this.type]
