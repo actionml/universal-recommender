@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.data.storage.DataMap
@@ -26,7 +26,7 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
-import org.template.helpers.{ IndexedDatasetConversions, ItemID, ItemProps }
+import com.actionml.helpers.{ IndexedDatasetConversions, ItemID, ItemProps }
 
 /** Universal Recommender models to save in ES */
 class URModel(

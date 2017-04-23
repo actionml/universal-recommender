@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import java.util
 
@@ -32,7 +32,7 @@ import org.json4s.JValue
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
-import org.template.helpers._
+import com.actionml.helpers._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
@@ -107,7 +107,7 @@ case class URAlgorithmParams(
 
 case class RankingParams(
     name: Option[String] = None,
-    `type`: Option[String] = None, // See [[org.template.BackfillType]]
+    `type`: Option[String] = None, // See [[com.actionml.BackfillType]]
     eventNames: Option[Seq[String]] = None, // None means use the algo eventNames list, otherwise a list of events
     offsetDate: Option[String] = None, // used only for tests, specifies the offset date to start the duration so the most
     // recent date for events going back by from the more recent offsetDate - duration
@@ -919,12 +919,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
   }
 
   def getMappings: Map[String, (String, Boolean)] = {
-    rankingFieldNames.map { fieldName =>
+    val mappings = rankingFieldNames.map { fieldName =>
       fieldName -> ("float", false)
     }.toMap ++ // create mappings for correlators, where the Boolean says to not use norms
       modelEventNames.map { correlator =>
         correlator -> ("string", true) // use norms with correlators to get closer to cosine similarity.
       }.toMap
+    logger.info(s"Index mappings for the Elasticsearch URModel: $mappings")
+    mappings
   }
 
 }

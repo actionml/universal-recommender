@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import java.util
 
@@ -35,7 +35,7 @@ import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
 import org.elasticsearch.search.SearchHits
 import org.json4s.JValue
-import org.template.helpers.{ ItemID, ItemProps }
+import com.actionml.helpers.{ ItemID, ItemProps }
 
 /** Elasticsearch notes:
  *  1) every query clause wil laffect scores unless it has a constant_score and boost: 0
@@ -145,6 +145,7 @@ object EsClient {
           mappings += (fieldName + (mappingsField("string", false)))
       }
       mappings += mappingsTail // "id" string is not_analyzed and does not use norms
+      logger.info(s"Mappings for the index: $mappings")
 
       val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
       val create = client.admin().indices().create(cir).actionGet()

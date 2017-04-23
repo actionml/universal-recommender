@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import org.apache.predictionio.controller.{ EmptyActualResult, EmptyEvaluationInfo, PDataSource, Params }
 import org.apache.predictionio.data.storage.PropertyMap
@@ -24,8 +24,8 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.core.{ EventWindow, SelfCleaningDataSource }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.template.helpers.{ ActionID, ItemID }
-import org.template.helpers._
+import com.actionml.helpers.{ ActionID, ItemID }
+import com.actionml.helpers._
 
 /** Taken from engine.json these are passed in to the DataSource constructor
  *

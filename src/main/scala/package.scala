@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import grizzled.slf4j.Logger
 

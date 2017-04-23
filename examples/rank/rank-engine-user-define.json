@@ -2,7 +2,7 @@
   "comment":" This config file uses default settings for all but the required values see README.md for docs",
   "id": "default",
   "description": "Default settings",
-  "engineFactory": "org.template.RecommendationEngine",
+  "engineFactory": "com.actionml.RecommendationEngine",
   "datasource": {
     "params" : {
       "appName": "default-rank",

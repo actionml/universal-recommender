@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.controller.{ EmptyActualResult, EmptyEvaluationInfo, Engine, EngineFactory }
-import org.template.helpers._
+import com.actionml.helpers._
 
 /** This file contains case classes that are used with reflection to specify how query and config
  *  JSON is to be parsed. the Query case class, for instance defines the way a JSON query is to be
