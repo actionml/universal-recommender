@@ -223,27 +223,34 @@ object EsClient {
     val restClient = client.open()
     try {
       // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
-      val response = restClient.performRequest(
-        "GET",
-        s"/_alias/$alias",
-        Map.empty[String, String].asJava)
-      val responseJValue = parse(EntityUtils.toString(response.getEntity))
-      // TODO to use keys
-      val oldIndexSet = responseJValue.extract[Map[String, JValue]].keys
-      val deleteOldIndexQuery = oldIndexSet.map(oldIndex => {
-        s"""{ "remove_index": { "index": "${oldIndex}"}}"""
-      }).mkString(",", ",", "")
 
-      val aliasQuery =
-        s"""
-           |{
-           |    "actions" : [
-           |        { "add":  { "index": "${newIndex}", "alias": "${alias}" } }
-        """ + deleteOldIndexQuery +
-          """
-           |    ]
-           |}
-          """.stripMargin.replace("\n", "")
+      val (oldIndexSet, deleteOldIndexQuery) = restClient.performRequest(
+        "HEAD",
+        s"/_alias/$alias",
+        Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+          case 200 => {
+            val response = restClient.performRequest(
+              "GET",
+              s"/_alias/$alias",
+              Map.empty[String, String].asJava)
+            val responseJValue = parse(EntityUtils.toString(response.getEntity))
+            // TODO to use keys
+            val oldIndexSet = responseJValue.extract[Map[String, JValue]].keys
+            val deleteOldIndexQuery = oldIndexSet.map(oldIndex => {
+              s"""{ "remove_index": { "index": "${oldIndex}"}}"""
+            }).mkString(",", ",", "")
+            (oldIndexSet, deleteOldIndexQuery)
+          }
+          case _ => (Set(), "")
+        }
+
+      val aliasQuery = s"""
+        |{
+        |    "actions" : [
+        |        { "add":  { "index": "${newIndex}", "alias": "${alias}" } }
+        |        ${deleteOldIndexQuery}
+        |    ]
+        |}""".stripMargin.replace("\n", "")
       val entity = new NStringEntity(aliasQuery, ContentType.APPLICATION_JSON)
       if (!oldIndexSet.isEmpty) {
         restClient.performRequest(
