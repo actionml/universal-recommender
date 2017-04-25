@@ -196,10 +196,14 @@ object EsClient {
   /** Commits any pending changes to the index */
   def refreshIndex(indexName: String): Unit = {
     val restClient = client.open()
-    restClient.performRequest(
-      "POST",
-      s"/$indexName/_refresh",
-      Map.empty[String, String].asJava)
+    try {
+      restClient.performRequest(
+        "POST",
+        s"/$indexName/_refresh",
+        Map.empty[String, String].asJava)
+    } finally {
+      restClient.close()
+    }
   }
 
   /** Create new index and hot-swap the new after it's indexed and ready to take over, then delete the old */
