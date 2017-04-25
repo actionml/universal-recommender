@@ -16,7 +16,7 @@ val mahoutVersion = "0.13.0"
 
 //val pioVersion = "0.10.0-incubating"
 val pioVersion = "0.11.0-SNAPSHOT"
-val elasticsearchVersion = "5.2.1"
+val elasticsearchVersion = "5.1.1"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
