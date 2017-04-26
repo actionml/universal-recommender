@@ -221,7 +221,8 @@ object EsClient {
 
     val newIndexURI = "/" + newIndex + "/" + typeName
     // TODO check if {"es.mapping.id": "id"} work on ESHadoop Interface of ESv5
-    indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
+    // Repartition to fit into Elasticsearch concurrency limits.
+    indexRDD.repartition(4).saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
     //refreshIndex(newIndex)
 
     val restClient = client.open()
