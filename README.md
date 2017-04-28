@@ -4,28 +4,32 @@ The Universal Recommender (UR) is a new type of collaborative filtering recommen
 
 Most recommenders can only use conversion events, like buy or rate. Using all we know about a user and their context allows us to much better predict their preferences.
 
-#Documentation
+# Documentation
 
  - [The Universal Recommender](http://actionml.com/docs/ur)
  - [The Correlated Cross-Occurrence Algorithm](http://mahout.apache.org/users/algorithms/intro-cooccurrence-spark.html)
  - [The Universal Recommender Slide Deck](http://www.slideshare.net/pferrel/unified-recommender-39986309)
 
 
-All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) and are now hosted in a separate repo at [https://github.com/actionml/docs.actionml.com](https://github.com/actionml/docs.actionml.com). If you wish to change or edit those docs make a PR to that repo.
+All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) and are hosted at [https://github.com/actionml/docs.actionml.com](https://github.com/actionml/docs.actionml.com). If you wish to change or edit the docs make a PR to that repo.
 
+# Contributions
+
+Contributions are encouraged and appreciated. Create a PR against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We take bug fixes or new features but insist that new features are general and any controls needed are added to the `engine.json` params so other users can control the features without modifying code of the UR. We will be happy to provide guidance or help in this.
 
 # Version Changelog
 
-## v0.5.1
+## v0.6.0
 
- - **Adds item-set based queries**: for shopping carts, favorites, and watch-list type recommendations. This is sometimes called "complimentary purchase"
-recommendations.
-- **Exclusion rules**: Previous versions allowed business rules to include (filter) or boost items by their properties, now items can be excluded by their properties too. 
-- **Major Speedup**: Some tests show this version is 43% faster than previous versions. 
+ - **Preformance**: Nearly a 50% speedup for most model calculation, and a new tuning parameter that can yield further speed improvements by filtering our unused or less useful data from model building.
+ - **Exclusion Rules**: now we have business rules for inclusion, exclusion, and boosts based on item properties.
+ - **Complimentary Purchase aka Item-set Recommendations**: "Shopping-cart" type recommendations. Can be used for wishlists, favorites, watchlists, any list based recommendations. Used with list or user data.
+ - **PredictionIO 0.11.0**: Full compatibility.
+ - **New Advanced Tuning**: Allows several new per indicator / event type tuning parameters for tuning model quality in a more targeted way.
 
 ## v0.5.0
 
- - **Apache PIO Compatible**: The first UR version compatible with Apache PredictionIO-0.10.0-incubating. All past versions do not work and should be upgraded.
+ - **Apache PIO Compatible**: The first UR version compatible with Apache PredictionIO-0.10.0-incubating. All past versions do not work and should be upgraded to this. The ActionML build of PIO is permanently deprecated since it is merged with Apache PIO.
 
 ## v0.4.2 **Replaces 0.4.1**
 

@@ -37,7 +37,9 @@ case class DataSourceParams(
   appName: String,
   eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
   eventWindow: Option[EventWindow],
-  minEventsPerUser: Option[Int]) extends Params
+  minEventsPerUser: Option[Int]) // defaults to 1 event, if the user has only one thehy will not contribute to
+    // training anyway
+    extends Params
 
 /** Read specified events from the PEventStore and creates RDDs for each event. A list of pairs (eventName, eventRDD)
  *  are sent to the Preparator for further processing.
@@ -104,11 +106,12 @@ class DataSource(val dsp: DataSourceParams)
  *
  *  @param actions List of Tuples (actionName, actionRDD)qw
  *  @param fieldsRDD RDD of item keyed PropertyMap for item metadata
+ *  @param minEventsPerUser users with less than this many events will not removed from training data
  */
 case class TrainingData(
     actions: Seq[(ActionID, RDD[(UserID, ItemID)])],
     fieldsRDD: RDD[(ItemID, PropertyMap)],
-    minEventsPerUser: Option[Int] = None) extends Serializable {
+    minEventsPerUser: Option[Int] = Some(1)) extends Serializable {
 
   override def toString: String = {
     val a = actions.map { t =>

@@ -21,6 +21,20 @@ import java.util
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.data.storage._
+
+/*
+//import org.json4s.JsonAST.{JField, JString}
+import org.json4s._
+import org.json4s.native.JsonMethods._
+import org.json4s.JValue
+//import org.json4s.jackson.JsonMethods._
+//import org.json4s.JsonDSL._
+*/
+import org.json4s.JValue
+import org.json4s.JsonAST._
+import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
+
 //import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -34,18 +48,22 @@ import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
 import org.elasticsearch.search.SearchHits
-import org.json4s.JValue
 import com.actionml.helpers.{ ItemID, ItemProps }
 
 /** Elasticsearch notes:
- *  1) every query clause wil laffect scores unless it has a constant_score and boost: 0
+ *  1) every query clause will affect scores unless it has a constant_score and boost: 0
  *  2) the Spark index writer is fast but must assemble all data for the index before the write occurs
  *  3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
  *  4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
  *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
+ *    Finally the correlator fields should be norms: true to enable norms, this make the score equal to the sum
+ *    of dot products divided by the length of each vector. This is the definition of "cosine" similarity.
+ *    Todo: norms may not be the best, should experiment to know for sure.
+ *  5) the client, either transport client for < ES5 or the rest client for >= ES5 there should be a timeout set since
+ *    the default is very long, several seconds.
  */
 
-/** Defines methods to use on Elasticsearch. */
+/** Defines methods to use on Elasticsearch.*/
 object EsClient {
   @transient lazy val logger: Logger = Logger[this.type]
 
@@ -60,6 +78,9 @@ object EsClient {
       "proper configuration settings")
   */
 
+  /** Gets the client for the right version of Elasticsearch. The ES timeout for the Transport client is
+   *  set in elasticsearch.yml with transport.tcp.connect_timeout: 200ms or something like that
+   */
   private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty) {
     new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
   } else {
@@ -79,7 +100,7 @@ object EsClient {
     if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
       val delete = client.admin().indices().delete(new DeleteIndexRequest(indexName)).actionGet()
       if (!delete.isAcknowledged) {
-        logger.info(s"Index $indexName wasn't deleted, but may have quietly failed.")
+        logger.warn(s"Index $indexName wasn't deleted, but may have quietly failed.")
       } else {
         // now refresh to get it 'committed'
         // todo: should do this after the new index is created so no index downtime
@@ -150,7 +171,7 @@ object EsClient {
       val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
       val create = client.admin().indices().create(cir).actionGet()
       if (!create.isAcknowledged) {
-        logger.info(s"Index $indexName wasn't created, but may have quietly failed.")
+        logger.warn(s"Index $indexName wasn't created, but may have quietly failed.")
       } else {
         // now refresh to get it 'committed'
         // todo: should do this after the new index is created so no index downtime
@@ -179,12 +200,12 @@ object EsClient {
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
 
-    logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
+    logger.trace(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
     createIndex(newIndex, typeName, fieldNames, typeMappings)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
     indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
-    //refreshIndex(newIndex)
+    //refreshIndex(newIndex) //appears to not be needed
 
     if (!aliasMetadata.isEmpty
       && aliasMetadata.get(alias) != null
@@ -223,14 +244,41 @@ object EsClient {
    *  @param indexName the index to search
    *  @return a [PredictedResults] collection
    */
-  def search(query: String, indexName: String): Option[SearchHits] = {
-    val sr = client.prepareSearch(indexName).setSource(query).get()
+  def search(query: String, indexName: String, correlators: Seq[String]): Option[SearchHits] = {
 
+    val sr = client.prepareSearch(indexName).setSource(query).get()
     if (!sr.isTimedOut) {
       Some(sr.getHits)
-    } else {
-      None
+    } else { // ask for raked items like popular
+      val rr = client.prepareSearch(indexName).setSource(rankedResults(query, correlators)).get()
+      if (!rr.isTimedOut) {
+        logger.warn("Elasticsearch timed out during a query so returning ranked items, not user, item, or" +
+          s" itemSet based. Query is now: ${rankedResults(query, correlators)}")
+        Some(rr.getHits)
+      } else {
+        None
+      }
     }
+  }
+
+  /** sorry, a little hacky, remove item, user, and/or itemset from query so all the bizrules
+   *  are unchanged but the query will run fast returning ranked results like popular.
+   *  Todo: a better way it to pass in a fallback query
+   */
+  def rankedResults(query: String, correlators: Seq[String]): String = {
+    var newQuery = query
+    for (correlator <- correlators) {
+      // way hacky, should use the removal or replacement functions but can't quite see how to do it
+      // Todo: Warning this will have problems if the correlator name can be interpretted as a regex
+      newQuery = newQuery.replace(correlator, "__null__") // replaces no matter where in the string, seems dangerous
+      /* removeField example that leaves an invalid query
+      newQuery = compact(render(parse(newQuery).removeField { // filter one at a time, there must be a better way
+        case JField(`correlator`, _) => true
+        case _                       => false
+      }))
+      */
+    }
+    newQuery
   }
 
   /** Gets the "source" field of an Elasticsearch document
@@ -271,7 +319,7 @@ object EsClient {
     } else {
       // delete all the indices that are pointed to by the alias, they can't be used
       logger.warn("There is no 1-1 mapping of index to alias so deleting the old indexes that are referenced by the " +
-        "alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
+        s"alias: $alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
       if (!allIndicesMap.isEmpty) {
         val i = allIndicesMap.keys().toArray.asInstanceOf[Array[String]]
         for (indexName <- i) {

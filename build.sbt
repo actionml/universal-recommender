@@ -6,7 +6,7 @@ name := "universal-recommender"
 
 version := "0.6.0"
 
-organization := "com.actonml"
+organization := "com.actionml"
 
 val mahoutVersion = "0.13.0"
 
@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
 
 resolvers += Resolver.mavenLocal
 
-resolvers += "rc parts for PIO" at "https://repository.apache.org/content/repositories/orgapachepredictionio-1016"
+//resolvers += "rc parts for PIO" at "https://repository.apache.org/content/repositories/orgapachepredictionio-1016"
 
 SbtScalariform.scalariformSettings
 

@@ -51,14 +51,33 @@ class Preparator
 
         // passing in previous row dictionary will use the values if they exist
         // and append any new ids, so after all are constructed we have all user ids in the last dictionary
-        logger.info("action: " + eventName.toString)
-        val ids = if (eventName == trainingData.actions.head._1 && trainingData.minEventsPerUser.nonEmpty) {
+        logger.info("EventName: " + eventName)
+        // logger.info(s"first eventName is ${trainingData.actions.head._1.toString}")
+        val ids = if (eventName == trainingData.actions.head._1.toString && trainingData.minEventsPerUser.nonEmpty) {
           val dIDS = IndexedDatasetSpark(eventRDD, trainingData.minEventsPerUser.get)(sc)
-          //dIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
-          dIDS
+          /* debugging
+          logger.info(s"Downsampled the IndexedDatasetSpark for eventName: $eventName ")
+          logger.info(s"User-ids: ${dIDS.rowIDs.toMap.keySet.mkString(",")} nrow: ${dIDS.matrix.nrow.toString}")
+          logger.info(s"Item-ids: ${dIDS.columnIDs.toMap.keySet.mkString(",")} ncol: ${dIDS.matrix.ncol.toString}")
+          */
+          // we have removed underactive users now remove the items they were the only to interact with
+          val ddIDS = IndexedDatasetSpark(eventRDD, Some(dIDS.rowIDs))(sc) // use the downsampled rows to downnsample
+          // columns too
+          /* debugging
+          logger.info(s"Double downsampled the IndexedDatasetSpark for eventName: $eventName ")
+          logger.info(s"User-ids: ${ddIDS.rowIDs.toMap.keySet.mkString(",")} nrow: ${ddIDS.matrix.nrow.toString}")
+          logger.info(s"Item-ids: ${ddIDS.columnIDs.toMap.keySet.mkString(",")} ncol: ${ddIDS.matrix.ncol.toString}")
+          ddIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
+          */
+          ddIDS
         } else {
           val dIDS = IndexedDatasetSpark(eventRDD, userDictionary)(sc)
-          //otherIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
+          /* debugging
+          dIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
+          logger.info(s"Secondary IndexedDatasetSpark for eventName: $eventName ")
+          logger.info(s"User-ids: ${dIDS.rowIDs.toMap.keySet.mkString(",")} nrow: ${dIDS.matrix.nrow.toString}")
+          logger.info(s"Item-ids: ${dIDS.columnIDs.toMap.keySet.mkString(",")} ncol: ${dIDS.matrix.ncol.toString}")
+           */
           dIDS
         }
 
@@ -67,16 +86,6 @@ class Preparator
 
     }
 
-    // now make sure all matrices have identical row space since this corresponds to all users
-    // with the primary event (and optionally downsampled) since other users do not contribute to the math
-    /*    val rowAdjustedIds = userDictionary map { userDict =>
-      indexedDatasets.map {
-        case (eventName, eventIDS) =>
-          (eventName, eventIDS.create(eventIDS.matrix, userDictionary.get, eventIDS.columnIDs)
-            .newRowCardinality(userDict.size)) // force row cardinality and sharing userDict
-      }
-    } getOrElse Seq.empty
-*/
     val fieldsRDD: RDD[(ItemID, ItemProps)] = trainingData.fieldsRDD.map {
       case (itemId, propMap) => itemId -> propMap.fields
     }
@@ -97,7 +106,7 @@ object IndexedDatasetSpark {
 
   def apply(
     elements: RDD[(String, String)],
-    minEventsPerUser: Int)(implicit sc: SparkContext) = {
+    minEventsPerUser: Int)(implicit sc: SparkContext): IndexedDatasetSpark = {
     // todo: a further optimization is to return any broadcast dictionaries so they can be passed in and
     // do not get broadcast again. At present there may be duplicate broadcasts.
 
@@ -165,7 +174,7 @@ object IndexedDatasetSpark {
 
   def apply(
     elements: RDD[(String, String)],
-    existingRowIDs: Option[BiDictionary])(implicit sc: SparkContext) = {
+    existingRowIDs: Option[BiDictionary])(implicit sc: SparkContext): IndexedDatasetSpark = {
     // todo: a further optimization is to return any broadcast dictionaries so they can be passed in and
     // do not get broadcast again. At present there may be duplicate broadcasts.
 

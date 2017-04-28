@@ -309,7 +309,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     //val backfillParams = ap.backfillField.getOrElse(DefaultURAlgoParams.DefaultBackfillParams)
     //val nonDefaultMappings = Map(backfillParams.name.getOrElse(DefaultURAlgoParams.BackfillFieldName) -> "float")
 
-    logger.info("Actions read now creating correlators")
+    logger.info("Indicators read now creating correlators")
     val cooccurrenceIDSs = if (ap.indicators.isEmpty) { // using one global set of algo params
       SimilarityAnalysis.cooccurrencesIDSs(
         data.actions.map(_._2).toArray,
@@ -477,7 +477,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     queryEventNames = query.eventNames.getOrElse(modelEventNames) // eventNames in query take precedence
 
     val (queryStr, blacklist) = buildQuery(ap, query, rankingFieldNames)
-    val searchHitsOpt = EsClient.search(queryStr, esIndex)
+    val searchHitsOpt = EsClient.search(queryStr, esIndex, queryEventNames)
 
     val withRanks = query.withRanks.getOrElse(false)
     val predictedResults = searchHitsOpt match {
@@ -603,8 +603,10 @@ class URAlgorithm(val ap: URAlgorithmParams)
     // shopping carts. We do not enforce this in the query nor throw an exception but a
     // WARN: is logged
     val itemSet: Seq[BoostableCorrelators] = if (query.itemSet.nonEmpty) {
-      if (query.item.nonEmpty || query.user.nonEmpty)
-        logger.warn("Item-sets should not be mixed with user or item-based queries")
+      if (query.item.nonEmpty || query.user.nonEmpty) {
+        logger.warn("ItemSets should not be mixed with user or item-based queries. This will produce unpredicable " +
+          "results.")
+      }
       Seq(BoostableCorrelators(modelEventNames.head, query.itemSet.get, query.itemSetBias))
     } else {
       Seq.empty
@@ -739,7 +741,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
             }
           } catch {
             case cce: ClassCastException =>
-              logger.warn(s"Bad value in item [${query.item}] corresponding to key: [$action] that was not a Seq[String] ignored.")
+              logger.warn(s"Bad value in item [${query.item}] corresponding to key: [$action] that was not a " +
+                "Seq[String]. The event is ignored.")
               Seq.empty[String]
           }
           val rItems = if (items.size <= maxQueryEvents) items else items.slice(0, maxQueryEvents - 1)
@@ -773,14 +776,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
         timeout = Duration(200, "millis")).toSeq
     } catch {
       case e: scala.concurrent.TimeoutException =>
-        logger.error(s"Timeout when read recent events. Empty list is used. $e")
+        logger.error(s"Timeout when reading recent events. Empty list is used. $e")
         Seq.empty[Event]
       case e: NoSuchElementException =>
-        logger.info("No user id for recs, returning similar items for the item specified")
+        logger.info("No user id for recs, returning item-based recs if an item is specified in the query.")
         Seq.empty[Event]
       case e: Exception => // fatal because of error, an empty query
-        logger.error(s"Error when read recent events: $e")
-        throw e
+        logger.error(s"Error when reading recent events. Trying to continue by ignoring the error. $e")
+        Seq.empty[Event]
     }
 
     val userEventBias = query.userBias.getOrElse(userBias)
@@ -821,7 +824,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   }
 
   /** get all metadata fields that are filters (not boosts) */
-  def getExcludingMetadata(query: Query): Seq[ExclusionFields] = {
+  def getExcludingMetadatagetExcludingMetadata(query: Query): Seq[ExclusionFields] = {
     val paramsFilterFields = fields.filter(_.bias == 0f)
     val queryFilterFields = query.fields.getOrEmpty.filter(_.bias == 0f)
 

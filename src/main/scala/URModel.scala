@@ -46,7 +46,7 @@ class URModel(
    */
   def save(dateNames: Seq[String], esIndex: String, esType: String): Boolean = {
 
-    logger.debug(s"Start save model")
+    logger.trace(s"Start save model")
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
