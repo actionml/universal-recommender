@@ -14,8 +14,15 @@ organization := "com.actionml"
 // val mahoutVersion = "0.13.0-SNAPSHOT"
 val mahoutVersion = "0.13.0"
 
-//val pioVersion = "0.10.0-incubating"
+// This PredictionIO SNAPSHOT version is included in the buildpack's 
+// local Maven repo, until Elasticasearch authentication PR
+// is merged & released:
+// https://github.com/apache/incubator-predictionio/pull/372
 val pioVersion = "0.11.0-SNAPSHOT"
+
+// This Elasticsearch version must exactly match the server version.
+// On Heroku, this means the Bonsai Add-on.
+// WARNING: tiny version differences will cuase problems.
 val elasticsearchVersion = "5.1.1"
 
 libraryDependencies ++= Seq(
@@ -24,7 +31,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % "2.1.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "2.1.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
-  // Mahout's Spark libs
+  // Mahout's Spark libs. They're custom compiled for Scala 2.11
+  // and included in the buildpack's local Maven repo.
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion,
   "org.apache.mahout" %% "mahout-spark" % mahoutVersion
     exclude("org.apache.spark", "spark-core_2.11"),
