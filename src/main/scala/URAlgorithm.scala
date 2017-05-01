@@ -79,7 +79,6 @@ case class BackfillField(
   // to use in calculation of backfill
 
 case class URAlgorithmParams(
-  appName: String, // filled in from engine.json
   indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
   recsModel: Option[String] = Some(defaultURAlgorithmParams.DefaultRecsModel), // "all", "collabFiltering", "backfill"
@@ -133,7 +132,6 @@ case class IndicatorParams(
   minLLR: Option[Double]) // defaults to none, takes precendence over maxCorrelatorsPerItem
 
 case class URAlgorithmParams(
-  appName: String, // filled in from engine.json
   indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
   recsModel: Option[String] = None, // "all", "collabFiltering", "backfill"
@@ -181,7 +179,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
   }
   case class FilterCorrelators(actionName: String, itemIDs: Seq[ItemID])
 
-  val appName: String = ap.appName
+  val appName: String = sys.env("PIO_EVENTSERVER_APP_NAME")
   val recsModel: String = ap.recsModel.getOrElse(defaultURAlgorithmParams.DefaultRecsModel)
   //val eventNames: Seq[String] = ap.eventNames
 

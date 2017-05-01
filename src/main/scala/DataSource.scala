@@ -29,12 +29,10 @@ import org.template.conversions._
 
 /** Taken from engine.json these are passed in to the DataSource constructor
  *
- *  @param appName registered name for the app
  *  @param eventNames a list of named events expected. The first is the primary event, the rest are secondary. These
  *                   will be used to create the primary correlator and cross-cooccurrence secondary correlators.
  */
 case class DataSourceParams(
-  appName: String,
   eventNames: List[String], // IMPORTANT: eventNames must be exactly the same as URAlgorithmParams eventNames
   eventWindow: Option[EventWindow]) extends Params
 
@@ -48,7 +46,7 @@ class DataSource(val dsp: DataSourceParams)
 
   @transient override lazy implicit val logger: Logger = Logger[this.type]
 
-  override def appName: String = dsp.appName
+  override def appName: String = sys.env("PIO_EVENTSERVER_APP_NAME")
   override def eventWindow: Option[EventWindow] = dsp.eventWindow
 
   drawInfo("Init DataSource", Seq(
@@ -66,7 +64,7 @@ class DataSource(val dsp: DataSourceParams)
     // cleanPersistedPEvents(sc) // broken in apache-pio v0.10.0-incubating it erases all data!!!!!!
 
     val eventsRDD = PEventStore.find(
-      appName = dsp.appName,
+      appName = sys.env("PIO_EVENTSERVER_APP_NAME"),
       entityType = Some("user"),
       eventNames = Some(eventNames),
       targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
@@ -89,7 +87,7 @@ class DataSource(val dsp: DataSourceParams)
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
     val fieldsRDD: RDD[(ItemID, PropertyMap)] = PEventStore.aggregateProperties(
-      appName = dsp.appName,
+      appName = sys.env("PIO_EVENTSERVER_APP_NAME"),
       entityType = "item")(sc).repartition(sc.defaultParallelism)
     //    logger.debug(s"FieldsRDD\n${fieldsRDD.take(25).mkString("\n")}")
 

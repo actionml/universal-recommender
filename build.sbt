@@ -46,6 +46,9 @@ libraryDependencies ++= Seq(
   "org.json4s" %% "json4s-native" % "3.2.10")
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
+// Search for packages provided by predictionio-buildpack
+resolvers += "Local Repository" at "file:///Users/mars.hall/Projects/predictionio-buildpack/repo"
+
 resolvers += Resolver.mavenLocal
 
 SbtScalariform.scalariformSettings

@@ -8,12 +8,11 @@
  
 **To import and experiment with the simple example data**
 
-1. Create a new app name, change `appName` in `engine.json`
+1. Create a new app name, set environment variable `PIO_EVENTSERVER_APP_NAME` the value of its `appName`, for example `export PIO_EVENTSERVER_APP_NAME=ur`
 2. Run `pio app new **your-new-app-name**`
-4. Import sample events by running `python data/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
-3. The engine.json file in the root directory of your new UR template is set up for the data you just imported (make sure to create a new one for your data) Edit this file and change the `appName` parameter to match what you called the app in step #2
-5. Perform `pio build`, `pio train`, and `pio deploy`
-6. To execute some sample queries run `./examples/query-handmade.sh`
+3. Import sample events by running `python data/import_handmade.py --access_key **your-access-key**` where the key can be retrieved with `pio app list`
+4. Perform `pio build`, `pio train`, and `pio deploy`
+5. To execute some sample queries run `./examples/query-handmade.sh`
 
 If there are timeouts, enable the delays that are commented out in the script&mdash;for now. In the production environment the engines will "warm up" with caching and will execute queries much faster. Also all services can be configured or scaled to meet virtually any performance needs.
 

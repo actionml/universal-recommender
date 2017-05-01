@@ -5,7 +5,6 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "appName": "default-rank",
       "eventNames": ["show", "like"]
     }
   },
@@ -23,7 +22,6 @@
       "name": "ur",
       "params": {
         "comment": "must have data for the first event or the model will not build, other events are optional",
-        "appName": "default-rank",
         "indexName": "urindex",
         "typeName": "items",
         "recsModel": "all",
