@@ -22,7 +22,6 @@
       "comment": "setup to only calculate a popularity model for *hot* and add it to the existing model for backfill",
       "name": "ur",
       "params": {
-        "indexName": "urindex",
         "typeName": "items",
         "eventNames": ["purchase", "view"],
         "recsModel": "backfill",

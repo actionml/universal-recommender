@@ -79,7 +79,6 @@ case class BackfillField(
   // to use in calculation of backfill
 
 case class URAlgorithmParams(
-  indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
   recsModel: Option[String] = Some(defaultURAlgorithmParams.DefaultRecsModel), // "all", "collabFiltering", "backfill"
   eventNames: Seq[String], // names used to ID all user actions
@@ -132,7 +131,6 @@ case class IndicatorParams(
   minLLR: Option[Double]) // defaults to none, takes precendence over maxCorrelatorsPerItem
 
 case class URAlgorithmParams(
-  indexName: String, // can optionally be used to specify the elasticsearch index name
   typeName: String, // can optionally be used to specify the elasticsearch type name
   recsModel: Option[String] = None, // "all", "collabFiltering", "backfill"
   eventNames: Option[Seq[String]], // names used to ID all user actions
@@ -224,7 +222,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ap.availableDateName,
     ap.expireDateName).collect { case Some(date) => date } distinct
 
-  val esIndex: String = ap.indexName
+  val esIndex: String = sys.env("PIO_EVENTSERVER_APP_NAME")
   val esType: String = ap.typeName
 
   drawInfo("Init URAlgorithm", Seq(

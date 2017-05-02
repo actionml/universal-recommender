@@ -22,7 +22,6 @@
       "name": "ur",
       "params": {
         "comment": "must have data for the first event or the model will not build, other events are optional",
-        "indexName": "urindex",
         "typeName": "items",
         "recsModel": "all",
         "eventNames": ["show", "like"],
