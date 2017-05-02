@@ -28,3 +28,8 @@ manifest.json
 target/
 pio.log
 /pio.sbt
+
+# buildpack specific
+.env
+PredictionIO-dist/
+repo/
