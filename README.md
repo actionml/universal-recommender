@@ -15,13 +15,14 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Contributions
 
-Contributions are encouraged and appreciated. Create a PR against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We take bug fixes or new features but insist that new features are general and any controls needed are added to the `engine.json` params so other users can control the features without modifying code of the UR. We will be happy to provide guidance or help in this.
+Contributions are encouraged and appreciated. Create a PR against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We like to keep new features general so users will not be required to change the code of the UR to make use of the new feature. We will be happy to provide guidance or help via the github PR.
 
 # Version Changelog
 
 ## v0.6.0
 
  - **Preformance**: Nearly a 50% speedup for most model calculation, and a new tuning parameter that can yield further speed improvements by filtering our unused or less useful data from model building.
+ - **GPU Support**: via Mahout 0.13.0 the core math of the UR now supports the use of GPUs for acceleration.
  - **Exclusion Rules**: now we have business rules for inclusion, exclusion, and boosts based on item properties.
  - **Complimentary Purchase aka Item-set Recommendations**: "Shopping-cart" type recommendations. Can be used for wishlists, favorites, watchlists, any list based recommendations. Used with list or user data.
  - **PredictionIO 0.11.0**: Full compatibility.

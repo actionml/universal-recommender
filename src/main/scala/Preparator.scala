@@ -55,29 +55,24 @@ class Preparator
         // logger.info(s"first eventName is ${trainingData.actions.head._1.toString}")
         val ids = if (eventName == trainingData.actions.head._1.toString && trainingData.minEventsPerUser.nonEmpty) {
           val dIDS = IndexedDatasetSpark(eventRDD, trainingData.minEventsPerUser.get)(sc)
-          /* debugging
-          logger.info(s"Downsampled the IndexedDatasetSpark for eventName: $eventName ")
-          logger.info(s"User-ids: ${dIDS.rowIDs.toMap.keySet.mkString(",")} nrow: ${dIDS.matrix.nrow.toString}")
-          logger.info(s"Item-ids: ${dIDS.columnIDs.toMap.keySet.mkString(",")} ncol: ${dIDS.matrix.ncol.toString}")
-          */
+          logger.info(s"Downsampled  users for minEventsPerUser: ${trainingData.minEventsPerUser}, eventName: $eventName ")
+          logger.info(s"Number of passing user-ids: ${dIDS.matrix.nrow.toString}")
+          logger.info(s"Total item-ids: ${dIDS.matrix.ncol.toString}")
           // we have removed underactive users now remove the items they were the only to interact with
           val ddIDS = IndexedDatasetSpark(eventRDD, Some(dIDS.rowIDs))(sc) // use the downsampled rows to downnsample
           // columns too
-          /* debugging
-          logger.info(s"Double downsampled the IndexedDatasetSpark for eventName: $eventName ")
-          logger.info(s"User-ids: ${ddIDS.rowIDs.toMap.keySet.mkString(",")} nrow: ${ddIDS.matrix.nrow.toString}")
-          logger.info(s"Item-ids: ${ddIDS.columnIDs.toMap.keySet.mkString(",")} ncol: ${ddIDS.matrix.ncol.toString}")
-          ddIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
-          */
+          logger.info(s"Downsampling items for users who pass minEventPerUser: ${trainingData.minEventsPerUser}, " +
+            s"eventName: $eventName ")
+          logger.info(s"Number of user-ids: ${ddIDS.matrix.nrow.toString}")
+          logger.info(s"Number of passing item-ids: ${ddIDS.matrix.ncol.toString}")
+          //ddIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
           ddIDS
         } else {
           val dIDS = IndexedDatasetSpark(eventRDD, userDictionary)(sc)
-          /* debugging
-          dIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
+          //dIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
           logger.info(s"Secondary IndexedDatasetSpark for eventName: $eventName ")
-          logger.info(s"User-ids: ${dIDS.rowIDs.toMap.keySet.mkString(",")} nrow: ${dIDS.matrix.nrow.toString}")
-          logger.info(s"Item-ids: ${dIDS.columnIDs.toMap.keySet.mkString(",")} ncol: ${dIDS.matrix.ncol.toString}")
-           */
+          logger.info(s"Number of user-ids: ${dIDS.matrix.nrow.toString}")
+          logger.info(s"Number of item-ids: ${dIDS.matrix.ncol.toString}")
           dIDS
         }
 
