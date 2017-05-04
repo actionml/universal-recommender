@@ -42,12 +42,23 @@ def import_events(client, file):
             " current_date: " + current_date.isoformat()
     elif (data[1] == "view"):  # assumes other event type is 'view'
       client.create_event(
-        event=data[1],
-        entity_type="user",
-        entity_id=data[0],
-        target_entity_type="item",  # type of item in this action
-        target_entity_id=data[2],
-        event_time = current_date
+              event=data[1],
+              entity_type="user",
+              entity_id=data[0],
+              target_entity_type="item",  # type of item in this action
+              target_entity_id=data[2],
+              event_time = current_date
+      )
+      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
+            " current_date: " + current_date.isoformat()
+    elif (data[1] == "category-pref"):  # assumes other event type is 'category-pref'
+      client.create_event(
+              event=data[1],
+              entity_type="user",
+              entity_id=data[0],
+              target_entity_type="item",  # type of item in this action
+              target_entity_id=data[2],
+              event_time = current_date
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
             " current_date: " + current_date.isoformat()

@@ -66,6 +66,7 @@ class Preparator
           logger.info(s"Number of user-ids: ${ddIDS.matrix.nrow.toString}")
           logger.info(s"Number of passing item-ids: ${ddIDS.matrix.ncol.toString}")
           //ddIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
+          userDictionary = Some(ddIDS.rowIDs)
           ddIDS
         } else {
           val dIDS = IndexedDatasetSpark(eventRDD, userDictionary)(sc)
@@ -73,10 +74,10 @@ class Preparator
           logger.info(s"Secondary IndexedDatasetSpark for eventName: $eventName ")
           logger.info(s"Number of user-ids: ${dIDS.matrix.nrow.toString}")
           logger.info(s"Number of item-ids: ${dIDS.matrix.ncol.toString}")
+          userDictionary = Some(dIDS.rowIDs)
           dIDS
         }
 
-        userDictionary = Some(ids.rowIDs)
         (eventName, ids)
 
     }
@@ -97,6 +98,7 @@ case class PreparedData(
  *  The most important odditiy is that it enforces that all rows (users) have minEventsPerUser or more events. The
  *  dictionary of user-name to user-id mappings will only contain those users.
  */
+//noinspection ScalaStyle
 object IndexedDatasetSpark {
 
   def apply(

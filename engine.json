@@ -7,7 +7,7 @@
     "params" : {
       "name": "sample-handmade-data.txt",
       "appName": "handmade",
-      "eventNames": ["purchase", "view"],
+      "eventNames": ["purchase", "view", "category-pref"],
       "minEventsPerUser": 2
     }
   },
@@ -33,6 +33,9 @@
           },
           {
             "name": "view"
+          },
+          {
+            "name": "category-pref"
           }
         ],
         "num": 4
