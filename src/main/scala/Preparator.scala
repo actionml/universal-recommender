@@ -166,6 +166,8 @@ object IndexedDatasetSpark {
     // wrap the DrmRdd and a CheckpointedDrm, which can be used anywhere a DrmLike[Int] is needed
     val drmInteractions = drmWrap[Int](interactions)
 
+    drmInteractions.newRowCardinality(rowIDDictionary.size)
+
     new IndexedDatasetSpark(drmInteractions, downsampledUserIDDictionary, itemIDDictionary)
   }
 
@@ -221,6 +223,8 @@ object IndexedDatasetSpark {
 
     // wrap the DrmRdd and a CheckpointedDrm, which can be used anywhere a DrmLike[Int] is needed
     val drmInteractions = drmWrap[Int](indexedInteractions)
+
+    drmInteractions.newRowCardinality(rowIDDictionary.size)
 
     new IndexedDatasetSpark(drmInteractions, rowIDDictionary, columnIDDictionary)
   }
