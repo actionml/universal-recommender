@@ -197,9 +197,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ap.maxQueryEvents.getOrElse(DefaultURAlgoParams.MaxQueryEvents)
   } else { // using the indicator method of setting query events
     ap.indicators.get.foldLeft[Int](0) { (previous, indicator) =>
-      previous + indicator.maxItemsPerUser.getOrElse(0)
-    } * 100
-    // this assumes one event doesn't happen more than 100 times more often than another
+      previous + indicator.maxItemsPerUser.getOrElse(DefaultURAlgoParams.MaxQueryEvents)
+    } * 10
+    // this assumes one event doesn't happen more than 10 times more often than another
     // not ideal but avoids one query to the event store per event type
   }
 
@@ -220,7 +220,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   val limit: Int = ap.num.getOrElse(DefaultURAlgoParams.NumResults)
 
-  val blacklistEvents: Seq[String] = ap.blacklistEvents.getOrEmpty
+  lazy val modelEventNames = if (ap.indicators.isEmpty) {
+    if (ap.eventNames.isEmpty) {
+      throw new IllegalArgumentException("No eventNames or indicators in engine.json and one of these is required")
+    } else ap.eventNames.get
+  } else ap.indicators.get.map(_.name)
+
+  val blacklistEvents = ap.blacklistEvents.getOrElse(Seq(modelEventNames.head)) // empty Seq[String] means no blacklist
   val returnSelf: Boolean = ap.returnSelf.getOrElse(DefaultURAlgoParams.ReturnSelf)
   val fields: Seq[Field] = ap.fields.getOrEmpty
 
@@ -229,12 +235,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
     .getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType)
   val maxEventsPerEventType: Int = ap.maxEventsPerEventType
     .getOrElse(DefaultURAlgoParams.MaxEventsPerEventType)
-
-  lazy val modelEventNames = if (ap.indicators.isEmpty) {
-    if (ap.eventNames.isEmpty) {
-      throw new IllegalArgumentException("No eventNames or indicators in engine.json and one of these is required")
-    } else ap.eventNames.get
-  } else ap.indicators.get.map(_.name)
 
   // Unique by 'type' ranking params, if collision get first.
   lazy val rankingsParams: Seq[RankingParams] = ap.rankings.getOrElse(Seq(RankingParams(
@@ -270,6 +270,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ("Random seed", randomSeed),
     ("MaxCorrelatorsPerEventType", maxCorrelatorsPerEventType),
     ("MaxEventsPerEventType", maxEventsPerEventType),
+    ("BlacklistEvents", blacklistEvents),
     ("══════════════════════════════", "════════════════════════════"),
     ("User bias", userBias),
     ("Item bias", itemBias),
@@ -701,11 +702,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
   /** Create a list of item ids that the user has interacted with or are not to be included in recommendations */
   def getExcludedItems(userEvents: Seq[Event], query: Query): Seq[String] = {
 
-    val blacklistedItems = userEvents.filter { event =>
+    val blacklistedItems = userEvents.filterNot { event =>
       // either a list or an empty list of filtering events so honor them
-      blacklistEvents match {
-        case Nil => modelEventNames.head equals event.event
-        case _   => blacklistEvents contains event.event
+      if (blacklistEvents.isEmpty) {
+        //logger.info("BlacklistEvents are empty, no filtering")
+        true
+      } else {
+        //logger.info(s"BlacklistEvents: $blacklistEvents, this event ${event.event}")
+        !(blacklistEvents contains event.event)
       }
     }.map(_.targetEntityId.getOrElse("")) ++ query.blacklistItems.getOrEmpty
 
@@ -845,28 +849,28 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val before = query.dateRange.get.before.getOrElse("")
       val after = query.dateRange.get.after.getOrElse("")
       val rangeStart = s"""
-                          |{
-                          |  "constant_score": {
-                          |    "filter": {
-                          |      "range": {
-                          |        "$name": {
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "$name": {
         """.stripMargin
 
       val rangeAfter = s"""
-                          |          "gt": "$after"
+        |          "gt": "$after"
         """.stripMargin
 
       val rangeBefore = s"""
-                           |          "lt": "$before"
+        |          "lt": "$before"
         """.stripMargin
 
       val rangeEnd = s"""
-                        |        }
-                        |      }
-                        |    },
-                        |    "boost": 0
-                        |  }
-                        |}
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
         """.stripMargin
 
       var range = rangeStart
@@ -882,40 +886,36 @@ class URAlgorithm(val ap: URAlgorithmParams)
       val availableDate = ap.availableDateName.get // never None
       val expireDate = ap.expireDateName.get
       val available = s"""
-                         |{
-                         |  "constant_score": {
-                         |    "filter": {
-                         |      "range": {
-                         |        "$availableDate": {
-                         |          "lte": "$currentDate"
-                         |        }
-                         |      }
-                         |    },
-                         |    "boost": 0
-                         |  }
-                         |}
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "$availableDate": {
+        |          "lte": "$currentDate"
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
         """.stripMargin
       val expire = s"""
-                      |{
-                      |  "constant_score": {
-                      |    "filter": {
-                      |      "range": {
-                      |        "$expireDate": {
-                      |          "gt": "$currentDate"
-                      |        }
-                      |      }
-                      |    },
-                      |    "boost": 0
-                      |  }
-                      |}
+        |{
+        |  "constant_score": {
+        |    "filter": {
+        |      "range": {
+        |        "$expireDate": {
+        |          "gt": "$currentDate"
+        |        }
+        |      }
+        |    },
+        |    "boost": 0
+        |  }
+        |}
         """.stripMargin
 
       Seq(parse(available), parse(expire))
     } else {
-      logger.info(
-        """
-          |Misconfigured date information, either your engine.json date settings or your query's dateRange is incorrect.
-          |Ingoring date information for this query.""".stripMargin)
       Seq.empty
     }
     json

@@ -7,8 +7,7 @@
     "params" : {
       "name": "sample-handmade-data.txt",
       "appName": "handmade",
-      "eventNames": ["purchase", "view", "category-pref"],
-      "minEventsPerUser": 2
+      "eventNames": ["purchase", "view", "category-pref"]
     }
   },
   "sparkConf": {
@@ -26,6 +25,7 @@
         "appName": "handmade",
         "indexName": "urindex",
         "typeName": "items",
+        "blacklistEvents": ["purchase"],
         "comment": "must have data for the first event or the model will not build, other events are optional",
         "indicators": [
           {
