@@ -71,7 +71,7 @@ class Preparator
           userDictionary = Some(ddIDS.rowIDs)
           ddIDS
         } else {
-          logger.info(s"Secondary IndexedDatasetSpark for eventName: $eventName ")
+          logger.info(s"IndexedDatasetSpark for eventName: $eventName ")
           logger.info(s"Number of user-ids passed in to the IndexedDatasetSpark" +
             s": ${userDictionary.getOrElse(new BiDictionary(Map.empty[String, Int])).size}")
           val dIDS = IndexedDatasetSpark(eventRDD, userDictionary)(sc)
@@ -171,7 +171,7 @@ object IndexedDatasetSpark {
     // wrap the DrmRdd and a CheckpointedDrm, which can be used anywhere a DrmLike[Int] is needed
     val drmInteractions = drmWrap[Int](interactions)
 
-    drmInteractions.newRowCardinality(rowIDDictionary.size)
+    //drmInteractions.newRowCardinality(rowIDDictionary.size)
 
     new IndexedDatasetSpark(drmInteractions, downsampledUserIDDictionary, itemIDDictionary)
   }
@@ -229,7 +229,7 @@ object IndexedDatasetSpark {
     // wrap the DrmRdd and a CheckpointedDrm, which can be used anywhere a DrmLike[Int] is needed
     val drmInteractions = drmWrap[Int](indexedInteractions)
 
-    drmInteractions.newRowCardinality(rowIDDictionary.size)
+    //drmInteractions.newRowCardinality(rowIDDictionary.size)
 
     new IndexedDatasetSpark(drmInteractions, rowIDDictionary, columnIDDictionary)
   }

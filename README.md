@@ -15,18 +15,27 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Contributions
 
-Contributions are encouraged and appreciated. Create a PR against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We like to keep new features general so users will not be required to change the code of the UR to make use of the new feature. We will be happy to provide guidance or help via the github PR.
+Contributions are encouraged and appreciated. Create a PR against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We like to keep new features general so users will not be required to change the code of the UR to make use of the new feature. We will be happy to provide guidance or help via the github PR review mechanism.
 
 # Version Changelog
 
+## Roadmap
+
+PIO-0.11.0 supports use of Elasticsearch 5.x, Spark 2.x, and Scala 2.11. The UR can be compiled for all these except ES 5.x by changing the `build.sbt` file. In a minor release we will provide alternative `build.sbt` files as examples of how to do this. ES 5 support is nearly ready in a PR and will be incorporated as soon as it is ready. ES 5 uses the REST API exclusively and so will support authentication and certain ES as a service hosts. It also has some significant performance improvements.
+
 ## v0.6.0
 
- - **Preformance**: Nearly a 50% speedup for most model calculation, and a new tuning parameter that can yield further speed improvements by filtering our unused or less useful data from model building.
- - **GPU Support**: via Mahout 0.13.0 the core math of the UR now supports the use of GPUs for acceleration.
- - **Exclusion Rules**: now we have business rules for inclusion, exclusion, and boosts based on item properties.
+This is a major upgrade release with several new features. Backward compatibility with 0.5.0 is maintained. **Note**: We no longer have a default `engine.json` file so you will need to copy `engine.json.template` to `engine.json` and edit it to fit your data. See the [Universal Recommender Congiuration](http://actionml.com/docs/ur_config) docs.
+
+ - **Performance**: Nearly a 40% speedup for most model calculation, and a new tuning parameter that can yield further speed improvements by filtering out unused or less useful data from model building. See `minEventsPerUser` in the UR configuration docs.
  - **Complimentary Purchase aka Item-set Recommendations**: "Shopping-cart" type recommendations. Can be used for wishlists, favorites, watchlists, any list based recommendations. Used with list or user data.
- - **PredictionIO 0.11.0**: Full compatibility.
+ - **Exclusion Rules**: now we have business rules for inclusion, exclusion, and boosts based on item properties.
+ - **PredictionIO 0.11.0**: Full compatibility, but no support for Elasticsearch 5, an option with PIO-0.11.0.
  - **New Advanced Tuning**: Allows several new per indicator / event type tuning parameters for tuning model quality in a more targeted way.
+ - **Norms Support**: For large dense datasets norms are now the default for model indexing and queries. This should result in slight precision gains, so better results. 
+ - **GPU Support**: via Mahout 0.13.0 the core math of the UR now supports the use of GPUs for acceleration.
+ - **Timeout Protection**: Queries for users with very large histories could cause a timeout. We now correctly limit the amount of user history that is used as per documentation, which will all but eliminate timeouts. 
+ - **Bug Fixes**: The use of `blackListEvents` as defined in `engine.json` was not working for an empty list, which should and now does disable any blacklisting except explicit item blacklists contained in the query.
 
 ## v0.5.0
 
