@@ -13,4 +13,4 @@ A machine learning search engine deployable to Heroku with the [PredictionIO bui
 
 ## Local Development
 
-These instructions have been generalized and are evolving in the [`local-dev` feature branch of predictionio-buildpack](https://github.com/heroku/predictionio-buildpack/blob/local-dev/CUSTOM.md#local-development). Please follow along there for local setup & usage.
+Use the buildpack to get setup for [local development](https://github.com/heroku/predictionio-buildpack/blob/master/DEV.md) with this engine.
