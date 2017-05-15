@@ -47,7 +47,7 @@ libraryDependencies ++= Seq(
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
 // Search for packages provided by predictionio-buildpack
-resolvers += "Local Repository" at "file:///Users/mars.hall/Projects/predictionio-buildpack/repo"
+resolvers += "Local Repository" at "file://"+baseDirectory.value+"/repo"
 
 resolvers += Resolver.mavenLocal
 
