@@ -55,31 +55,24 @@ class Preparator
         // logger.info(s"first eventName is ${trainingData.actions.head._1.toString}")
         val ids = if (eventName == trainingData.actions.head._1.toString && trainingData.minEventsPerUser.nonEmpty) {
           val dIDS = IndexedDatasetSpark(eventRDD, trainingData.minEventsPerUser.get)(sc)
-          logger.info(s"Downsampled  users for minEventsPerUser: ${trainingData.minEventsPerUser}, eventName: $eventName ")
-          logger.info(s"Number of rows in DRM: ${dIDS.matrix.nrow.toString}")
-          logger.info(s"Number of passing user-ids: ${dIDS.rowIDs.size}")
-          logger.info(s"Total columns in DRM: ${dIDS.matrix.ncol.toString}")
+          logger.info(s"Downsampled  users for minEventsPerUser: ${trainingData.minEventsPerUser}, eventName: $eventName" +
+            s" number of passing user-ids: ${dIDS.rowIDs.size}")
+          logger.info(s"Dimensions rows : ${dIDS.matrix.nrow.toString} columns: ${dIDS.matrix.ncol.toString}")
           // we have removed underactive users now remove the items they were the only to interact with
           val ddIDS = IndexedDatasetSpark(eventRDD, Some(dIDS.rowIDs))(sc) // use the downsampled rows to downnsample
-          // columns too
-          logger.info(s"Downsampling items for users who pass minEventPerUser: ${trainingData.minEventsPerUser}, " +
-            s"eventName: $eventName ")
-          logger.info(s"Number of rows in the DRM: ${ddIDS.matrix.nrow.toString}")
-          logger.info(s"Number of user-ids: ${ddIDS.rowIDs.size}")
-          logger.info(s"Number of passing columns in DRM: ${ddIDS.matrix.ncol.toString}")
-          //ddIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
           userDictionary = Some(ddIDS.rowIDs)
+          logger.info(s"Downsampled columns for users who pass minEventPerUser: ${trainingData.minEventsPerUser}, " +
+            s"eventName: $eventName number of user-ids: ${userDictionary.get.size}")
+          logger.info(s"Dimensions rows : ${ddIDS.matrix.nrow.toString} columns: ${ddIDS.matrix.ncol.toString}")
+          //ddIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
           ddIDS
         } else {
-          logger.info(s"IndexedDatasetSpark for eventName: $eventName ")
-          logger.info(s"Number of user-ids passed in to the IndexedDatasetSpark" +
-            s": ${userDictionary.getOrElse(new BiDictionary(Map.empty[String, Int])).size}")
+          //logger.info(s"IndexedDatasetSpark for eventName: $eventName User ids: $userDictionary")
           val dIDS = IndexedDatasetSpark(eventRDD, userDictionary)(sc)
-          //dIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
-          logger.info(s"Number of rows in the DRM after creation: ${dIDS.matrix.nrow.toString}")
-          logger.info(s"Number of user-ids after creation: ${dIDS.rowIDs.size}")
-          logger.info(s"Number of columns in DRM after creation: ${dIDS.matrix.ncol.toString}")
           userDictionary = Some(dIDS.rowIDs)
+          //dIDS.dfsWrite(eventName.toString, DefaultIndexedDatasetWriteSchema)(new SparkDistributedContext(sc))
+          logger.info(s"Dimensions rows : ${dIDS.matrix.nrow.toString} columns: ${dIDS.matrix.ncol.toString}")
+          logger.info(s"Number of user-ids after creation: ${userDictionary.get.size}")
           dIDS
         }
 
@@ -115,18 +108,6 @@ object IndexedDatasetSpark {
     // create separate collections of rowID and columnID tokens
     // use the dictionary passed in or create one from the element ids
     // broadcast the correct row id BiDictionary
-    /*    val (filteredElements, rowIDDictionary_bcast, rowIDDictionary) = if (existingRowIDs.isEmpty) {
-      val newRowIDDictionary = new BiDictionary(elements.map { case (rowID, _) => rowID }.distinct().collect())
-      val newRowIDDictionary_bcast = sc.broadcast(newRowIDDictionary)
-      (elements, newRowIDDictionary_bcast, newRowIDDictionary)
-    } else {
-      val existingRowIDDictionary_bcast = sc.broadcast(existingRowIDs.get)
-      val elementsRDD = elements.filter{ case (rowID, _) =>
-        existingRowIDDictionary_bcast.value.contains(rowID)
-      }
-      (elementsRDD, existingRowIDDictionary_bcast, existingRowIDs.get)
-    }
-*/
     val rowIDDictionary = new BiDictionary(elements.map { case (rowID, _) => rowID }.distinct().collect())
     val rowIDDictionary_bcast = sc.broadcast(rowIDDictionary)
     val filteredElements = elements.filter {
@@ -173,7 +154,7 @@ object IndexedDatasetSpark {
 
     //drmInteractions.newRowCardinality(rowIDDictionary.size)
 
-    new IndexedDatasetSpark(drmInteractions, downsampledUserIDDictionary, itemIDDictionary)
+    new IndexedDatasetSpark(drmInteractions.newRowCardinality(rowIDDictionary.size), downsampledUserIDDictionary, itemIDDictionary)
   }
 
   def apply(
@@ -229,9 +210,7 @@ object IndexedDatasetSpark {
     // wrap the DrmRdd and a CheckpointedDrm, which can be used anywhere a DrmLike[Int] is needed
     val drmInteractions = drmWrap[Int](indexedInteractions)
 
-    //drmInteractions.newRowCardinality(rowIDDictionary.size)
-
-    new IndexedDatasetSpark(drmInteractions, rowIDDictionary, columnIDDictionary)
+    new IndexedDatasetSpark(drmInteractions.newRowCardinality(rowIDDictionary.size), rowIDDictionary, columnIDDictionary)
   }
 
 }

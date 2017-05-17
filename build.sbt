@@ -46,8 +46,6 @@ libraryDependencies ++= Seq(
 
 resolvers += Resolver.mavenLocal
 
-//resolvers += "rc parts for PIO" at "https://repository.apache.org/content/repositories/orgapachepredictionio-1016"
-
 SbtScalariform.scalariformSettings
 
 ScalariformKeys.preferences := ScalariformKeys.preferences.value
