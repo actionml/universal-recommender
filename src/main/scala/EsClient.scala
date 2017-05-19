@@ -230,6 +230,7 @@ object EsClient {
       // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
 
       val (oldIndexSet, deleteOldIndexQuery) = restClient.performRequest(
+        // Does the alias exist?
         "HEAD",
         s"/_alias/$alias",
         Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
@@ -239,12 +240,19 @@ object EsClient {
               s"/_alias/$alias",
               Map.empty[String, String].asJava)
             val responseJValue = parse(EntityUtils.toString(response.getEntity))
-            // TODO to use keys
             val oldIndexSet = responseJValue.extract[Map[String, JValue]].keys
-            val deleteOldIndexQuery = oldIndexSet.map(oldIndex => {
-              s"""{ "remove_index": { "index": "${oldIndex}"}}"""
-            }).mkString(",", ",", "")
-            (oldIndexSet, deleteOldIndexQuery)
+            val oldIndexName = oldIndexSet.head
+            restClient.performRequest(
+              // Does the old index exist?
+              "HEAD",
+              s"/$oldIndexName",
+              Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+                case 200 => {
+                  val deleteOldIndexQuery = s""",{ "remove_index": { "index": "${oldIndexName}"}}"""
+                  (oldIndexSet, deleteOldIndexQuery)
+                }
+                case _ => (Set(), "")
+              }
           }
           case _ => (Set(), "")
         }
