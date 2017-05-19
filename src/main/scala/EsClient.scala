@@ -90,9 +90,7 @@ object EsClient {
         "HEAD",
         s"/$indexName",
         Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
-          case 404 =>
-            logger.warn("Elasticsearch index: $indexName wasn't deleted because it didn't exist. This may be an error.")
-            false
+          case 404 => false
           case 200 =>
             restClient.performRequest(
               "DELETE",
@@ -265,14 +263,6 @@ object EsClient {
         |    ]
         |}""".stripMargin.replace("\n", "")
       val entity = new NStringEntity(aliasQuery, ContentType.APPLICATION_JSON)
-      if (!oldIndexSet.isEmpty) {
-        restClient.performRequest(
-          "HEAD",
-          s"/${alias}",
-          Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
-            case 200 => deleteIndex(alias)
-          }
-      }
       restClient.performRequest(
         "POST",
         "/_aliases",
