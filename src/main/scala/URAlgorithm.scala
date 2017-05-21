@@ -23,8 +23,7 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.controller.{ P2LAlgorithm, Params }
 import org.apache.predictionio.data.storage.{ DataMap, Event, NullModel, PropertyMap }
 import org.apache.predictionio.data.store.LEventStore
-//import org.apache.mahout.math.cf.{ DownsamplableCrossOccurrenceDataset, SimilarityAnalysis }
-import org.apache.mahout.math.cf.SimilarityAnalysis
+\import org.apache.mahout.math.cf.{DownsamplableCrossOccurrenceDataset, SimilarityAnalysis}
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -300,23 +299,15 @@ class URAlgorithm(val ap: URAlgorithmParams)
     data: PreparedData,
     calcPopular: Boolean = true)(implicit sc: SparkContext): NullModel = {
 
-    // No one likes empty training data.
-    /*    require(
-      data.actions.head._2.asInstanceOf[IndexedDatasetSpark].rowIDs.size != 0,
-      s"""
-         |There are no users with the primary / conversion event and this is not allowed
-         |Check to see that your dataset contains the primary event.""".stripMargin)
-*/
-
-    //val backfillParams = ap.backfillField.getOrElse(DefaultURAlgoParams.DefaultBackfillParams)
-    //val nonDefaultMappings = Map(backfillParams.name.getOrElse(DefaultURAlgoParams.BackfillFieldName) -> "float")
-
-    logger.info("Indicators read now creating correlators")
+    /*logger.info("Indicators read now creating correlators")
     val cooccurrenceIDSs = SimilarityAnalysis.cooccurrencesIDSs(
       data.actions.map(_._2).toArray,
       ap.seed.getOrElse(System.currentTimeMillis()).toInt)
       .map(_.asInstanceOf[IndexedDatasetSpark])
-    /*    val cooccurrenceIDSs = if (ap.indicators.isEmpty) { // using one global set of algo params
+    */
+
+    logger.info("Actions read now creating correlators")
+    val cooccurrenceIDSs = if (ap.indicators.isEmpty) { // using one global set of algo params
       SimilarityAnalysis.cooccurrencesIDSs(
         data.actions.map(_._2).toArray,
         randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
@@ -325,8 +316,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
         maxNumInteractions = ap.maxEventsPerEventType.getOrElse(DefaultURAlgoParams.MaxEventsPerEventType))
         .map(_.asInstanceOf[IndexedDatasetSpark])
     } else { // using params per matrix pair, these take the place of eventNames, maxCorrelatorsPerEventType,
-      // and maxEventsPerEventType!
-      val indicators = ap.indicators.get
+    // and maxEventsPerEventType!
+    val indicators = ap.indicators.get
       val iDs = data.actions.map(_._2).toSeq
       val datasets = iDs.zipWithIndex.map {
         case (iD, i) =>
@@ -342,7 +333,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         ap.seed.getOrElse(System.currentTimeMillis()).toInt)
         .map(_.asInstanceOf[IndexedDatasetSpark])
     }
-*/
+
     val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
 
     val propertiesRDD: RDD[(ItemID, ItemProps)] = if (calcPopular) {
