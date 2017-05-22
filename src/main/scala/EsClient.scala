@@ -288,7 +288,8 @@ object EsClient {
       val response = restClient.performRequest(
         "POST",
         s"/$indexName/_search",
-        Map.empty[String, String].asJava)
+        Map.empty[String, String].asJava,
+        new StringEntity(query, ContentType.APPLICATION_JSON))
       response.getStatusLine.getStatusCode match {
         case 200 => Some(parse(EntityUtils.toString(response.getEntity)))
         case _   => None
