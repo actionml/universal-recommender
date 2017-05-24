@@ -40,10 +40,12 @@ heroku config:set \
   PIO_EVENTSERVER_HOSTNAME=my-eventserver.herokuapp.com
 
 heroku addons:create bonsai:shared-10 --as PIO_ELASTICSEARCH --version 5.1
-# Verify that Elasticsearch is really version `5.1.x`.
+# Verify that Elasticsearch is really version `5.x`.
+# May provide newer versions too, like `--version 5.3`.
 
-heroku addons:create heroku-postgresql:standard-0
-# Wait for Postgres to provision.
+# Use the Eventserver's database with this engine.
+# Do not share them between Universal Recommender engines.
+heroku addons:attach $EVENTSERVER_DATABASE_ADDON_ID
 
 git push heroku master
 
