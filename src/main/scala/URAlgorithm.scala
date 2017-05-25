@@ -23,7 +23,7 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.controller.{ P2LAlgorithm, Params }
 import org.apache.predictionio.data.storage.{ DataMap, Event, NullModel, PropertyMap }
 import org.apache.predictionio.data.store.LEventStore
-\import org.apache.mahout.math.cf.{DownsamplableCrossOccurrenceDataset, SimilarityAnalysis}
+import org.apache.mahout.math.cf.{DownsamplableCrossOccurrenceDataset, SimilarityAnalysis}
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
