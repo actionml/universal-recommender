@@ -33,3 +33,4 @@ pio.log
 .env
 PredictionIO-dist/
 repo/
+bin/pio
