@@ -1,0 +1,99 @@
+#!/bin/bash
+
+## NAME 
+##   import-events
+##
+## SYNOPSIS
+##   import-events [-f,--filepath] [file]
+##
+## DESCRIPTION
+##   import-events calls pio import with provided json file. File path defaults to data/sync-events.json
+##
+##   -f, --filepath  path for file to import
+##
+## CONFIG VARS
+##   $EVENTSERVER_APP_ID
+
+set -eu
+
+# Use `pio` command if it's already in the PATH
+if [ `which pio` ]
+  then PIO_BIN=pio
+# Otherwise try to use `bin/pio` installed for local dev
+elif [ -x bin/pio ]
+  then PIO_BIN=bin/pio
+else
+  echo
+  echo 'Cannot continue, because the `pio` command is not available.'
+  echo
+  echo 'To install for local development, see:'
+  echo '  https://github.com/heroku/predictionio-buildpack/blob/master/DEV.md'
+  exit 1
+fi
+
+#default value for syn-events.json file path
+FILE_PATH="data/initial-events.json"
+
+# Verify required env variables are set.
+if [ -z "${PIO_EVENTSERVER_APP_NAME:-}" ]
+then
+  echo "PIO_EVENTSERVER_APP_NAME is required to import data."
+  exit 1
+fi
+
+optspec=":f-:"
+while getopts "$optspec" optchar; do
+  case "${optchar}" in
+    -)
+      case "${OPTARG}" in
+        filepath)
+          FILE_PATH="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+          ;; 
+        filepath=*)
+          FILE_PATH=${OPTARG#*=}
+          ;;
+        *)
+          echo "Unknown option --${OPTARG}" >&2
+          ;;
+      esac;;
+    f)
+      FILE_PATH="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+      echo "Parsing value: $FILE_PATH"  >&2
+      ;;
+    \?) 
+      echo "Invalid option: -$OPTARG" 
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." 
+      exit 1
+      ;;
+  esac
+done
+
+echo "Importing events from $FILE_PATH"
+
+## write new events to eventserver, if there are new events
+if grep -q "{" "$FILE_PATH"; 
+then
+
+  echo "[IMPORT EVENTS] Importing new events to eventserver..."
+
+  $PIO_BIN app show $PIO_EVENTSERVER_APP_NAME | tee app-show-out.log
+
+  EVENTSERVER_APP_ID=`cat app-show-out.log | ruby -E utf-8:utf-8 -e 'STDOUT << /id:\s+(\w+)/i.match(STDIN.read)[1]'`
+
+  # Enable S3 HDFS support for newer regions.
+  if [ -n "${AWS_REGION:-}" ]
+  then
+    S3_SUPPORT_OPTS="--driver-java-options '-Dcom.amazonaws.services.s3.enableV4' --conf 'spark.executor.extraJavaOptions=-Dcom.amazonaws.services.s3.enableV4'"
+  fi
+
+  eval "$PIO_BIN import --appid $EVENTSERVER_APP_ID --input $FILE_PATH -- ${S3_SUPPORT_OPTS:-}"
+
+  rm "app-show-out.log" 
+
+  echo "[IMPORT EVENTS] Done."
+else
+  echo "[IMPORT EVENTS] No events to import."
+fi

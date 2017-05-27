@@ -22,6 +22,12 @@ A machine learning search engine deployable to Heroku with the [PredictionIO bui
 
 Use the buildpack setup this engine for **[local development](https://github.com/heroku/predictionio-buildpack/blob/master/DEV.md) including Elasticsearch**.
 
+Import sample data with:
+
+```bash
+bin/pio app new ur
+PIO_EVENTSERVER_APP_NAME=ur data/import-events -f data/initial-events.json
+```
 
 ## Deployment
 
@@ -51,3 +57,29 @@ git push heroku master
 
 heroku ps:scale web=1:Performance-M release=0:Performance-L train=0:Performance-L
 ```
+
+The sample data in `data/initial-events.json` is imported automatically when deployed. Delete this file if you wish not to have it imported. Note that the engine requires data for training before a deployment will succeed.
+
+### Elasticsearch config
+
+* `PIO_UR_ELASTICSEARCH_CONCURRENCY`
+  * defaults to `1`
+  * may increase in-line with the [Bonsai Add-on plan's](https://elements.heroku.com/addons/bonsai) value for **Concurrent Indexing**
+
+## Usage
+
+Sample query, for someone who already has a phone:
+
+```bash
+curl -X "POST" "http://127.0.0.1:8000/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{
+            "user": "100",
+            "fields": [{
+              "name": "category",
+              "values": ["phone"],
+              "bias": 0
+            }]
+          }'
+```
+

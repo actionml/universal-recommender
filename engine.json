@@ -5,8 +5,8 @@
   "engineFactory": "org.template.RecommendationEngine",
   "datasource": {
     "params" : {
-      "name": "sample-handmade-data.txt",
-      "eventNames": ["purchase", "view"]
+      "name": "iOS vs Android demo (data/initial-events.json)",
+      "eventNames": ["purchase", "bookmark"]
     }
   },
   "sparkConf": {
@@ -27,13 +27,10 @@
           {
             "name": "purchase"
           },{
-            "name": "view",
+            "name": "bookmark",
             "maxCorrelatorsPerItem": 50
           }
         ],
-        "availableDateName": "available",
-        "expireDateName": "expires",
-        "dateName": "date",
         "num": 4
       }
     }
