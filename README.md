@@ -20,7 +20,7 @@ A machine learning search engine deployable to Heroku with the [PredictionIO bui
 
 ## Local Development
 
-Use the buildpack setup this engine for **[local development](https://github.com/heroku/predictionio-buildpack/blob/master/DEV.md) including Elasticsearch**.
+First, use the buildpack to **[setup local development](https://github.com/heroku/predictionio-buildpack/blob/master/DEV.md) including Elasticsearch**.
 
 ### Import sample data
 
