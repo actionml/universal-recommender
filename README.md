@@ -68,7 +68,13 @@ The sample data in `data/initial-events.json` is imported automatically when dep
 
 ## Usage
 
-Sample query, for someone who already has a phone:
+```bash
+bin/pio build
+bin/pio train --driver-memory 2500m
+bin/pio deploy
+```
+
+Example query with the sample data:
 
 ```bash
 curl -X "POST" "http://127.0.0.1:8000/queries.json" \
