@@ -23,7 +23,7 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.controller.{ P2LAlgorithm, Params }
 import org.apache.predictionio.data.storage.{ DataMap, Event, NullModel, PropertyMap }
 import org.apache.predictionio.data.store.LEventStore
-\import org.apache.mahout.math.cf.{DownsamplableCrossOccurrenceDataset, SimilarityAnalysis}
+import org.apache.mahout.math.cf.{ DownsamplableCrossOccurrenceDataset, SimilarityAnalysis }
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -65,6 +65,7 @@ object DefaultURAlgoParams {
   val BackfillDuration = "3650 days" // for all time
 
   val ReturnSelf = false
+  val NumESWriteConnections: Option[Int] = None
 }
 
 /* default values must be set in code not the case class declaration
@@ -162,7 +163,10 @@ case class URAlgorithmParams(
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
   indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
-  seed: Option[Long] = None) // seed is not used presently
+  seed: Option[Long] = None, // seed is not used presently
+  numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
+  // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
+  // for ES 1.7 bulk queue is defaulted to 50
     extends Params //fixed default make it reproducible unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
@@ -231,6 +235,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
   val fields: Seq[Field] = ap.fields.getOrEmpty
 
   val randomSeed: Int = ap.seed.getOrElse(System.currentTimeMillis()).toInt
+
+  val numESWriteConnections = if (ap.numESWriteConnections.nonEmpty) ap.numESWriteConnections else DefaultURAlgoParams.NumESWriteConnections
+
   val maxCorrelatorsPerEventType: Int = ap.maxCorrelatorsPerEventType
     .getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType)
   val maxEventsPerEventType: Int = ap.maxEventsPerEventType
@@ -316,8 +323,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
         maxNumInteractions = ap.maxEventsPerEventType.getOrElse(DefaultURAlgoParams.MaxEventsPerEventType))
         .map(_.asInstanceOf[IndexedDatasetSpark])
     } else { // using params per matrix pair, these take the place of eventNames, maxCorrelatorsPerEventType,
-    // and maxEventsPerEventType!
-    val indicators = ap.indicators.get
+      // and maxEventsPerEventType!
+      val indicators = ap.indicators.get
       val iDs = data.actions.map(_._2).toSeq
       val datasets = iDs.zipWithIndex.map {
         case (iD, i) =>
@@ -352,7 +359,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     new URModel(
       coocurrenceMatrices = cooccurrenceCorrelators,
       propertiesRDDs = Seq(propertiesRDD),
-      typeMappings = getMappings).save(dateNames, esIndex, esType)
+      typeMappings = getMappings).save(dateNames, esIndex, esType, numESWriteConnections)
     new NullModel
   }
 
@@ -382,7 +389,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     // returns the existing model plus new popularity ranking
     new URModel(
       propertiesRDDs = Seq(fieldsRDD.cache(), propertiesRDD.cache()),
-      typeMappings = getMappings).save(dateNames, esIndex, esType)
+      typeMappings = getMappings).save(dateNames, esIndex, esType, numESWriteConnections)
     new NullModel
   }
 

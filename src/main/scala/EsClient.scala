@@ -21,6 +21,7 @@ import java.util
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.data.storage._
+import org.apache.spark.sql.catalyst.expressions.Coalesce
 
 /*
 //import org.json4s.JsonAST.{JField, JString}
@@ -195,7 +196,8 @@ object EsClient {
     typeName: String,
     indexRDD: RDD[Map[String, Any]],
     fieldNames: List[String],
-    typeMappings: Map[String, (String, Boolean)] = Map.empty): Unit = {
+    typeMappings: Map[String, (String, Boolean)] = Map.empty,
+    numESWriteConnections: Option[Int] = None): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
@@ -204,8 +206,20 @@ object EsClient {
     createIndex(newIndex, typeName, fieldNames, typeMappings)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
-    indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
-    //refreshIndex(newIndex) //appears to not be needed
+
+    // throttle writing to the max bulk-write connections, which is one per ES core.
+    // todo: can we find this from the cluster itself?
+    val newIndexRDD = if (numESWriteConnections.nonEmpty && indexRDD.context.defaultParallelism > (numESWriteConnections.get)) {
+      logger.info(s"defaultParallelism: ${indexRDD.context.defaultParallelism}")
+      logger.info(s"Coalesce to: ${numESWriteConnections.get} to reduce number of ES connections for saveToEs")
+      indexRDD.coalesce(numESWriteConnections.get)
+    } else {
+      logger.info(s"Number of ES connections for saveToEs: ${indexRDD.context.defaultParallelism}")
+      indexRDD
+    }
+
+    // logger.info(s"Index has ${newIndexRDD.count()} docs to write, writing now.")
+    newIndexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
 
     if (!aliasMetadata.isEmpty
       && aliasMetadata.get(alias) != null
