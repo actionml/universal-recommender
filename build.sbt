@@ -12,13 +12,14 @@ organization := "com.actionml"
 
 val mahoutVersion = "0.13.0"
 
-val pioVersion = "0.11.0-SNAPSHOT"
+val pioVersion = "0.11.0-incubating"
 
-val elasticsearchVersion = "5.2.1"
+val elasticsearchVersion = "5.2.2"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
   "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch" % pioVersion % "provided",
+  "org.elasticsearch.client" % "rest" % elasticsearchVersion,
   "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
@@ -56,3 +57,7 @@ assemblyMergeStrategy in assembly := {
     val oldStrategy = (assemblyMergeStrategy in assembly).value
     oldStrategy(x)
 }
+
+ assemblyShadeRules in assembly := Seq(
+  ShadeRule.rename("org.elasticsearch.client.**" -> "shadeio.ur.data.client.@1").inAll
+ )
