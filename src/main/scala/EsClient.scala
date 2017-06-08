@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import java.util
 
@@ -28,8 +28,6 @@ import org.apache.predictionio.data.storage.elasticsearch
 import org.apache.predictionio.data.storage._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.http.entity.ContentType
-import org.apache.http.nio.entity.NStringEntity
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.elasticsearch.spark._
@@ -40,27 +38,42 @@ import org.template.conversions.{ ItemID, ItemProps }
 import scala.collection.JavaConverters._
 
 /** Elasticsearch notes:
- *  1) every query clause wil laffect scores unless it has a constant_score and boost: 0
+ *  1) every query clause will affect scores unless it has a constant_score and boost: 0
  *  2) the Spark index writer is fast but must assemble all data for the index before the write occurs
  *  3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
  *  4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
  *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
+ *    Finally the correlator fields should be norms: true to enable norms, this make the score equal to the sum
+ *    of dot products divided by the length of each vector. This is the definition of "cosine" similarity.
+ *    Todo: norms may not be the best, should experiment to know for sure.
+ *  5) the client, either transport client for < ES5 or the rest client for >= ES5 there should be a timeout set since
+ *    the default is very long, several seconds.
  */
 
-/** Defines methods to use on Elasticsearch. */
+/** Defines methods to use on Elasticsearch.*/
 object EsClient {
   @transient lazy val logger: Logger = Logger[this.type]
 
-  implicit val formats = DefaultFormats
+  /*  This returns 2 incompatible objects of TransportClient and RestClient
 
-  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
+  private lazy val client = if (Storage.getConfig("ELASTICSEARCH5").nonEmpty)
+    new elasticsearch5.StorageClient(Storage.getConfig("ELASTICSEARCH5").get).client
+  else if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
     new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
   else
     throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
       "proper configuration settings")
+  */
 
-  // wrong way that uses only default settings, which will be a localhost ES sever.
-  //private lazy val client = new elasticsearch.StorageClient(StorageClientConfig()).client
+  /** Gets the client for the right version of Elasticsearch. The ES timeout for the Transport client is
+   *  set in elasticsearch.yml with transport.tcp.connect_timeout: 200ms or something like that
+   */
+  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty) {
+    new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
+  } else {
+    throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
+      "proper configuration settings")
+  }
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
    *  the changes will not be reflected.
@@ -113,7 +126,7 @@ object EsClient {
     indexName: String,
     indexType: String,
     fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty,
+    typeMappings: Map[String, (String, Boolean)] = Map.empty,
     refresh: Boolean = false): Boolean = {
     val restClient: RestClient = client.open()
     val result = try {
@@ -200,17 +213,17 @@ object EsClient {
     typeName: String,
     indexRDD: RDD[Map[String, Any]],
     fieldNames: List[String],
-    typeMappings: Map[String, String] = Map.empty): Unit = {
+    typeMappings: Map[String, (String, Boolean)] = Map.empty): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
 
-    logger.debug(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
+    logger.trace(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
     createIndex(newIndex, typeName, fieldNames, typeMappings)
 
     val newIndexURI = "/" + newIndex + "/" + typeName
     // TODO check if {"es.mapping.id": "id"} work on ESHadoop Interface of ESv5
     indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
-    //refreshIndex(newIndex)
+    //refreshIndex(newIndex) //appears to not be needed
 
     val restClient = client.open()
     try {
@@ -280,6 +293,26 @@ object EsClient {
       restClient.close()
       None
     }
+  }
+
+  /** sorry, a little hacky, remove item, user, and/or itemset from query so all the bizrules
+   *  are unchanged but the query will run fast returning ranked results like popular.
+   *  Todo: a better way it to pass in a fallback query
+   */
+  def rankedResults(query: String, correlators: Seq[String]): String = {
+    var newQuery = query
+    for (correlator <- correlators) {
+      // way hacky, should use the removal or replacement functions but can't quite see how to do it
+      // Todo: Warning this will have problems if the correlator name can be interpretted as a regex
+      newQuery = newQuery.replace(correlator, "__null__") // replaces no matter where in the string, seems dangerous
+      /* removeField example that leaves an invalid query
+      newQuery = compact(render(parse(newQuery).removeField { // filter one at a time, there must be a better way
+        case JField(`correlator`, _) => true
+        case _                       => false
+      }))
+      */
+    }
+    newQuery
   }
 
   /** Gets the "source" field of an Elasticsearch document

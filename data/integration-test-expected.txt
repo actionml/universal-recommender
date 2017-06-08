@@ -13,41 +13,41 @@ NOTE: due to available and expire dates you should never see the Iphone 5 or Iph
 
 Recommendations for user: u1
 
-{"itemScores":[{"item":"Nexus","score":0.22873082756996155},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Nexus","score":0.057719700038433075},{"item":"Surface","score":0.0}]}
 
 Recommendations for user: U 2
 
-{"itemScores":[{"item":"Iphone 4","score":0.3830534517765045},{"item":"Ipad-retina","score":0.08661800622940063},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Iphone 4","score":0.11071484535932541},{"item":"Ipad-retina","score":0.011783885769546032},{"item":"Surface","score":0.0}]}
 
 Recommendations for user: u-3
 
-{"itemScores":[{"item":"Galaxy","score":0.0},{"item":"Iphone 4","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0}]}
+{"itemScores":[{"item":"Iphone 4","score":0.21286821365356445},{"item":"Nexus","score":0.21286821365356445},{"item":"Ipad-retina","score":0.04337746649980545},{"item":"Galaxy","score":0.0}]}
 
 Recommendations for user: u-4
 
-{"itemScores":[{"item":"Nexus","score":0.5454773902893066},{"item":"Ipad-retina","score":0.23960837721824646},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Nexus","score":0.03073776885867119},{"item":"Ipad-retina","score":0.014456864446401596},{"item":"Surface","score":0.0}]}
 
 Recommendations for user: u5
 
-{"itemScores":[{"item":"Galaxy","score":0.800000011920929},{"item":"Iphone 4","score":0.800000011920929},{"item":"Ipad-retina","score":0.24548225104808807},{"item":"Nexus","score":0.0}]}
+{"itemScores":[{"item":"Iphone 4","score":0.325863242149353},{"item":"Ipad-retina","score":0.060010723769664764},{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0}]}
 
 ============ simple similar item recs ============
 
 Recommendations for item: Iphone 4
 
-{"itemScores":[{"item":"Galaxy","score":1.080641746520996},{"item":"Nexus","score":0.3213261365890503},{"item":"Ipad-retina","score":0.23569224774837494},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Nexus","score":0.29600009322166443},{"item":"Ipad-retina","score":0.07530848681926727},{"item":"Galaxy","score":0.0},{"item":"Surface","score":0.0}]}
 
 Recommendations for item: Ipad-retina
 
-{"itemScores":[{"item":"Galaxy","score":1.2022438049316406},{"item":"Iphone 4","score":0.9887586832046509},{"item":"Nexus","score":0.2940049171447754},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Iphone 4","score":0.6216142177581787},{"item":"Nexus","score":0.14531129598617554},{"item":"Galaxy","score":0.0},{"item":"Surface","score":0.0}]}
 
 Recommendations for item: Nexus
 
-{"itemScores":[{"item":"Galaxy","score":0.7244793176651001},{"item":"Iphone 4","score":0.7244793176651001},{"item":"Ipad-retina","score":0.14847303926944733},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Iphone 4","score":0.638360321521759},{"item":"Ipad-retina","score":0.04000714793801308},{"item":"Galaxy","score":0.0},{"item":"Surface","score":0.0}]}
 
 Recommendations for item: Galaxy
 
-{"itemScores":[{"item":"Iphone 4","score":0.5986188054084778},{"item":"Nexus","score":0.2639380991458893},{"item":"Ipad-retina","score":0.11311610043048859},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Iphone 4","score":0.0},{"item":"Nexus","score":0.0},{"item":"Ipad-retina","score":0.0},{"item":"Surface","score":0.0}]}
 
 Recommendations for item: Surface
 
@@ -73,20 +73,50 @@ Recommendations for no user no item, all from popularity, Tablets filter
 
 Recommendations for no user no item, all from popularity, Tablets boost
 
-{"itemScores":[{"item":"Nexus","score":0.9369767904281616},{"item":"Surface","score":0.6666666865348816},{"item":"Ipad-retina","score":0.204568549990654},{"item":"Galaxy","score":0.0}]}
+{"itemScores":[{"item":"Nexus","score":0.8031229376792908},{"item":"Surface","score":0.5714285969734192},{"item":"Ipad-retina","score":0.17534448206424713},{"item":"Galaxy","score":0.0}]}
 
 Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter
 
-{"itemScores":[{"item":"Ipad-retina","score":0.21918058395385742},{"item":"Iphone 4","score":0.0}]}
+{"itemScores":[{"item":"Ipad-retina","score":0.19178301095962524},{"item":"Iphone 4","score":0.0}]}
 
 ============ dateRange filter ============
 
 Recommendations for user: u1
 
-{"itemScores":[{"item":"Nexus","score":0.22873082756996155},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Nexus","score":0.05194773152470589},{"item":"Surface","score":0.0}]}
 
 ============ query with item and user *EXPERIMENTAL* ============
 
 Recommendations for no user no item, all from popularity, Tablets boost, Estados Unidos Mexicanos filter
 
-{"itemScores":[{"item":"Nexus","score":0.43929141759872437},{"item":"Surface","score":0.0}]}
+{"itemScores":[{"item":"Nexus","score":0.20753172039985657},{"item":"Surface","score":0.0}]}
+
+============ Advanced business rules ============
+
+Recommendations for user: u-3
+
+{"itemScores":[{"item":"Iphone 4","score":0.21286821365356445},{"item":"Nexus","score":0.21286821365356445},{"item":"Ipad-retina","score":0.04337746649980545},{"item":"Galaxy","score":0.0}]}
+
+Recommendations for user: u-3, Tablets filter
+
+{"itemScores":[{"item":"Nexus","score":0.2280730903148651},{"item":"Ipad-retina","score":0.0464758537709713}]}
+
+Recommendations for user: u-3, Tablets boost
+
+{"itemScores":[{"item":"Nexus","score":1.0229848623275757},{"item":"Ipad-retina","score":0.22399653494358063},{"item":"Iphone 4","score":0.020203793421387672},{"item":"Galaxy","score":0.0}]}
+
+Recommendations for user: u-3, Tablets excluded
+
+{"itemScores":[{"item":"Iphone 4","score":0.21286821365356445},{"item":"Galaxy","score":0.0}]}
+
+Recommendations for user: u-3, Tablets excluded, Estados Unidos Mexicanos boosted
+
+{"itemScores":[{"item":"Iphone 4","score":1.0098044872283936},{"item":"Galaxy","score":0.0}]}
+
+Recommendations for user: u-3, Tablets and Samsung excluded, Estados Unidos Mexicanos boosted, phones included
+
+{"itemScores":[{"item":"Iphone 4","score":1.0602947473526}]}
+
+Recommendations for user: u-3, Tablets and Samsung boosted, Estados Unidos Mexicanos excluded, phones included
+
+{"itemScores":[{"item":"Galaxy","score":0.2962070107460022}]}

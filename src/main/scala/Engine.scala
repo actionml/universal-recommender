@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.controller.{ EmptyActualResult, EmptyEvaluationInfo, Engine, EngineFactory }
-import org.template.conversions._
+import com.actionml.helpers._
 
 /** This file contains case classes that are used with reflection to specify how query and config
  *  JSON is to be parsed. the Query case class, for instance defines the way a JSON query is to be
@@ -34,6 +34,8 @@ case class Query(
   userBias: Option[Float] = None, // default: whatever is in algorithm params or 1
   item: Option[String] = None, // must be a user or item id
   itemBias: Option[Float] = None, // default: whatever is in algorithm params or 1
+  itemSet: Option[List[String]] = None, // item-set query, shpping cart for instance.
+  itemSetBias: Option[Float] = None, // default: whatever is in algorithm params or 1
   fields: Option[List[Field]] = None, // default: whatever is in algorithm params or None
   currentDate: Option[String] = None, // if used will override dateRange filter, currentDate must lie between the item's
   // expireDateName value and availableDateName value, all are ISO 8601 dates

@@ -22,10 +22,6 @@ def import_events(client, file):
   now_date = datetime.datetime.now(pytz.utc) # - datetime.timedelta(days=2.7)
   current_date = now_date
   event_time_increment = datetime.timedelta(days= -0.8)
-  available_date_increment = datetime.timedelta(days= 0.8)
-  event_date = now_date - datetime.timedelta(days= 2.4)
-  available_date = event_date + datetime.timedelta(days=-2)
-  expire_date = event_date + datetime.timedelta(days=2)
   print "Importing data..."
 
   for line in f:
@@ -33,7 +29,7 @@ def import_events(client, file):
     # For demonstration purpose action names are taken from input along with secondary actions on
     # For the UR add some item metadata
 
-    if (data[1] != "$set"):
+    if (data[1] == "purchase"):
       client.create_event(
         event=data[1],
         entity_type="user",
@@ -41,6 +37,28 @@ def import_events(client, file):
         target_entity_type="item",
         target_entity_id=data[2],
         event_time = current_date
+      )
+      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
+            " current_date: " + current_date.isoformat()
+    elif (data[1] == "view"):  # assumes other event type is 'view'
+      client.create_event(
+              event=data[1],
+              entity_type="user",
+              entity_id=data[0],
+              target_entity_type="item",  # type of item in this action
+              target_entity_id=data[2],
+              event_time = current_date
+      )
+      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
+            " current_date: " + current_date.isoformat()
+    elif (data[1] == "category-pref"):  # assumes other event type is 'category-pref'
+      client.create_event(
+              event=data[1],
+              entity_type="user",
+              entity_id=data[0],
+              target_entity_type="item",  # type of item in this action
+              target_entity_id=data[2],
+              event_time = current_date
       )
       print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
             " current_date: " + current_date.isoformat()
@@ -59,27 +77,6 @@ def import_events(client, file):
           " current_date: " + current_date.isoformat()
     count += 1
     current_date += event_time_increment
-
-  items = ['Iphone 6', 'Ipad-retina', 'Nexus', 'Surface', 'Iphone 4', 'Galaxy', 'Iphone 5']
-  print "All items: " + str(items)
-  for item in items:
-
-    client.create_event(
-      event="$set",
-      entity_type="item",
-      entity_id=item,
-      properties={"expires": expire_date.isoformat(),
-                  "available": available_date.isoformat(),
-                  "date": event_date.isoformat()}
-    )
-    print "Event: $set entity_id: " + item + \
-            " properties/availableDate: " + available_date.isoformat() + \
-            " properties/date: " + event_date.isoformat() + \
-            " properties/expireDate: " + expire_date.isoformat()
-    expire_date += available_date_increment
-    event_date += available_date_increment
-    available_date += available_date_increment
-    count += 1
 
   f.close()
   print "%s events are imported." % count

@@ -4,19 +4,19 @@
 set -e
 
 echo ""
-echo "Integration test for The Universal Recommender."
+echo "Integration test for The Universal Recommender doing item-set recommendations."
 echo "If some step fails check that your engine.json file has been restored"
 echo "or look for it in 'user-engine.json'"
 echo ""
 
 echo "Checking for needed files"
 if [ ! -f examples/handmade-engine.json ]; then
-    echo "File not found: examples/handmade-engine.json"
+    echo "File not found: examples/handmade-engine-item-sets.json"
     exit 1
 fi
 
-if [ ! -f data/sample-handmade-data.txt ]; then
-    echo "File not found: data/sample-handmade-data.txt"
+if [ ! -f data/sample-handmade-item-set-data.txt ]; then
+    echo "File not found: data/sample-handmade-item-set-data.txt"
     exit 1
 fi
 
@@ -26,43 +26,43 @@ if [ -f user-engine.json ]; then
 fi
 
 if [ ! -f data/integration-test-expected.txt ]; then
-    echo "File not found: data/integration-test-expected.txt"
+    echo "File not found: data/integration-test-item-set-expected.txt"
     exit 1
 fi
 
 echo ""
 echo "Checking status, should exit if pio is not running."
 pio status
-pio app new handmade || true
+pio app new handmade-item-sets || true
 
 echo ""
 echo "Checking to see if handmade app exists, should exit if not."
-pio app show handmade
+pio app show handmade-item-sets
 
 echo ""
-echo "Moving engine.json to user-engine.json if it exists"
-cp -n engine.json user-engine.json || true
+echo "Moving engine.json to user-engine.json"
+cp -n engine.json user-engine.json
 
 echo ""
 echo "Moving examples/handmade-engine.json to engine.json for integration test."
-cp examples/handmade-engine.json engine.json
+cp examples/handmade-engine-item-sets.json engine.json
 
 echo ""
 echo "Deleting handmade app data since the test is date dependent"
-pio app data-delete handmade -f
+pio app data-delete handmade-item-sets -f
 
 echo ""
 echo "Importing data for integration test"
 # get the access_key from pio app list
-ACCESS_KEY=`pio app show handmade | grep Key | cut -f 7 -d ' '`
+ACCESS_KEY=`pio app show handmade-item-sets | grep Key | cut -f 7 -d ' '`
 echo -n "Access key: "
 echo $ACCESS_KEY
-python examples/import_handmade.py --access_key $ACCESS_KEY --file data/sample-handmade-data.txt
+python examples/import_handmade_item_sets.py --access_key $ACCESS_KEY
 
 echo ""
 echo "Building and delpoying model"
 pio build
-pio train  -- --driver-memory 4g --executor-memory 4g
+pio train  -- --driver-memory 3g --executor-memory 3g
 echo "Model will remain deployed after this test"
 nohup pio deploy > deploy.out &
 echo "Waiting 30 seconds for the server to start"
@@ -75,16 +75,16 @@ sleep 30
 #this is due bug where first query had bad results
 #TODO: Investigate and squash
 
-./examples/multi-query-handmade.sh > test.out
+./examples/multi-query-handmade-item-sets.sh > test.out
 
 echo ""
-echo "Restoring engine.json if is was saved"
-mv user-engine.json engine.json || true 
+echo "Restoring engine.json"
+mv user-engine.json engine.json
 
 echo ""
 echo "Differences between expected and actual results, none is a passing test."
 echo "Note: differences in ordering of results with the same score is allowed."
-diff data/integration-test-expected.txt test.out
+diff data/integration-test-item-set-expected.txt test.out
 
 deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
 echo "Killing the deployed test PredictionServer"

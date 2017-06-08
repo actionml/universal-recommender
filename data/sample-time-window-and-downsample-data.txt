@@ -1,0 +1,68 @@
+u1,purchase,Iphone 6
+u1,purchase,Iphone 6
+u1,purchase,Iphone 6
+u1,purchase,Iphone 6
+u1,purchase,Iphone 5
+u1,purchase,Iphone 5
+u1,purchase,Iphone 5
+u1,purchase,Iphone 4
+u1,purchase,Iphone 4
+u1,purchase,Ipad-retina
+u2,purchase,Nexus
+u2,purchase,Galaxy
+u3,purchase,Surface
+u4,purchase,Iphone 5
+u4,purchase,Iphone 5
+u4,purchase,Iphone 5
+u4,purchase,Iphone 5
+u4,purchase,Iphone 4
+u4,purchase,Galaxy
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Mobile-acc
+u2,view,Phones
+u2,view,Tablets
+u2,view,Mobile-acc
+u3,view,Mobile-acc
+u4,view,Phones
+u4,view,Tablets
+u4,view,Soap
+u5,view,Soap
+Iphone 6,$set,categories:Phones:Electronics:Apple
+Iphone 6,$set,categories:Cameras
+Iphone 6,$set,countries:United States:Canada:Estados Unidos Mexicanos
+Iphone 6,$set,countries:United States:Canada
+Iphone 6,$set,countries:United States
+Iphone 5,$set,categories:Phones:Electronics:Apple
+Iphone 4,$set,categories:Cameras
+Iphone 4,$set,categories:Phones:Electronics:Apple
+Iphone 4,$set,categories:Phones:Electronics
+Iphone 4,$set,categories:Phones
+Ipad-retina,$set,categories:Phones
+Ipad-retina,$set,categories:Phones:Electronics
+Ipad-retina,$set,categories:Phones:Electronics:Apple
+Nexus,$set,categories:Phones:Electronics
+Nexus,$set,categories:Phones:Electronics:Google
+Nexus,$set,categories:Phones:Electronics
+Galaxy,$set,categories:Phones:Electronics:Samsung
+Galaxy,$set,categories:Phones:Electronics
+Galaxy,$set,categories:Phones:Electronics:Samsung
+Surface,$set,categories:Phones:Electronics:Microsoft
+Iphone 6,$set,defaultRank:7
+Iphone 5,$set,defaultRank:6
+Iphone 4,$set,defaultRank:5
+Nexus,$set,defaultRank:4
+Ipad-retina,$set,defaultRank:3
+Galaxy,$set,defaultRank:2
+Surface,$set,defaultRank:1
+Iphone 6,$set,defaultRank:1
+Iphone 5,$set,defaultRank:2
+Iphone 4,$set,defaultRank:3
+Nexus,$set,defaultRank:4
+Ipad-retina,$set,defaultRank:5
+Galaxy,$set,defaultRank:6
+Surface,$set,defaultRank:7

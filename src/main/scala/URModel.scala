@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.data.storage.DataMap
@@ -26,13 +26,13 @@ import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
-import org.template.conversions.{ IndexedDatasetConversions, ItemID, ItemProps }
+import com.actionml.helpers.{ IndexedDatasetConversions, ItemID, ItemProps }
 
 /** Universal Recommender models to save in ES */
 class URModel(
     coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
     propertiesRDDs: Seq[RDD[(ItemID, ItemProps)]] = Seq.empty,
-    typeMappings: Map[String, String] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
+    typeMappings: Map[String, (String, Boolean)] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
     nullModel: Boolean = false)(implicit sc: SparkContext) {
 
   @transient lazy val logger: Logger = Logger[this.type]
@@ -46,7 +46,7 @@ class URModel(
    */
   def save(dateNames: Seq[String], esIndex: String, esType: String): Boolean = {
 
-    logger.debug(s"Start save model")
+    logger.trace(s"Start save model")
 
     if (nullModel) throw new IllegalStateException("Saving a null model created from loading an old one.")
 
@@ -74,6 +74,8 @@ class URModel(
       }
     }
 
+    // todo: this could be replaced with an optional list of properties in the params json because now it
+    // goes through every element to find it's property name
     val esFields: List[String] = esRDD.flatMap(_.keySet).distinct().collect.toList
     logger.info(s"ES fields[${esFields.size}]: $esFields")
 
@@ -81,9 +83,28 @@ class URModel(
     true
   }
 
+  // Something in the second def of this function hangs on some data, reverting so this ***disables ranking***
   def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
+    //def groupAll( fields: Seq[RDD[(String, (Map[String, Any]))]]): RDD[(String, (Map[String, Any]))] = {
+    //if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
+    if (fields.size > 1) {
+      fields.head.cogroup[ItemProps](groupAll(fields.drop(1))).map {
+        case (key, pairMapSeqs) =>
+          // to be safe merge all maps but should only be one per rdd element
+          val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Any].asInstanceOf[ItemProps])(_ ++ _)
+          val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Any].asInstanceOf[ItemProps])(_ ++ _)
+          val fullMap = rdd1Maps ++ rdd2Maps
+          (key, fullMap)
+      }
+    } else {
+      fields.head
+    }
+  }
+
+  /*  def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
     fields.fold(sc.emptyRDD[(ItemID, ItemProps)])(_ ++ _).reduceByKey(_ ++ _)
   }
+*/
 }
 
 object URModel {

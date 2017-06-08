@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import grizzled.slf4j.Logger
 
@@ -26,8 +26,8 @@ import org.apache.mahout.sparkbindings._
 import org.apache.spark.rdd.RDD
 import org.json4s._
 
-/** Utility conversions for IndexedDatasetSpark */
-package object conversions {
+/** Various helper functions and types for the UR */
+package object helpers {
 
   type UserID = String
   type ActionID = String
@@ -84,12 +84,12 @@ package object conversions {
       @transient lazy val logger = Logger[this.type]
 
       //val matrix = indexedDataset.matrix.checkpoint()
-      val rowIDDictionary = indexedDataset.rowIDs
+      val rowIDReverseDictionary = indexedDataset.rowIDs.inverse // precalc the inverse
       implicit val sc = indexedDataset.matrix.context.asInstanceOf[SparkDistributedContext].sc
-      val rowIDDictionary_bcast = sc.broadcast(rowIDDictionary)
+      val rowIDReverseDictionary_bcast = sc.broadcast(rowIDReverseDictionary)
 
-      val columnIDDictionary = indexedDataset.columnIDs
-      val columnIDDictionary_bcast = sc.broadcast(columnIDDictionary)
+      val columnIDReverseDictionary = indexedDataset.columnIDs.inverse // precalc the inverse
+      val columnIDReverseDictionary_bcast = sc.broadcast(columnIDReverseDictionary)
 
       // may want to mapPartition and create bulk updates as a slight optimization
       // creates an RDD of (itemID, Map[correlatorName, list-of-correlator-values])
@@ -97,33 +97,16 @@ package object conversions {
         case (rowNum, itemVector) =>
 
           // turn non-zeros into list for sorting
-          var itemList = List[(Int, Double)]()
-          for (ve <- itemVector.nonZeroes) {
-            itemList = itemList :+ (ve.index, ve.get)
-          }
-          //sort by highest strength value descending(-)
-          val vector = itemList.sortBy { elem => -elem._2 }
-
-          val itemID = rowIDDictionary_bcast.value.inverse.getOrElse(rowNum, "INVALID_ITEM_ID")
-          try {
-
-            require(itemID != "INVALID_ITEM_ID", s"Bad row number in  matrix, skipping item $rowNum")
-            require(vector.nonEmpty, s"No values so skipping item $rowNum")
-
-            // create a list of element ids
-            val values = JArray(vector.map { item =>
-              JString(columnIDDictionary_bcast.value.inverse.getOrElse(item._1, "")) // should always be in the dictionary
-            })
-
-            (itemID, Map(actionName -> values))
-
-          } catch {
-            case cce: IllegalArgumentException => //non-fatal, ignore line
-              null.asInstanceOf[(ItemID, ItemProps)]
+          val vector = itemVector.nonZeroes.map { element =>
+            (element.index(), element.get())
+          }.toList.sortBy(element => -element._2) map { item =>
+            JString(columnIDReverseDictionary_bcast.value.getOrElse(item._1, "")) // should always be in the dictionary
           }
 
-      }.filter(_ != null)
+          val itemID = rowIDReverseDictionary_bcast.value.getOrElse(rowNum, "INVALID_ITEM_ID")
+
+          (itemID, Map(actionName -> JArray(vector)))
+      }
     }
   }
-
 }

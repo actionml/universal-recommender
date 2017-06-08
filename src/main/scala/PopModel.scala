@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.template
+package com.actionml
 
 import grizzled.slf4j.Logger
 import org.apache.predictionio.data.storage.Event
@@ -24,7 +24,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.format.ISODateTimeFormat
 import org.joda.time.{ DateTime, Interval }
-import org.template.conversions.{ ItemID, ItemProps }
+import com.actionml.helpers.{ ItemID, ItemProps }
 
 import scala.language.postfixOps
 import scala.util.Random

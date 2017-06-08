@@ -2,12 +2,13 @@
   "comment":" This config file uses default settings for all but the required values see README.md for docs",
   "id": "default",
   "description": "Default settings",
-  "engineFactory": "org.template.RecommendationEngine",
+  "engineFactory": "com.actionml.RecommendationEngine",
   "datasource": {
     "params" : {
       "name": "sample-handmade-data.txt",
       "appName": "handmade",
-      "eventNames": ["purchase", "view"]
+      "eventNames": ["purchase", "view", "category-pref"],
+      "minEventsPerUser": 3
     }
   },
   "sparkConf": {
@@ -31,6 +32,9 @@
             "name": "purchase"
           },{
             "name": "view",
+            "maxCorrelatorsPerItem": 50
+          },{
+            "name": "category-pref",
             "maxCorrelatorsPerItem": 50
           }
         ],

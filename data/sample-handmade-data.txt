@@ -26,6 +26,16 @@ u-4,view,Phones
 u-4,view,Tablets
 u-4,view,Soap
 u5,view,Soap
+u1,category-pref,phones
+u1,category-pref,phones
+u1,category-pref,phones
+u1,category-pref,tablets
+U 2,category-pref,tablets
+U 2,category-pref,phones
+u-3,category-pref,tablets
+u-4,category-pref,phones
+u-4,category-pref,phones
+u5,category-pref,toiletries
 Iphone 6,$set,categories:Phones:Electronics:Apple
 Iphone 5,$set,categories:Phones:Electronics:Apple
 Iphone 4,$set,categories:Phones:Electronics:Apple

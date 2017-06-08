@@ -1,0 +1,20 @@
+shopping-cart-1,purchase,iPhone 6
+shopping-cart-1,purchase,iPhone 6 charging cradle
+shopping-cart-1,purchase,iPhone earbuds
+shopping-cart-1,purchase,iPhone 6 case
+shopping-cart-2,purchase,Nexus 6p
+shopping-cart-2,purchase,Nexus 6p case
+shopping-cart-7,purchase,Nexus 6p
+shopping-cart-7,purchase,USB type-C cable
+shopping-cart-7,purchase,Nexus 6p case
+shopping-cart-3,purchase,iPhone 7
+shopping-cart-3,purchase,AirPods
+shopping-cart-4,purchase,iPhone 7
+shopping-cart-4,purchase,AirPods
+shopping-cart-5,purchase,iPhone 7
+shopping-cart-5,purchase,AirPods
+shopping-cart-6,purchase,iPhone 6
+shopping-cart-6,purchase,iPhone 6 case
+shopping-cart-8,purchase,Nexus 6p
+shopping-cart-8,purchase,Nexus 6p case
+shopping-cart-8,purchase,USB type-C cable
