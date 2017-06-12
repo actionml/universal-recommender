@@ -74,5 +74,6 @@ assemblyMergeStrategy in assembly := {
 }
 
  assemblyShadeRules in assembly := Seq(
+  ShadeRule.rename("org.apache.http.**" -> "shadeio.ur.data.http.@1").inAll,
   ShadeRule.rename("org.elasticsearch.client.**" -> "shadeio.ur.data.client.@1").inAll
  )
