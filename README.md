@@ -60,25 +60,22 @@ Adaptation of the normal [PIO engine deployment](https://github.com/heroku/predi
 # In a clone of this repo
 heroku create $APP_NAME
 
-heroku buildpacks:add https://github.com/heroku/heroku-buildpack-jvm-common.git
 heroku buildpacks:add https://github.com/heroku/predictionio-buildpack.git
 
 heroku config:set \
   PIO_EVENTSERVER_APP_NAME=ur \
-  PIO_EVENTSERVER_ACCESS_KEY=$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM \
-  PIO_EVENTSERVER_HOSTNAME=my-eventserver.herokuapp.com
+  PIO_EVENTSERVER_ACCESS_KEY=$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM
 
-heroku addons:create bonsai:shared-10 --as PIO_ELASTICSEARCH --version 5.1
+heroku addons:create bonsai --as PIO_ELASTICSEARCH --version 5.1
 # Verify that Elasticsearch is really version `5.x`.
-# May provide newer versions too, like `--version 5.3`.
+# Some regions provide newer versions, like `--version 5.3`.
 
-# Use the Eventserver's database with this engine.
-# Do not share them between Universal Recommender engines.
-heroku addons:attach $EVENTSERVER_DATABASE_ADDON_ID
+heroku addons:create heroku-postgresql:hobby-dev
+# Use a higher-level, paid plan for anything but a small demo.
 
 git push heroku master
 
-heroku ps:scale web=1:Performance-M release=0:Performance-L train=0:Performance-L
+heroku ps:scale web=1:Standard-2x release=0:Performance-L train=0:Performance-L
 ```
 
 The sample data in `data/initial-events.json` is imported automatically when deployed. Delete this file if you wish not to have it imported. Note that the engine requires data for training before a deployment will succeed.
