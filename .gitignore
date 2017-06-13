@@ -34,4 +34,4 @@ pio.log
 PredictionIO-dist/
 repo/
 bin/pio
-data/*-events.json
+data/sync-events.json
