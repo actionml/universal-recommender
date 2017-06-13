@@ -1,35 +1,35 @@
-{"event":"$set","entityType":"user","entityId":"000","properties":{"name":"Paula Powerton","platform":"all"}}
-{"event":"$set","entityType":"user","entityId":"001","properties":{"name":"Dee Signington","platform":"ios"}}
-{"event":"$set","entityType":"user","entityId":"002","properties":{"name":"Lukas Luddite","platform":"android"}}
-{"event":"$set","entityType":"user","entityId":"100","properties":{"name":"Molly Stone","platform":"ios"}}
-{"event":"$set","entityType":"user","entityId":"101","properties":{"name":"Herbert Melter","platform":"ios"}}
-{"event":"$set","entityType":"user","entityId":"102","properties":{"name":"Phil Andronico","platform":"ios"}}
-{"event":"$set","entityType":"user","entityId":"103","properties":{"name":"Billy Kroger","platform":"ios"}}
-{"event":"$set","entityType":"user","entityId":"104","properties":{"name":"Jenny Goodearth","platform":"ios"}}
-{"event":"$set","entityType":"user","entityId":"190","properties":{"name":"Misty McSwitch","platform":"ios"}}
-{"event":"$set","entityType":"user","entityId":"200","properties":{"name":"Aaron Felter","platform":"android"}}
-{"event":"$set","entityType":"user","entityId":"201","properties":{"name":"Luke Peter","platform":"android"}}
-{"event":"$set","entityType":"user","entityId":"202","properties":{"name":"Marcy Winehouse","platform":"android"}}
-{"event":"$set","entityType":"user","entityId":"203","properties":{"name":"Amy Zanos","platform":"android"}}
-{"event":"$set","entityType":"user","entityId":"204","properties":{"name":"Ray Ulter","platform":"android"}}
-{"event":"$set","entityType":"user","entityId":"290","properties":{"name":"Mark Supial","platform":"android"}}
-{"event":"$set","entityType":"item","entityId":"000","properties":{"name":"Pocket Power 28Ah","price":3900,"platform":"all","category":"accessory","subcategory":"usb-battery"}}
-{"event":"$set","entityType":"item","entityId":"001","properties":{"name":"Headspace Isolators","price":29900,"platform":"all","category":"audio","subcategory":"headphones"}}
-{"event":"$set","entityType":"item","entityId":"002","properties":{"name":"EyeFly","price":42900,"platform":"all","category":"extension","subcategory":"drone"}}
-{"event":"$set","entityType":"item","entityId":"003","properties":{"name":"<3 Beat Tracker","price":6900,"platform":"all","category":"extension","subcategory":"health"}}
-{"event":"$set","entityType":"item","entityId":"004","properties":{"name":"Danger Bot","price":19900,"platform":"all","category":"extension","subcategory":"home"}}
-{"event":"$set","entityType":"item","entityId":"005","properties":{"name":"Ultrabumpproof","price":1900,"platform":"all","category":"case","subcategory":"bumper"}}
-{"event":"$set","entityType":"item","entityId":"006","properties":{"name":"Phonefolio","price":4900,"platform":"all","category":"case","subcategory":"wallet"}}
-{"event":"$set","entityType":"item","entityId":"007","properties":{"name":"Candyshell","price":1400,"platform":"all","category":"case","subcategory":"hardcase"}}
-{"event":"$set","entityType":"item","entityId":"100","properties":{"name":"iPhone SE 64GB","price":49900,"platform":"ios","category":"phone","subcategory":"smartphone"}}
-{"event":"$set","entityType":"item","entityId":"101","properties":{"name":"iPhone 7 128GB","price":89900,"platform":"ios","category":"phone","subcategory":"smartphone"}}
-{"event":"$set","entityType":"item","entityId":"102","properties":{"name":"Applecare","price":9900,"platform":"ios","category":"care","subcategory":"extended-warranty"}}
-{"event":"$set","entityType":"item","entityId":"103","properties":{"name":"Lightning cable","price":900,"platform":"ios","category":"power","subcategory":"cable"}}
-{"event":"$set","entityType":"item","entityId":"104","properties":{"name":"High-speed Lightning Charger","price":1900,"platform":"ios","category":"power","subcategory":"charger"}}
-{"event":"$set","entityType":"item","entityId":"200","properties":{"name":"Google Pixel","price":64900,"platform":"android","category":"phone","subcategory":"smartphone"}}
-{"event":"$set","entityType":"item","entityId":"201","properties":{"name":"Samsumg Galaxy M","price":59900,"platform":"android","category":"phone","subcategory":"smartphone"}}
-{"event":"$set","entityType":"item","entityId":"202","properties":{"name":"Induction Charger","price":11900,"platform":"android","category":"power","subcategory":"charger"}}
-{"event":"$set","entityType":"item","entityId":"203","properties":{"name":"MicroUSB cable","price":900,"platform":"android","category":"power","subcategory":"cable"}}
+{"event":"$set","entityType":"user","entityId":"000","properties":{"platform":["ios","android"]}}
+{"event":"$set","entityType":"user","entityId":"001","properties":{"platform":["ios"]}}
+{"event":"$set","entityType":"user","entityId":"002","properties":{"platform":["android"]}}
+{"event":"$set","entityType":"user","entityId":"100","properties":{"platform":["ios"]}}
+{"event":"$set","entityType":"user","entityId":"101","properties":{"platform":["ios"]}}
+{"event":"$set","entityType":"user","entityId":"102","properties":{"platform":["ios"]}}
+{"event":"$set","entityType":"user","entityId":"103","properties":{"platform":["ios"]}}
+{"event":"$set","entityType":"user","entityId":"104","properties":{"platform":["ios"]}}
+{"event":"$set","entityType":"user","entityId":"190","properties":{"platform":["ios"]}}
+{"event":"$set","entityType":"user","entityId":"200","properties":{"platform":["android"]}}
+{"event":"$set","entityType":"user","entityId":"201","properties":{"platform":["android"]}}
+{"event":"$set","entityType":"user","entityId":"202","properties":{"platform":["android"]}}
+{"event":"$set","entityType":"user","entityId":"203","properties":{"platform":["android"]}}
+{"event":"$set","entityType":"user","entityId":"204","properties":{"platform":["android"]}}
+{"event":"$set","entityType":"user","entityId":"290","properties":{"platform":["android"]}}
+{"event":"$set","entityType":"item","entityId":"000","properties":{"name":["Pocket Power 28Ah"],"platform":["ios","android"],"category":["accessory"],"subcategory":["usb-battery"]}}
+{"event":"$set","entityType":"item","entityId":"001","properties":{"name":["Headspace Isolators"],"platform":["ios","android"],"category":["audio"],"subcategory":["headphones"]}}
+{"event":"$set","entityType":"item","entityId":"002","properties":{"name":["EyeFly"],"platform":["ios","android"],"category":["extension"],"subcategory":["drone"]}}
+{"event":"$set","entityType":"item","entityId":"003","properties":{"name":["<3 Beat Tracker"],"platform":["ios","android"],"category":["extension"],"subcategory":["health"]}}
+{"event":"$set","entityType":"item","entityId":"004","properties":{"name":["Danger Bot"],"platform":["ios","android"],"category":["extension"],"subcategory":["home"]}}
+{"event":"$set","entityType":"item","entityId":"005","properties":{"name":["Ultrabumpproof"],"platform":["ios","android"],"category":["case"],"subcategory":["bumper"]}}
+{"event":"$set","entityType":"item","entityId":"006","properties":{"name":["Phonefolio"],"platform":["ios","android"],"category":["case"],"subcategory":["wallet"]}}
+{"event":"$set","entityType":"item","entityId":"007","properties":{"name":["Candyshell"],"platform":["ios","android"],"category":["case"],"subcategory":["hardcase"]}}
+{"event":"$set","entityType":"item","entityId":"100","properties":{"name":["iPhone SE 64GB"],"platform":["ios"],"category":["phone"],"subcategory":["smartphone"]}}
+{"event":"$set","entityType":"item","entityId":"101","properties":{"name":["iPhone 7 128GB"],"platform":["ios"],"category":["phone"],"subcategory":["smartphone"]}}
+{"event":"$set","entityType":"item","entityId":"102","properties":{"name":["Applecare"],"platform":["ios"],"category":["care"],"subcategory":["extended-warranty"]}}
+{"event":"$set","entityType":"item","entityId":"103","properties":{"name":["Lightning cable"],"platform":["ios"],"category":["power"],"subcategory":["cable"]}}
+{"event":"$set","entityType":"item","entityId":"104","properties":{"name":["High-speed Lightning Charger"],"platform":["ios"],"category":["power"],"subcategory":["charger"]}}
+{"event":"$set","entityType":"item","entityId":"200","properties":{"name":["Google Pixel"],"platform":["android"],"category":["phone"],"subcategory":["smartphone"]}}
+{"event":"$set","entityType":"item","entityId":"201","properties":{"name":["Samsumg Galaxy M"],"platform":["android"],"category":["phone"],"subcategory":["smartphone"]}}
+{"event":"$set","entityType":"item","entityId":"202","properties":{"name":["Induction Charger"],"platform":["android"],"category":["power"],"subcategory":["charger"]}}
+{"event":"$set","entityType":"item","entityId":"203","properties":{"name":["MicroUSB cable"],"platform":["android"],"category":["power"],"subcategory":["cable"]}}
 {"event":"purchase","entityType":"user","entityId":"100","targetEntityType":"item","targetEntityId":"100"}
 {"event":"purchase","entityType":"user","entityId":"100","targetEntityType":"item","targetEntityId":"003"}
 {"event":"purchase","entityType":"user","entityId":"100","targetEntityType":"item","targetEntityId":"103"}
