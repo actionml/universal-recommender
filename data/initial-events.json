@@ -1,6 +1,4 @@
 {"event":"$set","entityType":"user","entityId":"000","properties":{"platform":["ios","android"]}}
-{"event":"$set","entityType":"user","entityId":"001","properties":{"platform":["ios"]}}
-{"event":"$set","entityType":"user","entityId":"002","properties":{"platform":["android"]}}
 {"event":"$set","entityType":"user","entityId":"100","properties":{"platform":["ios"]}}
 {"event":"$set","entityType":"user","entityId":"101","properties":{"platform":["ios"]}}
 {"event":"$set","entityType":"user","entityId":"102","properties":{"platform":["ios"]}}
