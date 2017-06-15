@@ -11,7 +11,7 @@
 {"event":"$set","entityType":"user","entityId":"203","properties":{"platform":["android"]}}
 {"event":"$set","entityType":"user","entityId":"204","properties":{"platform":["android"]}}
 {"event":"$set","entityType":"user","entityId":"290","properties":{"platform":["android"]}}
-{"event":"$set","entityType":"item","entityId":"000","properties":{"name":["Pocket Power 28Ah"],"platform":["ios","android"],"category":["accessory"],"subcategory":["usb-battery"]}}
+{"event":"$set","entityType":"item","entityId":"000","properties":{"name":["Pocket Power 28Ah"],"platform":["ios","android"],"category":["power"],"subcategory":["usb-battery"]}}
 {"event":"$set","entityType":"item","entityId":"001","properties":{"name":["Headspace Isolators"],"platform":["ios","android"],"category":["audio"],"subcategory":["headphones"]}}
 {"event":"$set","entityType":"item","entityId":"002","properties":{"name":["EyeFly"],"platform":["ios","android"],"category":["extension"],"subcategory":["drone"]}}
 {"event":"$set","entityType":"item","entityId":"003","properties":{"name":["<3 Beat Tracker"],"platform":["ios","android"],"category":["extension"],"subcategory":["health"]}}
