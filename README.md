@@ -24,10 +24,24 @@ The **users** and **items** are tagged with platform (`ios` and/or `android`) an
 
 ✏️ Throughout this document, code terms that start with `$` represent a value (shell variable) that should be replaced with a customized value, e.g `$ENGINE_NAME`…
 
-1. [Requirements](#user-content-requirements)
-1. [Deployment](#user-content-deployment)
-1. [Configuration](#user-content-configuration)
-1. [Local development](#user-content-local-development)
+1. ⚠️ [Requirements](#user-content-requirements)
+1. 🚀 [Demo Deployment](#user-content-demo-deployment)
+   1. [Create the app](#user-content-create-the-app)
+   1. [Configure the app](#user-content-configure-the-app)
+   1. [Provision Elasticsearch](#user-content-provision-elasticsearch)
+   1. [Provision Postgres](#user-content-provision-postgres)
+   1. [Import data](#user-content-import-data)
+   1. [Deploy the app](#user-content-deploy-the-app)
+   1. [Scale up](#user-content-scale-up)
+   1. [Retry release](#user-content-retry-release)
+   1. [Diagnostics](#user-content-diagnostics)
+1. 🎯 [Query for predictions](#user-content-query-for-predictions)
+1. 🛠 [Local development](#user-content-local-development)
+   1. [Import sample data](#user-content-import-sample-data)
+   1. [Run `pio`](#user-content-run-pio)
+   1. [Query the local engine](#user-content-query-the-local-engine)
+1. 🎛 [Configuration options](#user-content-configuration)
+
 
 ## Requirements
 
@@ -35,41 +49,161 @@ The **users** and **items** are tagged with platform (`ios` and/or `android`) an
 * [Heroku CLI](https://toolbelt.heroku.com), command-line tools
 * [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
-## Deployment
+
+## Demo Deployment
 
 Adaptation of the normal [PIO engine deployment](https://github.com/heroku/predictionio-buildpack/blob/master/CUSTOM.md#user-content-engine).
 
+### Create the app
+
 ```bash
-# In a clone of this repo
+git clone \
+  https://github.com/heroku/predictionio-engine-ur.git \
+  pio-engine-ur
+
+cd pio-engine-ur
+
 heroku create $ENGINE_NAME
-
 heroku buildpacks:add https://github.com/heroku/predictionio-buildpack.git
-
-heroku config:set \
-  PIO_EVENTSERVER_APP_NAME=ur \
-  PIO_EVENTSERVER_ACCESS_KEY=$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM
-
-heroku addons:create bonsai --as PIO_ELASTICSEARCH --version 5.1
-# Verify that Elasticsearch is really version `5.x`.
-# Some regions provide newer versions, like `--version 5.3`.
-
-heroku addons:create heroku-postgresql:hobby-dev
-# Use a higher-level, paid plan for anything but a small demo.
-
-git push heroku master
-
-heroku ps:scale web=1:Standard-2x release=0:Performance-L train=0:Performance-L
 ```
 
-The sample data in `data/initial-events.json` is imported automatically when deployed. Delete this file if you wish not to have it imported. Note that the engine requires data for training before a deployment will succeed.
+### Configure the app
+
+```bash
+heroku config:set \
+  PIO_EVENTSERVER_APP_NAME=ur \
+  PIO_EVENTSERVER_ACCESS_KEY=$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM-$RANDOM \
+  PIO_UR_ELASTICSEARCH_CONCURRENCY=1
+```
+
+### Provision Elasticsearch
+
+```bash
+heroku addons:create bonsai --as PIO_ELASTICSEARCH --version 5.1
+```
+
+* Verify that Elasticsearch is really version `5.x`.
+* Some regions provide newer versions, like `--version 5.3`.
 
 
-## Configuration
+### Provision Postgres
 
-* `PIO_UR_ELASTICSEARCH_CONCURRENCY`
-  * defaults to `1`
-  * may increase in-line with the [Bonsai Add-on plan's](https://elements.heroku.com/addons/bonsai) value for **Concurrent Indexing**
-  * the max for a dedicated Elasticsearch cluster is "unlimited", but in reality set it to match the number of Spark executor cores
+```bash
+heroku addons:create heroku-postgresql:hobby-dev
+```
+
+* Use a higher-level, paid plan for anything but a small demo.
+* `hobby-basic` is the smallest paid [heroku-postgresql plan](https://elements.heroku.com/addons/heroku-postgresql#pricing)
+
+### Import data
+
+Initial training data is automatically imported from [`data/initial-events.json`](data/initial-events.json).
+
+👓 When you're ready to begin working with your own data, read about strategies for [importing data](https://github.com/heroku/predictionio-buildpack/blob/master/CUSTOM.md#import-data).
+
+### Deploy the app
+
+```bash
+git push heroku master
+
+# Follow the logs to see training & web start-up
+#
+heroku logs -t
+```
+
+⚠️ **Initial deploy will probably fail due to memory constraints.** Proceed to scale up.
+
+### Scale up
+
+Once deployed, scale up the processes to avoid memory issues:
+
+```bash
+heroku ps:scale \
+  web=1:Standard-2X \
+  release=0:Performance-L \
+  train=0:Performance-L
+```
+
+💵 *These are paid, [professional dyno types](https://devcenter.heroku.com/articles/dyno-types#available-dyno-types)*
+
+### Retry release
+
+When the release (`pio train`) fails due to memory constraints or other transient error, you may use the Heroku CLI [releases:retry plugin](https://github.com/heroku/heroku-releases-retry) to rerun the release without pushing a new deployment:
+
+```bash
+# First time, install it.
+heroku plugins:install heroku-releases-retry
+
+# Re-run the release & watch the logs
+heroku releases:retry
+heroku logs -t
+```
+
+## Query for predictions
+
+Once deployment completes, the engine is ready to recommend of **items** for a **mobile phone user** based on their **purchase history**.
+
+Submit [queries to Universal Recommender](http://actionml.com/docs/ur_queries) to get recommendations.
+
+Get all recommendations for a user:
+
+```bash
+# an Android user
+curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{"user": "100"}'
+```
+
+```bash
+# an iPhone user
+curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{"user": "200"}'
+```
+
+
+Get recommendations for a user omitting *phones*:
+
+```bash
+curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{
+            "user": "100",
+            "fields": [{
+              "name": "category",
+              "values": ["phone"],
+              "bias": 0
+            }]
+          }'
+```
+
+Get accessory recommendations for a user omitting *phones* & boosting *power-related items*:
+
+```bash
+curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{
+            "user": "100",
+            "fields": [{
+              "name": "category",
+              "values": ["phone"],
+              "bias": 0
+            }],
+            "fields": [{
+              "name": "category",
+              "values": ["power"],
+              "bias": 0.5
+            }]
+          }'
+```
+
+For a user with no purchase history, the recommendations will be based on popularity:
+
+```bash
+curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{"user": "000"}'
+```
 
 
 ## Local Development
@@ -83,7 +217,7 @@ bin/pio app new ur
 PIO_EVENTSERVER_APP_NAME=ur data/import-events -f data/initial-events.json
 ```
 
-### Usage
+### Run `pio`
 
 ```bash
 bin/pio build
@@ -91,7 +225,7 @@ bin/pio train --driver-memory 2500m
 bin/pio deploy
 ```
 
-Example query with the sample data:
+### Query the local engine
 
 ```bash
 curl -X "POST" "http://127.0.0.1:8000/queries.json" \
@@ -105,3 +239,12 @@ curl -X "POST" "http://127.0.0.1:8000/queries.json" \
             }]
           }'
 ```
+
+
+## Configuration
+
+* `PIO_UR_ELASTICSEARCH_CONCURRENCY`
+  * defaults to `1`
+  * may increase in-line with the [Bonsai Add-on plan's](https://elements.heroku.com/addons/bonsai) value for **Concurrent Indexing**
+  * the max for a dedicated Elasticsearch cluster is "unlimited", but in reality set it to match the number of Spark executor cores
+
