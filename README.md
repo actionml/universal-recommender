@@ -205,6 +205,14 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
      -d $'{"user": "000"}'
 ```
 
+Get recommendations based on similarity with an *item*:
+
+```bash
+curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{"item": "101"}'
+```
+
 
 ## Local Development
 

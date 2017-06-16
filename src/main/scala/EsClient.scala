@@ -317,7 +317,7 @@ object EsClient {
         s"/$indexName/$typeName/$doc",
         Map.empty[String, String].asJava)
       val responseJValue = parse(EntityUtils.toString(response.getEntity))
-      (responseJValue \ "_hits" \ "hits" \ "_source").extract[Map[String, JValue]].asJava
+      (responseJValue \ "_source").extract[Map[String, JValue]].asJava
     } finally {
       restClient.close()
     }
