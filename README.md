@@ -192,7 +192,7 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
             "fields": [{
               "name": "category",
               "values": ["power"],
-              "bias": 0.5
+              "bias": 1.5
             }]
           }'
 ```
