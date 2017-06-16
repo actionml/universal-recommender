@@ -1,6 +1,6 @@
-# [PredictionIO](https://predictionio.incubator.apache.org) recommendation engine for [Heroku](https://www.heroku.com)
+# [PredictionIO](https://predictionio.incubator.apache.org) Universal Recommender for [Heroku](https://www.heroku.com)
 
-A fork of the **[Universal Recommender](https://github.com/actionml/universal-recommender) version 0.5.0** deployable with the [PredictionIO buildpack for Heroku](https://github.com/heroku/predictionio-buildpack).
+A fork of the **[Universal Recommender](https://github.com/actionml/universal-recommender) version 0.5.0** deployable with the [PredictionIO buildpack for Heroku](https://github.com/heroku/predictionio-buildpack). Due to substantial revisions to support Elasticsearch on Heroku, this fork lags behind the main UR; differences are listed in the [UR release log](http://actionml.com/docs/ur_version_log).
 
 > The Universal Recommender (UR) is a new type of collaborative filtering recommender based on an algorithm that can use data from a wide variety of user taste indicators&mdash;it is called the [Correlated Cross-Occurrence algorithm](https://mahout.apache.org/users/algorithms/intro-cooccurrence-spark.html). …CCO is able to ingest any number of user actions, events, profile data, and contextual information. It then serves results in a fast and scalable way. It also supports item properties for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender.
 
@@ -8,7 +8,9 @@ A fork of the **[Universal Recommender](https://github.com/actionml/universal-re
 
 The Heroku app depends on:
 
-* [PredictionIO 0.11.0 with support for authenticated Elasticsearch](https://github.com/mars/incubator-predictionio/tree/esclient-auth) ([compare to 0.11.0-incubating release](https://github.com/apache/incubator-predictionio/compare/release/0.11.0...mars:esclient-auth)). This capability is provided by a **0.11.0-SNAPSHOT** distribution that is included with buildpack for local development and deployment.
+* [PredictionIO 0.11.0 with support for authenticated Elasticsearch](https://github.com/mars/incubator-predictionio/tree/esclient-auth)
+  * This fork of UR is provided by a **0.11.0-SNAPSHOT** distribution that is included with buildpack for local development and deployment
+  * [Compare to 0.11.0-incubating release](https://github.com/apache/incubator-predictionio/compare/release/0.11.0...mars:esclient-auth)
 * [Bonsai Add-on](https://elements.heroku.com/addons/bonsai) to provide Elasticsearch 5.x
 
 ## Demo Story 🐸
@@ -143,8 +145,6 @@ heroku logs -t
 
 Once deployment completes, the engine is ready to recommend of **items** for a **mobile phone user** based on their **purchase history**.
 
-Submit [queries to Universal Recommender](http://actionml.com/docs/ur_queries) to get recommendations.
-
 Get all recommendations for a user:
 
 ```bash
@@ -212,6 +212,8 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
      -H "Content-Type: application/json" \
      -d $'{"item": "101"}'
 ```
+
+👓 See the main [Universal Recommender query docs](http://actionml.com/docs/ur_queries) for more parameters. *Please note those docs have been updated for the newest version 0.6.0, but this repo provides version 0.5.0. Differences are listed in the [UR release log](http://actionml.com/docs/ur_version_log).*
 
 
 ## Local Development
