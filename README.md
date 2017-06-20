@@ -231,7 +231,7 @@ PIO_EVENTSERVER_APP_NAME=ur data/import-events -f data/initial-events.json
 
 ```bash
 bin/pio build
-bin/pio train --driver-memory 2500m
+bin/pio train -- --driver-memory 2500m
 bin/pio deploy
 ```
 
