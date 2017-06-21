@@ -162,7 +162,7 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
 ```
 
 
-Get recommendations for a user omitting *phones*:
+Get recommendations for a user, down-ranking *phones*:
 
 ```bash
 curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
@@ -172,12 +172,12 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
             "fields": [{
               "name": "category",
               "values": ["phone"],
-              "bias": 0
+              "bias": 0.1
             }]
           }'
 ```
 
-Get accessory recommendations for a user omitting *phones* & boosting *power-related items*:
+Get accessory recommendations for a user down-ranking *phones* & boosting *power-related items*:
 
 ```bash
 curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
@@ -187,7 +187,7 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
             "fields": [{
               "name": "category",
               "values": ["phone"],
-              "bias": 0
+              "bias": 0.1
             }],
             "fields": [{
               "name": "category",
