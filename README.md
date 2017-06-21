@@ -162,7 +162,7 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
 ```
 
 
-Get recommendations for a user, down-ranking *phones*:
+Get recommendations for a user, excluding *phones*:
 
 ```bash
 curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
@@ -172,12 +172,12 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
             "fields": [{
               "name": "category",
               "values": ["phone"],
-              "bias": 0.1
+              "bias": 0
             }]
           }'
 ```
 
-Get accessory recommendations for a user down-ranking *phones* & boosting *power-related items*:
+Get accessory recommendations for a user excluding *phones* & boosting *power-related items*:
 
 ```bash
 curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
@@ -187,13 +187,12 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
             "fields": [{
               "name": "category",
               "values": ["phone"],
-              "bias": 0.1
-            }],
-            "fields": [{
+              "bias": 0
+            },{
               "name": "category",
               "values": ["power"],
               "bias": 1.5
-            }]
+            }
           }'
 ```
 
@@ -211,6 +210,17 @@ Get recommendations based on similarity with an *item*:
 curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
      -H "Content-Type: application/json" \
      -d $'{"item": "101"}'
+```
+
+Get recommendations for a *user* boosting on similarity with an *item*:
+
+```bash
+curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
+     -H "Content-Type: application/json" \
+     -d $'{
+            "user": "100",
+            "item": "101"
+          }'
 ```
 
 👓 See the main [Universal Recommender query docs](http://actionml.com/docs/ur_queries) for more parameters. *Please note those docs have been updated for the newest version 0.6.0, but this repo provides version 0.5.0. Differences are listed in the [UR release log](http://actionml.com/docs/ur_version_log).*
