@@ -565,7 +565,11 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val boostedMetadata = getBoostedMetadata(query)
     val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata
 
-    val shouldFields: Seq[JValue] = allBoostedCorrelators.map {
+    val shouldFields: Seq[JValue] = allBoostedCorrelators.filter {
+      // only use non-zero boosts
+      case BoostableCorrelators(actionName, itemIDs, boost) =>
+        boost.getOrElse(1f) != 0f
+    }.map {
       case BoostableCorrelators(actionName, itemIDs, boost) =>
         render("terms" -> (actionName -> itemIDs) ~ ("boost" -> boost))
     }
@@ -615,8 +619,18 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   /** Build not must query part */
   def buildQueryMustNot(query: Query, events: Seq[Event]): JValue = {
-    val mustNotFields: JValue = render("ids" -> ("values" -> getExcludedItems(events, query)) ~ ("boost" -> 0))
-    mustNotFields
+    val excludedItems = ("ids" -> ("values" -> getExcludedItems(events, query)) ~ ("boost" -> 0))
+
+    val boostedMetadata = getBoostedMetadata(query)
+    val excludedByZeroBoost = boostedMetadata.filter {
+      case BoostableCorrelators(actionName, itemIDs, boost) =>
+        boost.getOrElse(1f) == 0f
+    }.map {
+      case BoostableCorrelators(actionName, itemIDs, boost) =>
+        ("terms" -> (actionName -> itemIDs) ~ ("boost" -> boost))
+    }
+
+    render(excludedItems ++ excludedByZeroBoost)
   }
 
   /** Build sort query part */
