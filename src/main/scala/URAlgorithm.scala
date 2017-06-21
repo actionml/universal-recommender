@@ -659,25 +659,17 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
       if (m != null) {
         val itemEventBias = query.itemBias.getOrElse(itemBias)
+        logger.info(s"getBiasedSimilarItems for item ${query.item.get}, bias value ${itemEventBias}")
         val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
         modelEventNames.map { action =>
-          val items: Seq[String] = try {
-            if (m.containsKey(action) && m.get(action) != null) {
-              m.get(action).asInstanceOf[util.ArrayList[String]].asScala
-            } else {
-              Seq.empty[String]
-            }
-          } catch {
-            case cce: ClassCastException =>
-              logger.warn(s"Bad value in item [${query.item}] corresponding to key: [$action] that was not a Seq[String] ignored.")
-              Seq.empty[String]
-          }
+          val items: Seq[String] = m.get(action).getOrElse(Seq.empty[String])
           val rItems = if (items.size <= maxQueryEvents) items else items.slice(0, maxQueryEvents - 1)
           BoostableCorrelators(action, rItems, itemEventsBoost)
         }
       } else {
-        Seq.empty
-      } // no similar items
+        logger.info(s"getBiasedSimilarItems for item ${query.item.get}: item not found")
+        Seq.empty[BoostableCorrelators]
+      } // item not found in Elasticsearch
     } else {
       Seq.empty[BoostableCorrelators]
     } // no item specified

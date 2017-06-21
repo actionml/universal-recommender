@@ -309,15 +309,18 @@ object EsClient {
    *  @param doc for UR the item id
    *  @return source [java.util.Map] of field names to any valid field values or null if empty
    */
-  def getSource(indexName: String, typeName: String, doc: String): util.Map[String, JValue] = {
+  def getSource(indexName: String, typeName: String, doc: String): Map[String, List[String]] = {
+    val url = s"/$indexName/$typeName/$doc"
     val restClient = client.open()
     try {
       val response = restClient.performRequest(
         "GET",
-        s"/$indexName/$typeName/$doc",
+        url,
         Map.empty[String, String].asJava)
       val responseJValue = parse(EntityUtils.toString(response.getEntity))
-      (responseJValue \ "_source").extract[Map[String, JValue]].asJava
+      val result = (responseJValue \ "_source").values.asInstanceOf[Map[String, List[String]]]
+      logger.info(s"getSource for ${url} result: ${result}")
+      result
     } finally {
       restClient.close()
     }
