@@ -63,13 +63,19 @@ class URModel(
     val groupedRDD: RDD[(ItemID, ItemProps)] = groupAll(correlatorRDDs ++ propertiesRDDs)
     //    logger.debug(s"Grouped RDD\n${groupedRDD.take(25).mkString("\n")}")
 
+    logger.info("Build Elasticsearch items RDD")
     val esRDD: RDD[Map[String, Any]] = groupedRDD.mapPartitions { iter =>
       iter map {
         case (itemId, itemProps) =>
-          val propsMap = itemProps.map {
-            case (propName, propValue) =>
-              propName -> URModel.extractJvalue(dateNames, propName, propValue)
-          }
+          val propsMap = itemProps
+            .filter {
+              case (propName, propValue) =>
+                propValue.toOption.nonEmpty
+            }
+            .map {
+              case (propName, propValue) =>
+                propName -> URModel.extractJvalue(dateNames, propName, propValue)
+            }
           propsMap + ("id" -> itemId)
       }
     }
