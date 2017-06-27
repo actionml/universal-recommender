@@ -16,12 +16,17 @@
 
 set -eu
 
-# Use `pio` command if it's already in the PATH
-if [ `which pio` ]
-  then PIO_BIN=pio
-# Otherwise try to use `bin/pio` installed for local dev
-elif [ -x bin/pio ]
+# Try to use `bin/pio` installed for local dev
+if [ -x bin/pio ]
   then PIO_BIN=bin/pio
+  # Load local environment from .env if it's available
+  if [ -x bin/dotenv ]
+    then
+    source bin/dotenv
+  fi
+# Otherwise, use `pio` command if it's already in the PATH
+elif [ `which pio` ]
+  then PIO_BIN=pio
 else
   echo
   echo 'Cannot continue, because the `pio` command is not available.'
