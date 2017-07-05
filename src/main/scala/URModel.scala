@@ -44,7 +44,7 @@ class URModel(
    *  Elasticsearch's support. One exception is the Data scalar, which is also supported
    *  @return always returns true since most other reasons to not save cause exceptions
    */
-  def save(dateNames: Seq[String], esIndex: String, esType: String): Boolean = {
+  def save(dateNames: Seq[String], esIndex: String, esType: String, numESWriteConnections: Option[Int] = None): Boolean = {
 
     logger.trace(s"Start save model")
 
@@ -79,7 +79,7 @@ class URModel(
     val esFields: List[String] = esRDD.flatMap(_.keySet).distinct().collect.toList
     logger.info(s"ES fields[${esFields.size}]: $esFields")
 
-    EsClient.hotSwap(esIndex, esType, esRDD, esFields, typeMappings)
+    EsClient.hotSwap(esIndex, esType, esRDD, esFields, typeMappings, numESWriteConnections)
     true
   }
 

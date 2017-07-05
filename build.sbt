@@ -4,7 +4,7 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "universal-recommender"
 
-version := "0.6.0"
+version := "0.6.1-SNAPSHOT"
 
 organization := "com.actionml"
 
