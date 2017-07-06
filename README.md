@@ -228,7 +228,17 @@ curl -X "POST" "http://$ENGINE_NAME.herokuapp.com/queries.json" \
 
 ## Local Development
 
-First, use the buildpack to **[setup local development](https://github.com/heroku/predictionio-buildpack/blob/master/DEV.md) including Elasticsearch**.
+Start in this repo's working directory. If you don't already have it cloned, then do it now:
+
+```bash
+git clone \
+  https://github.com/heroku/predictionio-engine-ur.git \
+  pio-engine-ur
+
+cd pio-engine-ur
+```
+
+Next, **[setup local development](https://github.com/heroku/predictionio-buildpack/blob/master/DEV.md) including Elasticsearch** using the buildpack.
 
 ### Import sample data
 
