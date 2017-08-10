@@ -34,4 +34,6 @@ pio.log
 PredictionIO-dist/
 repo/
 bin/pio
+bin/dotenv
 data/sync-events.json
+batchpredict-output.json

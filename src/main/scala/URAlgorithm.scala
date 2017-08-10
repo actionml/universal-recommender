@@ -168,7 +168,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   @transient lazy implicit val logger: Logger = Logger[this.type]
 
-  implicit val formats = DefaultFormats
+  @transient lazy implicit val formats = DefaultFormats
 
   case class BoostableCorrelators(actionName: String, itemIDs: Seq[ItemID], boost: Option[Float]) {
     def toFilterCorrelators: FilterCorrelators = {
@@ -538,8 +538,6 @@ class URAlgorithm(val ap: URAlgorithmParams)
               ("sort" -> sort)
 
       val compactJson = compact(render(json))
-
-      logger.info(s"Query:\n$compactJson")
       (compactJson, events)
     } catch {
       case e: IllegalArgumentException => ("", Seq.empty[Event])
