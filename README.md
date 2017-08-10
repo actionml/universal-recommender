@@ -9,6 +9,7 @@ Most recommenders can only use conversion events, like buy or rate. Using all we
  - [The Universal Recommender](http://actionml.com/docs/ur)
  - [The Correlated Cross-Occurrence Algorithm](http://mahout.apache.org/users/algorithms/intro-cooccurrence-spark.html)
  - [The Universal Recommender Slide Deck](http://www.slideshare.net/pferrel/unified-recommender-39986309)
+ - [Multi-domain predictive AI or how to make one thing predict another](https://developer.ibm.com/dwblog/2017/mahout-spark-correlated-cross-occurences/)
 
 
 All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) and are hosted at [https://github.com/actionml/docs.actionml.com](https://github.com/actionml/docs.actionml.com). If you wish to change or edit the docs make a PR to that repo.
