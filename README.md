@@ -273,7 +273,9 @@ curl -X "POST" "http://127.0.0.1:8000/queries.json" \
 ## Configuration
 
 * `PIO_UR_ELASTICSEARCH_CONCURRENCY`
-  * defaults to `1`
   * may increase in-line with the [Bonsai Add-on plan's](https://elements.heroku.com/addons/bonsai) value for **Concurrent Indexing**
   * the max for a dedicated Elasticsearch cluster is "unlimited", but in reality set it to match the number of Spark executor cores
-
+* `PIO_UR_ELASTICSEARCH_INDEX_REPLICAS`
+  * more replicas may improve concurrent search performance
+  * should increase in-line with the number of Elasticsearch nodes (n-1) in the cluster
+  * takes effect after the next training, when a new index is inserted

@@ -47,14 +47,6 @@ libraryDependencies ++= Seq(
   "org.json4s" %% "json4s-native" % "3.2.10")
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
-// assemblyShadeRules in assembly := Seq(
-//   ShadeRule.rename("org.elasticsearch.**" -> "universal-recommender.elasticsearch.@1")
-//     inLibrary("org.elasticsearch.client" % "rest" % elasticsearchVersion,
-//       "org.elasticsearch" %% "elasticsearch-spark-20" % elasticsearchVersion,
-//       "org.elasticsearch" % "elasticsearch-hadoop-mr"  % elasticsearchVersion)
-//     inProject
-// )
-
 // Search for packages provided by predictionio-buildpack
 resolvers += "Local Repository" at "file://"+baseDirectory.value+"/repo"
 

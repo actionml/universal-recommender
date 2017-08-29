@@ -26,6 +26,7 @@ import org.apache.predictionio.data.storage.{ DataMap, Storage, StorageClientCon
 import org.apache.predictionio.workflow.CleanupFunctions
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import org.elasticsearch.client.RestClient
 import org.apache.http.HttpHost
 import org.apache.http.auth.{ AuthScope, UsernamePasswordCredentials }
 import org.apache.http.entity.ContentType
@@ -171,8 +172,12 @@ object EsClient {
       Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
         case 404 => {
           var mappings = s"""
-          |{ "mappings": { "$indexType": {
-          |  "properties": {
+          |{ "settings": {
+          |    "index": {
+          |      "number_of_replicas": ${sys.env.getOrElse("PIO_UR_ELASTICSEARCH_INDEX_REPLICAS", "1")} }},
+          |  "mappings": {
+          |    "$indexType": {
+          |      "properties": {
           """.stripMargin.replace("\n", "")
 
           def mappingsField(`type`: String) = {
