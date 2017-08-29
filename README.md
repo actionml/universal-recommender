@@ -8,9 +8,8 @@ A fork of the **[Universal Recommender](https://github.com/actionml/universal-re
 
 The Heroku app depends on:
 
-* [PredictionIO 0.11.0 with support for authenticated Elasticsearch](https://github.com/mars/incubator-predictionio/tree/esclient-auth)
-  * This fork of UR is provided by a **0.11.0-SNAPSHOT** distribution that is included with buildpack for local development and deployment
-  * [Compare to 0.11.0-incubating release](https://github.com/apache/incubator-predictionio/compare/release/0.11.0...mars:esclient-auth)
+* Development build **PredictionIO 0.12.0-SNAPSHOT** [from commit](https://github.com/apache/incubator-predictionio/commit/bf84ede6fe475ec591e784eb453c6194befb8515)
+  * Included with buildpack for local development and Heroku deployment
 * [Bonsai Add-on](https://elements.heroku.com/addons/bonsai) to provide Elasticsearch 5.x
 
 ## Demo Story 🐸
