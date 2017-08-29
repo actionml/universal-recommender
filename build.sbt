@@ -18,16 +18,17 @@ val mahoutVersion = "0.13.0"
 // local Maven repo, until Elasticasearch authentication PR
 // is merged & released:
 // https://github.com/apache/incubator-predictionio/pull/372
-val pioVersion = "0.11.0-SNAPSHOT"
+val pioVersion = "0.12.0-SNAPSHOT"
 
-// This Elasticsearch version must exactly match the server version.
-// On Heroku, this means the Bonsai Add-on.
-// WARNING: tiny version differences will cuase problems.
-val elasticsearchVersion = "5.1.1"
+// This Elasticsearch version must exactly match the PredictionIO version.
+val elasticsearchVersion = "5.4.1"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
-  "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch" % pioVersion % "provided",
+  "org.elasticsearch.client" % "rest" % elasticsearchVersion,
+  "org.elasticsearch"       %% "elasticsearch-spark-20" % elasticsearchVersion % "provided"
+    exclude("org.apache.spark", "*"),
+  "org.elasticsearch"        % "elasticsearch-hadoop-mr"  % elasticsearchVersion % "provided",
   "org.apache.spark" %% "spark-core" % "2.1.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "2.1.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
@@ -45,6 +46,14 @@ libraryDependencies ++= Seq(
     exclude("xmlpull", "xmlpull"),
   "org.json4s" %% "json4s-native" % "3.2.10")
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
+
+// assemblyShadeRules in assembly := Seq(
+//   ShadeRule.rename("org.elasticsearch.**" -> "universal-recommender.elasticsearch.@1")
+//     inLibrary("org.elasticsearch.client" % "rest" % elasticsearchVersion,
+//       "org.elasticsearch" %% "elasticsearch-spark-20" % elasticsearchVersion,
+//       "org.elasticsearch" % "elasticsearch-hadoop-mr"  % elasticsearchVersion)
+//     inProject
+// )
 
 // Search for packages provided by predictionio-buildpack
 resolvers += "Local Repository" at "file://"+baseDirectory.value+"/repo"

@@ -245,8 +245,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     ("Rankings:", "")) ++ rankingsParams.map(x => (x.`type`.get, x.name)))
 
   def train(sc: SparkContext, data: PreparedData): NullModel = {
-
-    recsModel match {
+    val m = recsModel match {
       case RecsModel.All => calcAll(data)(sc)
       case RecsModel.CF  => calcAll(data, calcPopular = false)(sc)
       case RecsModel.BF  => calcPop(data)(sc)
@@ -257,6 +256,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
              |Bad algorithm param recsModel=[$unknownRecsModel] in engine definition params, possibly a bad json value.
              |Use one of the available parameter values ($RecsModel).""".stripMargin)
     }
+    EsClient.close()
+    m
   }
 
   /** Calculates recs model as well as popularity model */
