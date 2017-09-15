@@ -66,7 +66,7 @@ def import_events(client, file):
         )
         print(
             'Event: {0} entity_id: {1} target_entity_id: {2} current_date: {3}'
-            .format(action, item_id, item_id, current_date.isoformat()))
+            .format(action, user_id, item_id, current_date.isoformat()))
     count += 1
     current_date += event_time_increment
 
