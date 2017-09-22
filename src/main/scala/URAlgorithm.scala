@@ -23,7 +23,7 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.controller.{ P2LAlgorithm, Params }
 import org.apache.predictionio.data.storage.{ DataMap, Event, NullModel, PropertyMap }
 import org.apache.predictionio.data.store.LEventStore
-import org.apache.mahout.math.cf.{DownsamplableCrossOccurrenceDataset, SimilarityAnalysis}
+import org.apache.mahout.math.cf.{ DownsamplableCrossOccurrenceDataset, SimilarityAnalysis }
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -165,8 +165,8 @@ case class URAlgorithmParams(
   indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
   seed: Option[Long] = None, // seed is not used presently
   numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
-  // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
-  // for ES 1.7 bulk queue is defaulted to 50
+    // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
+    // for ES 1.7 bulk queue is defaulted to 50
     extends Params //fixed default make it reproducible unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
