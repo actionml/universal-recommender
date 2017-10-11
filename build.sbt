@@ -21,8 +21,8 @@ libraryDependencies ++= Seq(
   "org.elasticsearch"       %% "elasticsearch-spark-20" % elasticsearchVersion % "provided"
     exclude("org.apache.spark", "*"),
   "org.elasticsearch"        % "elasticsearch-hadoop-mr"  % elasticsearchVersion % "provided",
-  "org.apache.spark" %% "spark-core" % "2.1.0" % "provided",
-  "org.apache.spark" %% "spark-mllib" % "2.1.0" % "provided",
+  "org.apache.spark" %% "spark-core" % "2.1.1" % "provided",
+  "org.apache.spark" %% "spark-mllib" % "2.1.1" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
   // Mahout's Spark libs. They're custom compiled for Scala 2.11
   // and included in the buildpack's local Maven repo.
