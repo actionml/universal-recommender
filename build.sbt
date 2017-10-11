@@ -11,17 +11,9 @@ version := "0.5.0"
 
 organization := "com.actionml"
 
-// val mahoutVersion = "0.13.0-SNAPSHOT"
 val mahoutVersion = "0.13.0"
-
-// This PredictionIO SNAPSHOT version is included in the buildpack's 
-// local Maven repo, until Elasticasearch authentication PR
-// is merged & released:
-// https://github.com/apache/incubator-predictionio/pull/372
-val pioVersion = "0.12.0-SNAPSHOT"
-
-// This Elasticsearch version must exactly match the PredictionIO version.
-val elasticsearchVersion = "5.4.1"
+val pioVersion = "0.12.0-incubating"
+val elasticsearchVersion = "5.5.2"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
@@ -46,9 +38,6 @@ libraryDependencies ++= Seq(
     exclude("xmlpull", "xmlpull"),
   "org.json4s" %% "json4s-native" % "3.2.10")
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
-
-// Search for packages provided by predictionio-buildpack
-resolvers += "Local Repository" at "file://"+baseDirectory.value+"/repo"
 
 resolvers += Resolver.mavenLocal
 

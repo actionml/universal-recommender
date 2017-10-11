@@ -1,6 +1,6 @@
 # [PredictionIO](https://predictionio.incubator.apache.org) Universal Recommender for [Heroku](https://www.heroku.com)
 
-A fork of the **[Universal Recommender](https://github.com/actionml/universal-recommender) version 0.5.0** deployable with the [PredictionIO buildpack for Heroku](https://github.com/heroku/predictionio-buildpack). Due to substantial revisions to support Elasticsearch on Heroku, this fork lags behind the main UR; differences are listed in the [UR release log](http://actionml.com/docs/ur_version_log).
+A fork of the **[Universal Recommender](https://github.com/actionml/universal-recommender) version 0.5.0** deployable with the [PredictionIO buildpack for Heroku](https://github.com/heroku/predictionio-buildpack). Due to substantial revisions to support Elasticsearch on Heroku, this fork lags behind the main UR; conceptual differences beyond version 0.5.0 are listed in the [UR release log](http://actionml.com/docs/ur_version_log).
 
 > The Universal Recommender (UR) is a new type of collaborative filtering recommender based on an algorithm that can use data from a wide variety of user taste indicators&mdash;it is called the [Correlated Cross-Occurrence algorithm](https://mahout.apache.org/users/algorithms/intro-cooccurrence-spark.html). …CCO is able to ingest any number of user actions, events, profile data, and contextual information. It then serves results in a fast and scalable way. It also supports item properties for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender.
 
@@ -8,18 +8,12 @@ A fork of the **[Universal Recommender](https://github.com/actionml/universal-re
 
 The Heroku app depends on:
 
-* Development build **PredictionIO 0.12.0-SNAPSHOT** [from commit](https://github.com/apache/incubator-predictionio/commit/bf84ede6fe475ec591e784eb453c6194befb8515)
-  * Included with buildpack for local development and Heroku deployment
-* [Bonsai Add-on](https://elements.heroku.com/addons/bonsai) to provide Elasticsearch 5.x
+* [Bonsai Add-on](https://elements.heroku.com/addons/bonsai) to provide the search engine (Elasticsearch 5.x)
+* [Heroku Postgres Add-on](https://elements.heroku.com/addons/heroku-postgresql) to provide the database
 
 ## Demo Story 🐸
 
 This engine demonstrates recommendation of **items** for a **mobile phone user** based on their **purchase history**. The model is trained with a small [example data set](data/initial-events.json).
-
-The **users** and **items** are tagged with platform (`ios` and/or `android`) and the ID's partitioned logically to make it easier to interpret results:
-  * `0xx` => `ios` & `android`
-  * `1xx` => `android`-only
-  * `2xx` => `ios`-only
 
 ## How To 📚
 
@@ -80,11 +74,12 @@ heroku config:set \
 ### Provision Elasticsearch
 
 ```bash
-heroku addons:create bonsai --as PIO_ELASTICSEARCH --version 5.1
+heroku addons:create bonsai --as PIO_ELASTICSEARCH --version 5.4
 ```
 
-* Verify that Elasticsearch is really version `5.x`.
-* Some regions provide newer versions, like `--version 5.3`.
+Ensure the `--version` you specify is a [currently supported version](https://docs.bonsai.io/v1.0/docs/supported-elasticsearch-versions).
+
+In the Bonsai add-on's dashboard, verify that Elasticsearch is really the requested version. Only versions greater than 5.1 will work with this Heroku app. *Caution: it's easy to accidentally provision the wrong version.*
 
 
 ### Provision Postgres
@@ -100,7 +95,7 @@ heroku addons:create heroku-postgresql:hobby-dev
 
 Initial training data is automatically imported from [`data/initial-events.json`](data/initial-events.json).
 
-👓 When you're ready to begin working with your own data, read about strategies for [importing data](https://github.com/heroku/predictionio-buildpack/blob/master/CUSTOM.md#import-data).
+👓 When you're ready to begin working with your own data, read about strategies for [importing data](https://github.com/heroku/predictionio-buildpack/blob/master/CUSTOM.md#user-content-import-data).
 
 ### Deploy the app
 
