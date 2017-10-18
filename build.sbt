@@ -4,27 +4,29 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "universal-recommender"
 
-version := "0.6.0"
+version := "0.7.0"
 
 organization := "com.actionml"
 
-val mahoutVersion = "0.13.0"
+val mahoutVersion = "0.13.1-SNAPSHOT"
 
-val pioVersion = "0.11.0-incubating"
+val pioVersion = "0.12.0-incubating"
 
-val elasticsearch1Version = "1.7.5"
+//val elasticsearch1Version = "1.7.5"
 
-//val elasticsearch5Version = "5.1.2"
+val elasticsearch5Version = "5.6.3"
+
+val sparkVersion = "2.2.1"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
   "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch1" % pioVersion % "provided",
-  "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
-  "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
+  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
   // Mahout's Spark libs
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion,
-  "org.apache.mahout" %% "mahout-spark" % mahoutVersion
+  "org.apache.mahout" %% "mahout-spark" % mahoutVersion classifier "spark_1.6"
     exclude("org.apache.spark", "spark-core_2.10"),
   "org.apache.mahout"  % "mahout-math" % mahoutVersion,
   "org.apache.mahout"  % "mahout-hdfs" % mahoutVersion
@@ -37,7 +39,7 @@ libraryDependencies ++= Seq(
     exclude("xmlpull", "xmlpull"),
   // possible build for es5 
   //"org.elasticsearch"       %% "elasticsearch-spark-13" % elasticsearch5Version % "provided",
-  "org.elasticsearch" % "elasticsearch" % "1.7.5" % "provided",
+  "org.elasticsearch" % "elasticsearch" % elasticsearch5Version % "provided",
   "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.2"
     exclude("org.apache.spark", "spark-catalyst_2.10")
     exclude("org.apache.spark", "spark-sql_2.10"),
