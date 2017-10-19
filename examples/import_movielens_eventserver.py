@@ -13,7 +13,7 @@ def import_events(client, file):
   f = open(file, 'r')
   random.seed(SEED)
   count = 0
-  print "Importing data..."
+  print("Importing data...")
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
     # For demonstration purpose, randomly mix in some buy events
@@ -50,7 +50,7 @@ def import_events(client, file):
       )
     count += 1
   f.close()
-  print "%s events are imported." % count
+  print("%s events are imported." % count)
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(
@@ -60,7 +60,7 @@ if __name__ == '__main__':
   parser.add_argument('--file', default="./data/sample_movielens_data.txt")
 
   args = parser.parse_args()
-  print args
+  print(args)
 
   client = predictionio.EventClient(
     access_key=args.access_key,

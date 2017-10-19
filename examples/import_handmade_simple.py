@@ -22,7 +22,7 @@ def import_events(client, file):
   now_date = datetime.datetime.now(pytz.utc) # - datetime.timedelta(days=2.7)
   current_date = now_date
   event_time_increment = datetime.timedelta(days= -0.8)
-  print "Importing data..."
+  print("Importing data...")
 
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
@@ -38,8 +38,8 @@ def import_events(client, file):
         target_entity_id=data[2],
         event_time = current_date
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
-            " current_date: " + current_date.isoformat()
+      print("Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
+            " current_date: " + current_date.isoformat())
     elif (data[1] == "view"):  # assumes other event type is 'view'
       client.create_event(
               event=data[1],
@@ -49,8 +49,8 @@ def import_events(client, file):
               target_entity_id=data[2],
               event_time = current_date
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
-            " current_date: " + current_date.isoformat()
+      print("Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
+            " current_date: " + current_date.isoformat())
     elif (data[1] == "category-pref"):  # assumes other event type is 'category-pref'
       client.create_event(
               event=data[1],
@@ -60,8 +60,8 @@ def import_events(client, file):
               target_entity_id=data[2],
               event_time = current_date
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
-            " current_date: " + current_date.isoformat()
+      print("Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
+            " current_date: " + current_date.isoformat())
     elif (data[1] == "$set"):  # must be a set event
       properties = data[2].split(PROPERTIES_DELIMITER)
       prop_name = properties.pop(0)
@@ -73,13 +73,13 @@ def import_events(client, file):
         event_time=current_date,
         properties={prop_name: prop_value}
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/"+prop_name+": " + str(properties) + \
-          " current_date: " + current_date.isoformat()
+      print("Event: " + data[1] + " entity_id: " + data[0] + " properties/"+prop_name+": " + str(properties) + \
+          " current_date: " + current_date.isoformat())
     count += 1
     current_date += event_time_increment
 
   f.close()
-  print "%s events are imported." % count
+  print("%s events are imported." % count)
 
 
 if __name__ == '__main__':
@@ -90,7 +90,7 @@ if __name__ == '__main__':
   parser.add_argument('--file', default="./data/sample-handmade-data.txt")
 
   args = parser.parse_args()
-  print args
+  print(args)
 
   client = predictionio.EventClient(
     access_key=args.access_key,

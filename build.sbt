@@ -4,7 +4,7 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "universal-recommender"
 
-version := "0.7.0"
+version := "0.7.0-SNAPSHOT"
 
 organization := "com.actionml"
 
@@ -16,7 +16,7 @@ val pioVersion = "0.12.0-incubating"
 
 val elasticsearch5Version = "5.6.3"
 
-val sparkVersion = "2.2.1"
+val sparkVersion = "2.1.1"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
