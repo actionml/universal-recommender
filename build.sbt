@@ -8,43 +8,44 @@ version := "0.7.0-SNAPSHOT"
 
 organization := "com.actionml"
 
-val mahoutVersion = "0.13.1-SNAPSHOT"
+scalaVersion := "2.11.11"
+
+scalaVersion in ThisBuild := "2.11.11"
+
+val mahoutVersion = "0.13.0"
 
 val pioVersion = "0.12.0-incubating"
 
-//val elasticsearch1Version = "1.7.5"
-
-val elasticsearch5Version = "5.6.3"
+val elasticsearchVersion = "5.5.2"
 
 val sparkVersion = "2.1.1"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
-  "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch1" % pioVersion % "provided",
-  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
-  "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
+  "org.elasticsearch.client" % "rest" % elasticsearchVersion,
+  "org.elasticsearch"       %% "elasticsearch-spark-20" % elasticsearchVersion % "provided"
+    exclude("org.apache.spark", "*"),
+  "org.elasticsearch"        % "elasticsearch-hadoop-mr"  % elasticsearchVersion % "provided",
+  "org.apache.spark" %% "spark-core" % "2.1.1" % "provided",
+  "org.apache.spark" %% "spark-mllib" % "2.1.1" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
-  // Mahout's Spark libs
+  // Mahout's Spark libs. They're custom compiled for Scala 2.11
+  // and included in the buildpack's local Maven repo.
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion,
-  "org.apache.mahout" %% "mahout-spark" % mahoutVersion classifier "spark_1.6"
-    exclude("org.apache.spark", "spark-core_2.10"),
+  "org.apache.mahout" %% "mahout-spark" % mahoutVersion
+    exclude("org.apache.spark", "spark-core_2.11"),
   "org.apache.mahout"  % "mahout-math" % mahoutVersion,
   "org.apache.mahout"  % "mahout-hdfs" % mahoutVersion
     exclude("com.thoughtworks.xstream", "xstream")
     exclude("org.apache.hadoop", "hadoop-client"),
-  //"org.apache.hbase"        % "hbase-client"   % "0.98.5-hadoop2" % "provided",
-  //  exclude("org.apache.zookeeper", "zookeeper"),
   // other external libs
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
     exclude("xmlpull", "xmlpull"),
-  // possible build for es5 
-  //"org.elasticsearch"       %% "elasticsearch-spark-13" % elasticsearch5Version % "provided",
-  "org.elasticsearch" % "elasticsearch" % elasticsearch5Version % "provided",
-  "org.elasticsearch" % "elasticsearch-spark_2.10" % "2.1.2"
-    exclude("org.apache.spark", "spark-catalyst_2.10")
-    exclude("org.apache.spark", "spark-sql_2.10"),
   "org.json4s" %% "json4s-native" % "3.2.10")
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
+
+
+resolvers += "Local Repository" at "file:///Users/pat/.custom-scala-m2/repo"
 
 resolvers += Resolver.mavenLocal
 
@@ -66,3 +67,7 @@ assemblyMergeStrategy in assembly := {
     val oldStrategy = (assemblyMergeStrategy in assembly).value
     oldStrategy(x)
 }
+
+//assemblyShadeRules in assembly := Seq(
+//  ShadeRule.rename("org.apache.http.**" -> "shadeio.ur.data.http.@1").inAll,
+//  ShadeRule.rename("org.elasticsearch.client.**" -> "shadeio.ur.data.client.@1").inAll)
