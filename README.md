@@ -1,6 +1,6 @@
 # The Universal Recommender
 
-The Universal Recommender (UR) is a new type of collaborative filtering recommender based on an algorithm that can use data from a wide variety of user taste indicators&mdash;it is called the Correlated Cross-Occurrence algorithm. Unlike  matrix factorization embodied in things like MLlib's ALS, CCO is able to ingest any number of user actions, events, profile data, and contextual information. It then serves results in a fast and scalable way. It also supports item properties for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender. These boosts and filters allow users to build vey flexible business rules.
+The Universal Recommender (UR) is a new type of collaborative filtering recommender based on an algorithm that can use data from a wide variety of user preference indicators&mdash;it is called the Correlated Cross-Occurrence algorithm. Unlike  matrix factorization embodied in things like MLlib's ALS, CCO is able to ingest any number of user actions, events, profile data, and contextual information. It then serves results in a fast and scalable way. It also supports item properties for building flexible business rules for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender.
 
 Most recommenders can only use conversion events, like buy or rate. Using all we know about a user and their context allows us to much better predict their preferences.
 
@@ -17,7 +17,7 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 Contributions are encouraged and appreciated. Create a PR against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We like to keep new features general so users will not be required to change the code of the UR to make use of the new feature. We will be happy to provide guidance or help via the github PR review mechanism.
 
-# Version Changelog
+# The Universal Recommender Version Log
 
 ## Roadmap
 
@@ -25,7 +25,7 @@ PIO-0.11.0 supports use of Elasticsearch 5.x, Spark 2.x, and Scala 2.11. The UR 
 
 ## v0.6.0
 
-This is a major upgrade release with several new features. Backward compatibility with 0.5.0 is maintained. **Note**: We no longer have a default `engine.json` file so you will need to copy `engine.json.template` to `engine.json` and edit it to fit your data. See the [Universal Recommender Congiuration](http://actionml.com/docs/ur_config) docs.
+This is a major upgrade release with several new features. Backward compatibility with 0.5.0 is maintained. **Note**: We no longer have a default `engine.json` file so you will need to copy `engine.json.template` to `engine.json` and edit it to fit your data. See the [Universal Recommender Configuration](http://actionml.com/docs/ur_config) docs.
 
  - **Performance**: Nearly a 40% speedup for most model calculation, and a new tuning parameter that can yield further speed improvements by filtering out unused or less useful data from model building. See `minEventsPerUser` in the UR configuration docs.
  - **Complimentary Purchase aka Item-set Recommendations**: "Shopping-cart" type recommendations. Can be used for wishlists, favorites, watchlists, any list based recommendations. Used with list or user data.
@@ -33,6 +33,7 @@ This is a major upgrade release with several new features. Backward compatibilit
  - **PredictionIO 0.11.0**: Full compatibility, but no support for Elasticsearch 5, an option with PIO-0.11.0.
  - **New Advanced Tuning**: Allows several new per indicator / event type tuning parameters for tuning model quality in a more targeted way.
  - **Norms Support**: For large dense datasets norms are now the default for model indexing and queries. This should result in slight precision gains, so better results. 
+ - **Mahout 0.13.0 Support**: the UR no longer requires a local build of Mahout.  
  - **GPU Support**: via Mahout 0.13.0 the core math of the UR now supports the use of GPUs for acceleration.
  - **Timeout Protection**: Queries for users with very large histories could cause a timeout. We now correctly limit the amount of user history that is used as per documentation, which will all but eliminate timeouts. 
  - **Bug Fixes**: The use of `blackListEvents` as defined in `engine.json` was not working for an empty list, which should and now does disable any blacklisting except explicit item blacklists contained in the query.
@@ -69,7 +70,7 @@ This is a major upgrade release with several new features. Backward compatibilit
  - a query with no item or user will get recommendations based on popularity
  - a new integration test has been added
  - a regression bug where some ids were being tokenized by Elasticsearch, leading to incorrect results, was fixed. **NOTE: for users with complex ids containing dashes or spaces this is an important fix.**
- - a dateRange in the query now takes precidence to the item attached expiration and avaiable dates. 
+ - a dateRange in the query now takes precedence to the item attached expiration and available dates. 
 
 ## v0.2.1
 
@@ -81,7 +82,7 @@ This is a major upgrade release with several new features. Backward compatibilit
  - hot/trending/popular used for backfill and when no other recommendations are returned by the query
  - filters/bias < 0 caused scores to be altered in v0.1.1 fixed in this version so filters have no effect on scoring.
  - the model is now hot-swapped in Elasticsearch so no downtime should be seen, in fact there is no need to run `pio deploy` to make the new model active.
- - it is now possible to have an engine.json (call it something else) dedicated to recalculating the popularity model. This allows fast updates to poularity without recalculating the collaborative filtering model.
+ - it is now possible to have an engine.json (call it something else) dedicated to recalculating the popularity model. This allows fast updates to popularity without recalculating the collaborative filtering model.
  - Elasticsearch can now be in cluster mode
 
 ## v0.1.1
@@ -101,5 +102,5 @@ This is a major upgrade release with several new features. Backward compatibilit
  - see the github [issues list](https://github.com/PredictionIO/template-scala-parallel-universal-recommendation/issues)
  
  
-#License
-This Software is licensed under the Apache Software Foundation version 2 licence found here: http://www.apache.org/licenses/LICENSE-2.0
+# License
+This Software is licensed under the Apache Software Foundation version 2 license found here: http://www.apache.org/licenses/LICENSE-2.0

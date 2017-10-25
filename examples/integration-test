@@ -40,8 +40,8 @@ echo "Checking to see if handmade app exists, should exit if not."
 pio app show handmade
 
 echo ""
-echo "Moving engine.json to user-engine.json"
-cp -n engine.json user-engine.json
+echo "Moving engine.json to user-engine.json if it exists"
+cp -n engine.json user-engine.json || true
 
 echo ""
 echo "Moving examples/handmade-engine.json to engine.json for integration test."
@@ -78,8 +78,8 @@ sleep 30
 ./examples/multi-query-handmade.sh > test.out
 
 echo ""
-echo "Restoring engine.json"
-mv user-engine.json engine.json
+echo "Restoring engine.json if is was saved"
+mv user-engine.json engine.json || true 
 
 echo ""
 echo "Differences between expected and actual results, none is a passing test."
