@@ -66,6 +66,7 @@ object DefaultURAlgoParams {
   val BackfillDuration = "3650 days" // for all time
 
   val ReturnSelf = false
+  val NumESWriteConnections: Option[Int] = None
 }
 
 /* default values must be set in code not the case class declaration
@@ -163,7 +164,10 @@ case class URAlgorithmParams(
   // used as the subject of a dateRange in queries, specifies the name of the item property
   dateName: Option[String] = None,
   indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
-  seed: Option[Long] = None) // seed is not used presently
+  seed: Option[Long] = None, // seed is not used presently
+  numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
+    // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
+    // for ES 1.7 bulk queue is defaulted to 50
     extends Params //fixed default make it reproducible unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
@@ -226,14 +230,17 @@ class URAlgorithm(val ap: URAlgorithmParams)
   lazy val modelEventNames = if (ap.indicators.isEmpty) {
     if (ap.eventNames.isEmpty) {
       throw new IllegalArgumentException("No eventNames or indicators in engine.json and one of these is required")
-    } else ap.eventNames.get
-  } else ap.indicators.get.map(_.name)
+    } else { ap.eventNames.get }
+  } else { ap.indicators.get.map(_.name) }
 
   val blacklistEvents = ap.blacklistEvents.getOrElse(Seq(modelEventNames.head)) // empty Seq[String] means no blacklist
   val returnSelf: Boolean = ap.returnSelf.getOrElse(DefaultURAlgoParams.ReturnSelf)
   val fields: Seq[Field] = ap.fields.getOrEmpty
 
   val randomSeed: Int = ap.seed.getOrElse(System.currentTimeMillis()).toInt
+
+  val numESWriteConnections = if (ap.numESWriteConnections.nonEmpty) ap.numESWriteConnections else DefaultURAlgoParams.NumESWriteConnections
+
   val maxCorrelatorsPerEventType: Int = ap.maxCorrelatorsPerEventType
     .getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType)
   val maxEventsPerEventType: Int = ap.maxEventsPerEventType
@@ -357,7 +364,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     new URModel(
       coocurrenceMatrices = cooccurrenceCorrelators,
       propertiesRDDs = Seq(propertiesRDD),
-      typeMappings = getMappings).save(dateNames, esIndex, esType)
+      typeMappings = getMappings).save(dateNames, esIndex, esType, numESWriteConnections)
     new NullModel
   }
 
@@ -387,7 +394,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     // returns the existing model plus new popularity ranking
     new URModel(
       propertiesRDDs = Seq(fieldsRDD.cache(), propertiesRDD.cache()),
-      typeMappings = getMappings).save(dateNames, esIndex, esType)
+      typeMappings = getMappings).save(dateNames, esIndex, esType, numESWriteConnections)
     new NullModel
   }
 
@@ -561,15 +568,22 @@ class URAlgorithm(val ap: URAlgorithmParams)
     try {
       // create a list of all query correlators that can have a bias (boost or filter) attached
       val (boostable, events) = getBiasedRecentUserActions(query)
+      logger.info(s"getBiasedRecentUserActions returned boostable: ${boostable} and events: ${events}")
 
       // since users have action history and items have correlators and both correspond to the same "actions" like
       // purchase or view, we'll pass both to the query if the user history or items correlators are empty
       // then metadata or backfill must be relied on to return results.
       val numRecs = query.num.getOrElse(limit)
+      logger.info(s"query.num.getOrElse returned numRecs: ${numRecs}")
+
       val should = buildQueryShould(query, boostable)
+      logger.info(s"buildQueryShould returned should: ${should}")
       val must = buildQueryMust(query, boostable)
+      logger.info(s"buildQueryMust returned must: ${must}")
       val mustNot = buildQueryMustNot(query, events)
+      logger.info(s"buildQueryMustNot returned mustNot: ${mustNot}")
       val sort = buildQuerySort()
+      logger.info(s"buildQuerySort returned sort: ${sort}")
 
       val json =
         ("size" -> numRecs) ~
@@ -581,12 +595,17 @@ class URAlgorithm(val ap: URAlgorithmParams)
               ("minimum_should_match" -> 1))) ~
               ("sort" -> sort)
 
+      logger.info(s"json is: ${json}")
       val compactJson = compact(render(json))
+      logger.info(s"compact json is: ${compactJson}")
 
-      logger.info(s"Query:\n$compactJson")
+      //logger.info(s"Query:\n$compactJson")
       (compactJson, events)
     } catch {
-      case e: IllegalArgumentException => ("", Seq.empty[Event])
+      case e: IllegalArgumentException => {
+        logger.warn("whoops, IllegalArgumentException for something in buildQuery.")
+        ("", Seq.empty[Event])
+      }
     }
   }
 
@@ -599,12 +618,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } else {
       Seq.empty
     }
+    logger.info(s"recentUserHistory is: ${recentUserHistory}")
 
     val similarItems: Seq[BoostableCorrelators] = if (itemBias >= 0f) {
       getBiasedSimilarItems(query)
     } else {
       Seq.empty
     }
+    logger.info(s"similarItems is: ${similarItems}")
 
     // this only makes sense when you train on (item-set-id, event-name, item-id) aka
     // shopping carts. We do not enforce this in the query nor throw an exception but a
@@ -618,9 +639,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } else {
       Seq.empty
     }
+    logger.info(s"itemSet is: ${itemSet}")
 
     val boostedMetadata = getBoostedMetadata(query)
+    logger.info(s"boostedMetadata is: ${boostedMetadata}")
     val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata ++ itemSet
+    logger.info(s"allBoostedCorrelators is: ${allBoostedCorrelators}")
 
     val shouldFields: Seq[JValue] = allBoostedCorrelators.filter {
       // only use non-zero boosts
@@ -630,6 +654,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       case BoostableCorrelators(actionName, itemIDs, boost) =>
         render("terms" -> (actionName -> itemIDs) ~ ("boost" -> boost))
     }
+    logger.info(s"shouldFields is: ${shouldFields}")
 
     // todo: this should not be sent if there are no rankings, causes 0 scores to be returned as backfill even
     // with no other ranking. Currently the 0 score results are filtered out for no active ranking.
@@ -644,6 +669,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         |  }
         |}
         |""".stripMargin)
+    logger.info(s"shouldScore is: ${shouldScore}")
 
     shouldFields :+ shouldScore
   }
@@ -735,10 +761,13 @@ class URAlgorithm(val ap: URAlgorithmParams)
   /** Get similar items for an item, these are already in the action correlators in ES */
   def getBiasedSimilarItems(query: Query): Seq[BoostableCorrelators] = {
     if (query.item.nonEmpty) {
+      logger.info(s"using item ${query.item.get}")
       val m = EsClient.getSource(esIndex, esType, query.item.get)
+      logger.info(s"got source: ${m}")
 
-      if (m != null) {
+      if (m.nonEmpty) {
         val itemEventBias = query.itemBias.getOrElse(itemBias)
+        logger.info(s"getBiasedSimilarItems for item ${query.item.get}, bias value ${itemEventBias}")
         val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
         modelEventNames.map { action =>
           val items: Seq[String] = m.get(action).getOrElse(Seq.empty[String])
@@ -746,8 +775,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
           BoostableCorrelators(action, rItems, itemEventsBoost)
         }
       } else {
-        Seq.empty
-      } // no similar items
+        logger.info(s"getBiasedSimilarItems for item ${query.item.get}: item not found")
+        Seq.empty[BoostableCorrelators]
+      } // item not found in Elasticsearch
     } else {
       Seq.empty[BoostableCorrelators]
     } // no item specified
@@ -918,12 +948,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val mappings = rankingFieldNames.map { fieldName =>
       fieldName -> ("float", false)
     }.toMap ++ // create mappings for correlators, where the Boolean says to not use norms
-    modelEventNames.map { correlator =>
-      correlator -> ("keyword", true) // use norms with correlators to get closer to cosine similarity.
-    }.toMap ++
-    dateNames.map { dateName =>
-      dateName -> ("date", false) // map dates to be interpreted as dates
-    }
+      modelEventNames.map { correlator =>
+        correlator -> ("keyword", true) // use norms with correlators to get closer to cosine similarity.
+      }.toMap ++
+      dateNames.map { dateName =>
+        dateName -> ("date", false) // map dates to be interpreted as dates
+      }
     logger.info(s"Index mappings for the Elasticsearch URModel: $mappings")
     mappings
   }

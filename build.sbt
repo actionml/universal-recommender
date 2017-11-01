@@ -30,7 +30,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-mllib" % "2.1.1" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
   // Mahout's Spark libs. They're custom compiled for Scala 2.11
-  // and included in the buildpack's local Maven repo.
+  // and included in the local Maven repo in the .custom-scala-m2/repo resolver below
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion,
   "org.apache.mahout" %% "mahout-spark" % mahoutVersion
     exclude("org.apache.spark", "spark-core_2.11"),

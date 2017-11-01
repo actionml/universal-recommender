@@ -17,11 +17,11 @@
 
 package com.actionml
 
+import java.net.URLEncoder
 import java.util
 
 import grizzled.slf4j.Logger
 import org.apache.http.util.EntityUtils
-
 import org.apache.predictionio.data.storage.{ DataMap, Storage, StorageClientConfig }
 import org.apache.predictionio.workflow.CleanupFunctions
 import org.apache.spark.SparkContext
@@ -41,6 +41,8 @@ import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback
 import org.elasticsearch.spark._
 import org.json4s.JValue
 import org.json4s.DefaultFormats
+import org.json4s.JsonAST.JString
+// import org.json4s.native.Serialization.writePretty
 import com.actionml.helpers.{ ItemID, ItemProps }
 
 import scala.collection.immutable
@@ -50,14 +52,13 @@ import scala.collection.JavaConverters._
 /** Elasticsearch notes:
  *  1) every query clause will affect scores unless it has a constant_score and boost: 0
  *  2) the Spark index writer is fast but must assemble all data for the index before the write occurs
- *  3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
- *  4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
+ *  3) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
  *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
  *    Finally the correlator fields should be norms: true to enable norms, this make the score equal to the sum
  *    of dot products divided by the length of each vector. This is the definition of "cosine" similarity.
- *    Todo: norms may not be the best, should experiment to know for sure.
- *  5) the client, either transport client for < ES5 or the rest client for >= ES5 there should be a timeout set since
+ *  4) the client, either transport client for < ES5 or the rest client for >= ES5 there should have a timeout set since
  *    the default is very long, several seconds.
+ *
  */
 
 /** Defines methods to use on Elasticsearch 5 through the REST client.*/
@@ -68,7 +69,7 @@ object EsClient {
 
   private val configOpt = Storage.getConfig("ELASTICSEARCH")
 
-  private lazy val client: RestClient = configOpt map { config =>
+  private lazy val client: RestClient = configOpt.map { config =>
     val usernamePassword = (
       config.properties.get("USERNAME"),
       config.properties.get("PASSWORD"))
@@ -154,7 +155,6 @@ object EsClient {
   }
 
   /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
-   *  Todo: move PIO_UR_ELASTICSEARCH_INDEX_REPLICAS into engine.json
    *
    *  @param indexName elasticsearch name
    *  @param indexType names the type of index, usually use the item name
@@ -173,39 +173,22 @@ object EsClient {
       "HEAD",
       s"/$indexName",
       Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
-        case 404 => {
+        case 404 => { // should always be a unique index name so fail unless we get a 404
           var mappings = s"""
-            |{ "settings": {
-            |    "index": {
-            |      "number_of_replicas": ${sys.env.getOrElse("PIO_UR_ELASTICSEARCH_INDEX_REPLICAS", "1")}
-            |    }
-            |  },
-            |  "mappings": {
+            |{ "mappings": {
             |    "$indexType": {
             |      "properties": {
             """.stripMargin.replace("\n", "")
 
-          def mappingsField(`type`: String, `normsEnabled`: Boolean) = {
-            if (`type` == "keyword") {
-              s"""
-              |    : {
-              |      "type": "${`type`}",
-              |      "index": "not_analyzed",
-              |      "norms" : "${`normsEnabled`}"
-              |    },
-              """.stripMargin.replace("\n", "")
-            } else {
-              s"""
-              |    : {
-              |      "type": "${`type`}"
-              |    },
-              """.stripMargin.replace("\n", "")
-
-            }
-
+          def mappingsField(`type`: String) = {
+            s"""
+            |    : {
+            |      "type": "${`type`}"
+            |    },
+            """.stripMargin.replace("\n", "")
           }
 
-          val mappingsTail = // forces the last element to have no comma, fuck JSON
+          val mappingsTail = // unused mapping forces the last element to have no comma, fuck JSON
             s"""
             |    "last": {
             |      "type": "keyword"
@@ -213,26 +196,17 @@ object EsClient {
             |}}}}
             """.stripMargin.replace("\n", "")
 
-          /*
           fieldNames.foreach { fieldName =>
             if (typeMappings.contains(fieldName))
-              mappings += (s""""$fieldName"""" + mappingsField(typeMappings(fieldName)))
-            else // unspecified fields are treated as not_analyzed keyword
+              mappings += (s""""$fieldName"""" + mappingsField(typeMappings(fieldName)._1))
+            else // unspecified fields are treated as not_analyzed strings
               mappings += (s""""$fieldName"""" + mappingsField("keyword"))
           }
-          */
 
-          fieldNames.foreach { fieldName =>
-            if (typeMappings.contains(fieldName))
-              mappings += (s""""$fieldName"""" + mappingsField(typeMappings(fieldName)._1, typeMappings(fieldName)._2))
-            else // unspecified fields are treated as not_analyzed keywords, they are string properties used for
-              // business rules type queries
-              mappings += (s""""$fieldName"""" + (mappingsField("keyword", false)))
-          }
-
-          mappings += mappingsTail // any other string is not_analyzed
+          mappings += mappingsTail // "id" string is not_analyzed and does not use norms          val entity = new NStringEntity(mappings, ContentType.APPLICATION_JSON)
+          //logger.info(s"Create index with:\n$indexName\n$mappings\n")
           val entity = new NStringEntity(mappings, ContentType.APPLICATION_JSON)
-          logger.info(s"Create index with:\n$indexName\n$mappings\n")
+
           client.performRequest(
             "PUT",
             s"/$indexName",
@@ -248,7 +222,8 @@ object EsClient {
           true
         }
         case 200 =>
-          logger.warn(s"Elasticsearch index: $indexName wasn't created because it already exists. This may be an error.")
+          logger.warn(s"Elasticsearch index: $indexName wasn't created because it already exists. " +
+            s"This may be an error. Leaving the old index active.")
           false
         case _ =>
           throw new IllegalStateException(s"/$indexName is invalid.")
@@ -270,7 +245,8 @@ object EsClient {
     typeName: String,
     indexRDD: RDD[Map[String, Any]],
     fieldNames: List[String],
-    typeMappings: Map[String, (String, Boolean)] = Map.empty): Unit = {
+    typeMappings: Map[String, (String, Boolean)] = Map.empty,
+    numESWriteConnections: Option[Int] = None): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
     //val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
@@ -280,12 +256,21 @@ object EsClient {
     // taken out for now since there is no client.admin in the REST client. Have to construct REST call directly
     createIndex(newIndex, typeName, fieldNames, typeMappings, true)
 
+    // throttle writing to the max bulk-write connections, which is one per ES core.
+    // todo: can we find this from the cluster itself?
+    val repartitionedIndexRDD = if (numESWriteConnections.nonEmpty && indexRDD.context.defaultParallelism >
+      numESWriteConnections.get) {
+      logger.info(s"defaultParallelism: ${indexRDD.context.defaultParallelism}")
+      logger.info(s"Coalesce to: ${numESWriteConnections.get} to reduce number of ES connections for saveToEs")
+      indexRDD.coalesce(numESWriteConnections.get)
+    } else {
+      logger.info(s"Number of ES connections for saveToEs: ${indexRDD.context.defaultParallelism}")
+      indexRDD
+    }
+
     val newIndexURI = "/" + newIndex + "/" + typeName
     // TODO check if {"es.mapping.id": "id"} works on ESHadoop Interface of ESv5
     // Repartition to fit into Elasticsearch concurrency limits.
-    // Todo: this is not used by PIO so should be a UR param like the Spark partitioning
-    // move to UR params
-    val esConcurrency = sys.env.get("PIO_UR_ELASTICSEARCH_CONCURRENCY")
 
     val usernamePasswordOpt = configOpt flatMap { config =>
       val usernamePassword = (
@@ -311,8 +296,7 @@ object EsClient {
           } else {
             Map("es.net.ssl" -> "false")
           })).getOrElse(Map.empty[String, String])
-    indexRDD.coalesce(esConcurrency.getOrElse("1").toInt).saveToEs(newIndexURI, esConfig)
-    //refreshIndex(newIndex)
+    repartitionedIndexRDD.saveToEs(newIndexURI, esConfig)
 
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
 
@@ -368,14 +352,19 @@ object EsClient {
    *  @return a [PredictedResults] collection
    */
   def search(query: String, indexName: String): Option[JValue] = {
+    logger.info(s"Query:\n${query}")
     val response = client.performRequest(
       "POST",
       s"/$indexName/_search",
       Map.empty[String, String].asJava,
       new StringEntity(query, ContentType.APPLICATION_JSON))
     response.getStatusLine.getStatusCode match {
-      case 200 => Some(parse(EntityUtils.toString(response.getEntity)))
-      case _   => None
+      case 200 =>
+        logger.info(s"Got source from query: ${query}")
+        Some(parse(EntityUtils.toString(response.getEntity)))
+      case _ =>
+        logger.info(s"Query: ${query}\nproduced status code: ${response.getStatusLine.getStatusCode}")
+        None
     }
   }
 
@@ -387,15 +376,55 @@ object EsClient {
    *  @return source [java.util.Map] of field names to any valid field values or null if empty
    */
   def getSource(indexName: String, typeName: String, doc: String): Map[String, List[String]] = {
-    val url = s"/$indexName/$typeName/$doc"
-    val response = client.performRequest(
-      "GET",
-      url,
-      Map.empty[String, String].asJava)
-    val responseJValue = parse(EntityUtils.toString(response.getEntity))
-    val result = (responseJValue \ "_source").values.asInstanceOf[Map[String, List[String]]]
-    logger.info(s"getSource for ${url} result: ${result}")
-    result
+    val url = s"/$indexName/$typeName/${encodeURIFragment(doc)}"
+    var rjv: Option[JValue] = Some(JString(""))
+    logger.info(s"using URL: $url")
+    try { // ES throws and exception when a doc is not found!!!! Why, oh why--the madness...
+      logger.info("performing request")
+      val response = client.performRequest(
+        "GET",
+        url,
+        Map.empty[String, String].asJava)
+      logger.info(s"got response: $response")
+
+      rjv = response.getStatusLine.getStatusCode match {
+        case 200 =>
+          val entity = EntityUtils.toString(response.getEntity)
+          logger.info(s"got status code: 200\nentity: ${entity}")
+          if (entity.isEmpty) {
+            None
+          } else {
+            logger.info(s"About to parse: $entity")
+            Some(parse(entity))
+          }
+        case 404 =>
+          logger.info(s"got status code: 404")
+          Some(parse("""{"notFound": "true"}"""))
+        case _ =>
+          logger.info(s"got status code: ${response.getStatusLine.getStatusCode}\nentity: ${EntityUtils.toString(response.getEntity)}")
+          None
+      }
+    } catch {
+      case e: org.elasticsearch.client.ResponseException => {
+        logger.info("got no data for the item")
+        rjv = None
+      }
+      case _ =>
+        logger.info("got no data for the item")
+        rjv = None
+    } finally {
+      logger.info("aahhh, finally")
+    }
+
+    if (rjv.nonEmpty) {
+      //val responseJValue = parse(EntityUtils.toString(response.getEntity))
+      val result = (rjv.get \ "_source").values.asInstanceOf[Map[String, List[String]]]
+      logger.info(s"getSource for ${url} result: ${result}")
+      result
+    } else {
+      logger.info(s"Non-existent item $doc, but that's ok, return backfill recs")
+      Map.empty
+    }
   }
 
   def getIndexName(alias: String): Option[String] = {
@@ -425,6 +454,26 @@ object EsClient {
       .map(index => sc.esJsonRDD(alias + "/" + typeName) map { case (itemId, json) => itemId -> DataMap(json).fields })
       .getOrElse(sc.emptyRDD)
   }
+
+  import java.io.UnsupportedEncodingException
+
+  def encodeURIFragment(s: String): String = {
+    var result: String = ""
+    try
+      result = URLEncoder.encode(s, "UTF-8")
+        .replaceAll("\\+", "%20")
+        .replaceAll("\\%21", "!")
+        .replaceAll("\\%27", "'")
+        .replaceAll("\\%28", "(")
+        .replaceAll("\\%29", ")")
+        .replaceAll("\\%7E", "%7E")
+    catch {
+      case e: UnsupportedEncodingException =>
+        result = s
+    }
+    result
+  }
+
 }
 
 class BasicAuthProvider(
