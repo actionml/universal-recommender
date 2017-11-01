@@ -1,3 +1,85 @@
+# Testing branch
+
+This branch is for testing a pre-release of the UR integrated with Scala 2.11, Spark 2.2.1, and most importantly Elasticsearch 5.x.
+
+Known bugs: exclusion rules not working. This will be fixed before release in the next few days
+
+Issues: do not trust the integration test, Lucene and ES have changed their scoring method and so you cannot compare the old scores to the new ones. The test will be fixed before release. You can trust the test to populate PIO with some sample data you can play with.
+
+You must build PredictionIO with the default parameters so just run `./make-distribution` this will require you to install Scala 2.11, Spark 2.1.1 or greater, ES 5.5.2 or greater, Hadoop 2.6 or greater. If you have issues getting pio to build and run send questions to the PIO mailing list. Once PIO is running test with `pio status` and `pio app list`. You will need to create an app in import your data to run the integration test to get some sample data installed in the “handmade” app.
+
+*Backup your data*, moving from ES 1 to ES 5 will delete all data!!!! Actually even worse it is still in HBase but you can’t get at it so to upgrade so the following:
+
+ - `pio export` with pio < 0.12.0 =====*Before upgrade!*=====
+ - `pio data-delete` all your old apps =====*Before upgrade!*=====
+ - build and install pio 0.12.0 including all the services =====*The point of no return!*=====
+ - `pio app new …` and `pio import…` any needed datasets
+ - download and build Mahout for Scala 2.11 from this repo: https://github.com/actionml/mahout.git follow the instructions in the README.md
+ - download the UR from here: https://github.com/actionml/universal-recommender.git and checkout branch 0.7.0-SNAPSHOT
+ - replace the line: `resolvers += "Local Repository" at "file:///Users/pat/.custom-scala-m2/repo”` with your path to the local mahout build
+ - build the UR with `pio build` or run the integration test to get sample data put into PIO `./examples/integration-test`
+
+This will use the released PIO and alpha UR
+
+a sample of pio-env.sh that works with one type of setup is below, but you'll have to change paths to match yours:
+
+
+```
+#!/usr/bin/env bash
+
+# SPARK_HOME: Apache Spark is a hard dependency and must be configured.
+# using Spark 2.2.1 here
+SPARK_HOME=/usr/local/spark
+
+# ES_CONF_DIR: You must configure this if you have advanced configuration for
+# using ES 5.6.3
+ES_CONF_DIR=/usr/local/elasticsearch/config
+
+# HADOOP_CONF_DIR: You must configure this if you intend to run PredictionIO
+# using hadoop 2.8 here
+HADOOP_CONF_DIR=/usr/local/hadoop/etc/hadoop
+
+# HBASE_CONF_DIR: You must configure this if you intend to run PredictionIO
+# using HBase 2.x here
+HBASE_CONF_DIR=/usr/local/hbase/conf
+
+# Filesystem paths where PredictionIO uses as block storage.
+PIO_FS_BASEDIR=$HOME/.pio_store
+PIO_FS_ENGINESDIR=$PIO_FS_BASEDIR/engines
+PIO_FS_TMPDIR=$PIO_FS_BASEDIR/tmp
+
+# Storage Repositories
+PIO_STORAGE_REPOSITORIES_METADATA_NAME=pio_meta
+PIO_STORAGE_REPOSITORIES_METADATA_SOURCE=ELASTICSEARCH
+
+PIO_STORAGE_REPOSITORIES_MODELDATA_NAME=pio_
+PIO_STORAGE_REPOSITORIES_MODELDATA_SOURCE=LOCALFS
+
+PIO_STORAGE_REPOSITORIES_APPDATA_NAME=pio_appdata
+PIO_STORAGE_REPOSITORIES_APPDATA_SOURCE=ELASTICSEARCH
+
+PIO_STORAGE_REPOSITORIES_EVENTDATA_NAME=pio_eventdata
+PIO_STORAGE_REPOSITORIES_EVENTDATA_SOURCE=HBASE
+
+# ES config
+PIO_STORAGE_SOURCES_ELASTICSEARCH_TYPE=elasticsearch
+PIO_STORAGE_SOURCES_ELASTICSEARCH_HOSTS=localhost
+PIO_STORAGE_SOURCES_ELASTICSEARCH_PORTS=9200 # <===== notice 9200 now
+PIO_STORAGE_SOURCES_ELASTICSEARCH_CLUSTERNAME=elasticsearch_xyz <===== should match what you have in you ES config file
+PIO_STORAGE_SOURCES_ELASTICSEARCH_HOME=/usr/local/elasticsearch
+
+PIO_STORAGE_SOURCES_LOCALFS_TYPE=localfs
+PIO_STORAGE_SOURCES_LOCALFS_HOSTS=$PIO_FS_BASEDIR/models
+
+PIO_STORAGE_SOURCES_HBASE_TYPE=hbase
+PIO_STORAGE_SOURCES_HBASE_HOME=/usr/local/hbase
+```
+
+
+========================================================================================
+
+
+
 # The Universal Recommender
 
 The Universal Recommender (UR) is a new type of collaborative filtering recommender based on an algorithm that can use data from a wide variety of user preference indicators&mdash;it is called the Correlated Cross-Occurrence algorithm. Unlike  matrix factorization embodied in things like MLlib's ALS, CCO is able to ingest any number of user actions, events, profile data, and contextual information. It then serves results in a fast and scalable way. It also supports item properties for building flexible business rules for filtering and boosting recommendations and can therefor be considered a hybrid collaborative filtering and content-based recommender.
