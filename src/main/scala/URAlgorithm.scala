@@ -565,6 +565,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
     query: Query,
     backfillFieldNames: Seq[String] = Seq.empty): (String, Seq[Event]) = {
 
+    logger.info(s"Got query: \n${query}")
+
     try {
       // create a list of all query correlators that can have a bias (boost or filter) attached
       val (boostable, events) = getBiasedRecentUserActions(query)
@@ -702,18 +704,19 @@ class URAlgorithm(val ap: URAlgorithmParams)
     mustFields ++ filteringDateRange
   }
 
-  /** Build not must query part */
+  /** Build mustNot part of the query */
   def buildQueryMustNot(query: Query, events: Seq[Event]): JValue = {
+    // this excludes any items from the query by id
     val excludedItems = ("ids" -> ("values" -> getExcludedItems(events, query)) ~ ("boost" -> 0))
 
-    val boostedMetadata = getBoostedMetadata(query)
-    val excludedByZeroBoost = boostedMetadata.filter {
-      case BoostableCorrelators(actionName, itemIDs, boost) =>
-        boost.getOrElse(1f) == 0f
-    }.map {
-      case BoostableCorrelators(actionName, itemIDs, boost) =>
-        ("terms" -> (actionName -> itemIDs) ~ ("boost" -> boost))
+    // exclude items with metadata boost = 0
+    val excludingMetadata = getExcludingMetadata(query)
+    logger.info(s"boosted metadata, should include boost = 0 for exclusions: ${excludingMetadata}")
+    val excludedByZeroBoost = excludingMetadata.map {
+      case ExclusionFields(metatdataName, values) =>
+        ("terms" -> (metatdataName -> values))
     }
+    logger.info(s"excluded by 0 boost: ${excludedByZeroBoost}")
 
     render(excludedItems ++ excludedByZeroBoost)
   }
@@ -850,8 +853,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
       .distinct // de-dup and favor query fields
   }
 
-  /** get all metadata fields that are filters (not boosts) */
-  def getExcludingMetadatagetExcludingMetadata(query: Query): Seq[ExclusionFields] = {
+  /** get all metadata fields that are exclusion filters (not boosts) */
+  def getExcludingMetadata(query: Query): Seq[ExclusionFields] = {
     val paramsFilterFields = fields.filter(_.bias == 0f)
     val queryFilterFields = query.fields.getOrEmpty.filter(_.bias == 0f)
 
