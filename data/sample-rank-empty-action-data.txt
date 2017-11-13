@@ -1,0 +1,8 @@
+product-1,$set,defaultRank:1.0
+product-2,$set,defaultRank:2.7
+product-3,$set,defaultRank:3.2
+product-4,$set,defaultRank:4.7
+product-5,$set,defaultRank:5.0
+product-6,$set,defaultRank:6.9
+product-7,$set,defaultRank:7.15
+product-8,$set,defaultRank:8.07

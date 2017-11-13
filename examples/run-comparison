@@ -1,0 +1,106 @@
+set -e
+
+APP_UR="handmade"
+APP_UR_DF="handmade-df"
+
+MEM="16G"
+SCALE="large"
+
+echo "Generating random data"
+python generate_random_data.py $SCALE
+
+
+INPUT_DATA_PURC="/Users/yh03294/pio_engines/_datasets/ur_develop_small_dataset_purchase_3.json"
+INPUT_DATA_PURC="input_data_purchase.json"
+INPUT_DATA_VW="input_data_view.json"
+#INPUT_DATA="test.json"
+
+APPID_UR=`pio app show $APP_UR | grep 'App ID' | cut -d ':' -f 2`
+APPID_UR_DF=`pio app show $APP_UR_DF | grep 'App ID' | cut -d ':' -f 2`
+
+echo ""
+echo ""
+echo "Deleting data in both apps ($APP_UR and $APP_UR_DF)"
+yes YES | pio app data-delete $APP_UR
+yes YES | pio app data-delete $APP_UR_DF
+
+echo ""
+echo ""
+echo "Importing mock data in both apps($APPID_UR and $APPID_UR_DF)"
+echo ""
+echo "Importing $`wc -l $INPUT_DATA_PURC` purchase events"
+pio import --input $INPUT_DATA_PURC --appid $APPID_UR
+pio import --input $INPUT_DATA_PURC --appid $APPID_UR_DF
+echo ""
+echo "Importing $`wc -l $INPUT_DATA_VW` view events"
+pio import --input $INPUT_DATA_VW --appid $APPID_UR
+pio import --input $INPUT_DATA_VW --appid $APPID_UR_DF
+
+echo ""
+echo ""
+echo "Train both engines"
+cd universal-recommender 
+echo ""
+echo "Building UR"
+pio build > build.log
+echo ""
+echo "Training UR"
+cp examples/handmade-engine.json engine.json
+START=$(date +%s)
+pio train -- --driver-memory $MEM --executor-memory $MEM > train.log
+END=$(date +%s)
+DIFF=$(( $END - $START ))
+echo "Training UR took $DIFF s"
+ENGINEID_UR=`grep engineInstanceId train.log | cut -d '=' -f 2`
+echo "Instance-ID: $ENGINEID_UR"
+cd ..
+
+cd universal-recommender-df
+echo ""
+echo "Building UR DF"
+pio build > build.log
+echo ""
+echo "Training UR DF"
+cp examples/handmade-engine.json engine.json
+START=$(date +%s)
+pio train -- --driver-memory $MEM --executor-memory $MEM > train.log
+END=$(date +%s)
+DIFF=$(( $END - $START ))
+echo "Training UR DF took $DIFF s"
+ENGINEID_UR_DF=`grep engineInstanceId train.log | cut -d '=' -f 2`
+echo "Instance-ID: $ENGINEID_UR_DF"
+cd ..
+
+# Test ES Index of 25 products
+echo ""
+echo ""
+echo "Comparing ES values of several products"
+python compare_es_indices.py $INPUT_DATA_PURC 25
+
+########################
+### Deployment Phase ###
+########################
+
+# Deploy both engines
+echo ""
+echo ""
+echo "Deploying UR on 8000..."
+cd universal-recommender 
+pio deploy --port 8000 --engine-instance-id $ENGINEID_UR > ur_deploy.log &
+sleep 30
+cd ..
+
+cd universal-recommender-df
+echo ""
+echo ""
+echo "Deploying UR DF on 8001..."
+pio deploy --port 8001 --engine-instance-id $ENGINEID_UR_DF > ur_df_deploy.log &
+sleep 30
+cd ..
+
+echo ""
+echo "Recoms UR"
+curl -H "Content-Type: application/json" -d '{"item": "1", "dateRange": {"name": "popRank","before": "9999","after": "0"}}' http://localhost:8000/queries.json
+echo ""
+echo "Recoms UR DF"
+curl -H "Content-Type: application/json" -d '{"item": "1", "dateRange": {"name": "popRank","before": "9999","after": "0"}}' http://localhost:8001/queries.json

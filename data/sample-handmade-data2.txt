@@ -1,0 +1,15 @@
+U 1,purchase,Iphone 6
+U 2,purchase,Iphone 6
+U 1,purchase,Iphone 5
+U 2,purchase,Iphone 5
+U 3,purchase,Iphone 5
+U 4,purchase,Iphone 5
+U 1,purchase,Iphone 4
+U 1,purchase,Ipad-retina
+U 1,purchase,Nexus
+U 2,purchase,Nexus
+U 3,purchase,Nexus
+U 4,purchase,Nexus
+U 5,purchase,Nexus
+U 6,purchase,Nexus
+U 7,purchase,Nexus

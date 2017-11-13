@@ -1,0 +1,38 @@
+{
+  "comment":" This config file uses default settings for all but the required values see README.md for docs",
+  "id": "default",
+  "description": "Default settings",
+  "engineFactory": "com.actionml.RecommendationEngine",
+  "datasource": {
+    "params" : {
+      "appName": "default-rank",
+      "eventNames": ["show", "like"]
+    }
+  },
+  "sparkConf": {
+    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+    "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
+    "spark.kryo.referenceTracking": "false",
+    "spark.kryoserializer.buffer": "300m",
+    "spark.executor.memory": "4g",
+    "es.index.auto.create": "true"
+  },
+  "algorithms": [
+    {
+      "name": "ur",
+      "params": {
+        "appName": "default-rank",
+        "indexName": "urindex",
+        "typeName": "items",
+        "recsModel": "backfill",
+        "eventNames": ["show", "like"],
+        "rankings":[
+          {
+            "name": "defaultRank",
+            "type": "userDefined"
+          }
+        ]
+      }
+    }
+  ]
+}

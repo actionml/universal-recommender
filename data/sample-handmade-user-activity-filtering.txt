@@ -1,0 +1,52 @@
+u1,purchase,Iphone 6
+u1,purchase,Iphone 5
+u1,purchase,Iphone 4
+u1,purchase,Ipad-retina
+U 2,purchase,Nexus
+U 2,purchase,Galaxy
+u-3,purchase,Surface
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 4
+u-4,purchase,Galaxy
+u-5,purchase,Iphone 5
+u-5,purchase,Iphone 5
+u-5,purchase,Iphone 5
+u-5,purchase,Iphone 5
+u-5,purchase,Iphone 5
+u-6,purchase,Iphone 7
+u1,view,Iphone 6
+u1,view,Iphone 5
+u1,view,Iphone 4
+u1,view,Ipad-retina
+U 2,view,Nexus
+U 2,view,Galaxy
+u-3,view,Surface
+u-4,view,Iphone 5
+u-4,view,Iphone 5
+u-4,view,Iphone 5
+u-4,view,Iphone 5
+u-4,view,Iphone 4
+u-4,view,Galaxy
+u-5,view,Iphone 5
+u-5,view,Iphone 5
+u-5,view,Iphone 5
+u-5,view,Iphone 5
+u-5,view,Iphone 5
+u-6,view,Iphone 7
+u1,category-pref,phones
+U 2,category-pref,phones
+u-3,category-pref,soap
+u-4,category-pref,electronics
+u-5,category-pref,electronics
+u-6,category-pref,phones
+u-7,category-pref,soap
+u-8,category-pref,phones
+u-9,category-pref,phones
+u-10,category-pref,soap
+u-11,category-pref,electronics
+u-12,category-pref,electronics
+u-13,category-pref,phones
+u-14,category-pref,soap

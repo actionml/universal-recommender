@@ -1,0 +1,39 @@
+{
+  "comment":" This config file uses default settings for all but the required values see README.md for docs",
+  "id": "default",
+  "description": "Default settings",
+  "engineFactory": "com.actionml.RecommendationEngine",
+  "datasource": {
+    "params" : {
+      "name": "sample-handmade-item-sets-data.txt",
+      "appName": "handmade-item-sets",
+      "eventNames": ["purchase"]
+    }
+  },
+  "sparkConf": {
+    "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+    "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
+    "spark.kryo.referenceTracking": "false",
+    "spark.kryoserializer.buffer": "300m",
+    "es.index.auto.create": "true"
+  },
+  "algorithms": [
+    {
+      "comment": "simplest setup where all values are default, popularity based backfill, must add eventsNames",
+      "name": "ur",
+      "params": {
+        "appName": "handmade-item-sets",
+        "indexName": "ur-item-sets-index",
+        "typeName": "items",
+        "comment": "must have data for the first event or the model will not build, other events are optional",
+        "indicators": [
+          {
+            "name": "purchase"
+          }
+        ],
+        "recsModel": "collabFiltering",
+        "num": 4
+      }
+    }
+  ]
+}

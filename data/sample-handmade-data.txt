@@ -1,0 +1,112 @@
+u1,purchase,Iphone 6
+u1,purchase,Iphone 5
+u1,purchase,Iphone 4
+u1,purchase,Ipad-retina
+U 2,purchase,Nexus
+U 2,purchase,Galaxy
+u-3,purchase,Surface
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 4
+u-4,purchase,Galaxy
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Phones
+u1,view,Mobile-acc
+U 2,view,Phones
+U 2,view,Tablets
+U 2,view,Mobile-acc
+u-3,view,Mobile-acc
+u-4,view,Phones
+u-4,view,Tablets
+u-4,view,Soap
+u5,view,Soap
+u1,category-pref,phones
+u1,category-pref,phones
+u1,category-pref,phones
+u1,category-pref,tablets
+U 2,category-pref,tablets
+U 2,category-pref,phones
+u-3,category-pref,tablets
+u-4,category-pref,phones
+u-4,category-pref,phones
+u5,category-pref,toiletries
+Iphone 6,$set,categories:Phones:Electronics:Apple
+Iphone 5,$set,categories:Phones:Electronics:Apple
+Iphone 4,$set,categories:Phones:Electronics:Apple
+Ipad-retina,$set,categories:Tablets:Electronics:Apple
+Nexus,$set,categories:Tablets:Electronics:Google
+Galaxy,$set,categories:Phones:Electronics:Samsung
+Surface,$set,categories:Tablets:Electronics:Microsoft
+Iphone 4,$set,countries:United States:Canada:Estados Unidos Mexicanos
+Ipad-retina,$set,countries:United States:Estados Unidos Mexicanos
+Nexus,$set,countries:United States:Canada
+Galaxy,$set,countries:United States
+Surface,$set,countries:United States:Canada
+Iphone 6,$set,categories:Cameras
+Iphone 5,$set,categories:Cameras
+Iphone 4,$set,categories:Cameras
+Ipad-retina,$set,categories:Computers
+Nexus,$set,categories:Computers
+Galaxy,$set,categories:Cameras
+Surface,$set,categories:Computers
+Iphone 4,$set,countries:Cuba
+Ipad-retina,$set,countries:Cuba
+Nexus,$set,countries:Cuba
+Galaxy,$set,countries:Cuba
+Surface,$set,countries:Cuba
+u1,purchase,Iphone 6
+u1,purchase,Iphone 5
+u1,purchase,Iphone 4
+u1,purchase,Ipad-retina
+U 2,purchase,Nexus
+U 2,purchase,Galaxy
+u-3,purchase,Surface
+u-4,purchase,Iphone 5
+u-4,purchase,Iphone 4
+u-4,purchase,Galaxy
+u1,view,Phones
+u1,view,Mobile-acc
+U 2,view,Phones
+U 2,view,Tablets
+U 2,view,Mobile-acc
+u-3,view,Mobile-acc
+u-4,view,Phones
+u-4,view,Tablets
+u-4,view,Soap
+u5,view,Soap
+u1,purchase,Galaxy
+u1,purchase,Galaxy
+u1,purchase,Galaxy
+u1,purchase,Galaxy
+U 2,purchase,Iphone 5
+U 2,purchase,Iphone 5
+u1,view,Soap
+u1,view,Soap
+u-3,view,Mobile-acc
+u-4,view,Mobile-acc
+u-4,view,Mobile-acc
+Iphone 6,$set,categories:Phones:Electronics:Apple
+Iphone 5,$set,categories:Phones:Electronics:Apple
+Iphone 4,$set,categories:Phones:Electronics:Apple
+Ipad-retina,$set,categories:Tablets:Electronics:Apple
+Nexus,$set,categories:Tablets:Electronics:Google
+Galaxy,$set,categories:Phones:Electronics:Samsung
+Surface,$set,categories:Tablets:Electronics:Microsoft
+Iphone 4,$set,countries:United States:Canada:Estados Unidos Mexicanos
+Ipad-retina,$set,countries:United States:Estados Unidos Mexicanos
+Nexus,$set,countries:United States:Canada
+Galaxy,$set,countries:United States
+Surface,$set,countries:United States:Canada
+Iphone 6,$set,defaultRank:7
+Iphone 5,$set,defaultRank:6
+Iphone 4,$set,defaultRank:5
+Nexus,$set,defaultRank:4
+Ipad-retina,$set,defaultRank:3
+Galaxy,$set,defaultRank:2
+Surface,$set,defaultRank:1
