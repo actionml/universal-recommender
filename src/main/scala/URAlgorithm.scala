@@ -128,47 +128,47 @@ case class RankingParams(
 }
 
 case class DefaultIndicatorParams(
-  maxItemsPerUser: Int = DefaultURAlgoParams.MaxQueryEvents, // defaults to maxEventsPerEventType
-  maxCorrelatorsPerItem: Int = DefaultURAlgoParams.MaxCorrelatorsPerEventType,
-  // defaults to maxCorrelatorsPerEventType
-  minLLR: Option[Double] = None) // defaults to none, takes precendence over maxCorrelatorsPerItem
+    maxItemsPerUser: Int = DefaultURAlgoParams.MaxQueryEvents, // defaults to maxEventsPerEventType
+    maxCorrelatorsPerItem: Int = DefaultURAlgoParams.MaxCorrelatorsPerEventType,
+    // defaults to maxCorrelatorsPerEventType
+    minLLR: Option[Double] = None) // defaults to none, takes precendence over maxCorrelatorsPerItem
 
 case class IndicatorParams(
-  name: String, // must match one in eventNames
-  maxItemsPerUser: Option[Int], // defaults to maxEventsPerEventType
-  maxCorrelatorsPerItem: Option[Int], // defaults to maxCorrelatorsPerEventType
-  minLLR: Option[Double]) // defaults to none, takes precendence over maxCorrelatorsPerItem
+    name: String, // must match one in eventNames
+    maxItemsPerUser: Option[Int], // defaults to maxEventsPerEventType
+    maxCorrelatorsPerItem: Option[Int], // defaults to maxCorrelatorsPerEventType
+    minLLR: Option[Double]) // defaults to none, takes precendence over maxCorrelatorsPerItem
 
 case class URAlgorithmParams(
-  appName: String, // filled in from engine.json
-  indexName: String, // can optionally be used to specify the elasticsearch index name
-  typeName: String, // can optionally be used to specify the elasticsearch type name
-  recsModel: Option[String] = None, // "all", "collabFiltering", "backfill"
-  eventNames: Option[Seq[String]], // names used to ID all user actions
-  blacklistEvents: Option[Seq[String]] = None, // None means use the primary event, empty array means no filter
-  // number of events in user-based recs query
-  maxQueryEvents: Option[Int] = None,
-  maxEventsPerEventType: Option[Int] = None,
-  maxCorrelatorsPerEventType: Option[Int] = None,
-  num: Option[Int] = None, // default max # of recs requested
-  userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
-  itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
-  returnSelf: Option[Boolean] = None, // query building logic defaults this to false
-  fields: Option[Seq[Field]] = None, //defaults to no fields
-  // leave out for default or popular
-  rankings: Option[Seq[RankingParams]] = None,
-  // name of date property field for when the item is available
-  availableDateName: Option[String] = None,
-  // name of date property field for when an item is no longer available
-  expireDateName: Option[String] = None,
-  // used as the subject of a dateRange in queries, specifies the name of the item property
-  dateName: Option[String] = None,
-  indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
-  seed: Option[Long] = None, // seed is not used presently
-  numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
+    appName: String, // filled in from engine.json
+    indexName: String, // can optionally be used to specify the elasticsearch index name
+    typeName: String, // can optionally be used to specify the elasticsearch type name
+    recsModel: Option[String] = None, // "all", "collabFiltering", "backfill"
+    eventNames: Option[Seq[String]], // names used to ID all user actions
+    blacklistEvents: Option[Seq[String]] = None, // None means use the primary event, empty array means no filter
+    // number of events in user-based recs query
+    maxQueryEvents: Option[Int] = None,
+    maxEventsPerEventType: Option[Int] = None,
+    maxCorrelatorsPerEventType: Option[Int] = None,
+    num: Option[Int] = None, // default max # of recs requested
+    userBias: Option[Float] = None, // will cause the default search engine boost of 1.0
+    itemBias: Option[Float] = None, // will cause the default search engine boost of 1.0
+    returnSelf: Option[Boolean] = None, // query building logic defaults this to false
+    fields: Option[Seq[Field]] = None, //defaults to no fields
+    // leave out for default or popular
+    rankings: Option[Seq[RankingParams]] = None,
+    // name of date property field for when the item is available
+    availableDateName: Option[String] = None,
+    // name of date property field for when an item is no longer available
+    expireDateName: Option[String] = None,
+    // used as the subject of a dateRange in queries, specifies the name of the item property
+    dateName: Option[String] = None,
+    indicators: Option[List[IndicatorParams]] = None, // control params per matrix pair
+    seed: Option[Long] = None, // seed is not used presently
+    numESWriteConnections: Option[Int] = None) // hint about how to coalesce partitions so we don't overload ES when
     // writing the model. The rule of thumb is (numberOfNodesHostingPrimaries * bulkRequestQueueLength) * 0.75
     // for ES 1.7 bulk queue is defaulted to 50
-    extends Params //fixed default make it reproducible unless supplied
+  extends Params //fixed default make it reproducible unless supplied
 
 /** Creates cooccurrence, cross-cooccurrence and eventually content correlators with
  *  [[org.apache.mahout.math.cf.SimilarityAnalysis]] The analysis part of the recommender is

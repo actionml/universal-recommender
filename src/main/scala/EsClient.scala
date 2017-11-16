@@ -169,15 +169,17 @@ object EsClient {
     fieldNames: List[String],
     typeMappings: Map[String, (String, Boolean)] = Map.empty,
     refresh: Boolean = false): Boolean = {
+    val s =
     client.performRequest(
       "HEAD",
       s"/$indexName",
       Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
         case 404 => { // should always be a unique index name so fail unless we get a 404
-          var mappings = s"""
-            |{ "mappings": {
-            |    "$indexType": {
-            |      "properties": {
+          var mappings =
+            s"""
+              |{ "mappings": {
+              |    "$indexType": {
+              |      "properties": {
             """.stripMargin.replace("\n", "")
 
           def mappingsField(`type`: String) = {
@@ -190,9 +192,9 @@ object EsClient {
 
           val mappingsTail = // unused mapping forces the last element to have no comma, fuck JSON
             s"""
-            |    "last": {
-            |      "type": "keyword"
-            |    }
+              |    "last": {
+              |      "type": "keyword"
+              |    }
             |}}}}
             """.stripMargin.replace("\n", "")
 
@@ -328,13 +330,15 @@ object EsClient {
         case _ => (Set(), "")
       }
 
-    val aliasQuery = s"""
-      |{
-      |    "actions" : [
-      |        { "add":  { "index": "${newIndex}", "alias": "${alias}" } }
-      |        ${deleteOldIndexQuery}
-      |    ]
-      |}""".stripMargin.replace("\n", "")
+    val aliasQuery =
+      s"""
+        |{
+        |    "actions" : [
+        |        { "add":  { "index": "${newIndex}", "alias": "${alias}" } }
+        |        ${deleteOldIndexQuery}
+        |    ]
+        |}
+      """.stripMargin.replace("\n", "")
 
     val entity = new NStringEntity(aliasQuery, ContentType.APPLICATION_JSON)
     client.performRequest(
@@ -410,10 +414,8 @@ object EsClient {
         rjv = None
       }
       case _ =>
-        logger.info("got no data for the item")
+        logger.info("got unknown exception and so no data for the item")
         rjv = None
-    } finally {
-      logger.info("aahhh, finally")
     }
 
     if (rjv.nonEmpty) {
