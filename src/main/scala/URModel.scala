@@ -27,10 +27,11 @@ import org.joda.time.DateTime
 import org.json4s.JsonAST.JArray
 import org.json4s._
 import com.actionml.helpers.{ IndexedDatasetConversions, ItemID, ItemProps }
+import org.apache.spark.sql.DataFrame
 
 /** Universal Recommender models to save in ES */
 class URModel(
-    coocurrenceMatrices: Seq[(ItemID, IndexedDataset)] = Seq.empty,
+    coocurrenceDfs: Seq[(ItemID, DataFrame)] = Seq.empty,
     propertiesRDDs: Seq[RDD[(ItemID, ItemProps)]] = Seq.empty,
     typeMappings: Map[String, (String, Boolean)] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
     nullModel: Boolean = false)(implicit sc: SparkContext) {
@@ -54,14 +55,17 @@ class URModel(
     // convert cooccurrence matrices into correlators as RDD[(itemID, (actionName, Seq[itemID])]
     // do they need to be in Elasticsearch format
     logger.info("Converting cooccurrence matrices into correlators")
-    val correlatorRDDs: Seq[RDD[(ItemID, ItemProps)]] = coocurrenceMatrices.map {
-      case (actionName, dataset) =>
-        dataset.asInstanceOf[IndexedDatasetSpark].toStringMapRDD(actionName)
+    val correlatorDFRDDs: Seq[RDD[(ItemID, ItemProps)]] = coocurrenceDfs.map { //Seq(("purchase",df),("atb",df))
+      case (actionName, df) =>
+        val itemProps = df.map[(ItemID, ItemProps)](row => {
+          var itemId = row.get(0).toString //
+          var correlators = row.getSeq[String](1).toList //corrs [22805,22806]
+          (itemId, Map(actionName -> JArray(correlators map { t => JsonAST.JString(t) })))
+        })
+        itemProps
     }
 
-    logger.info("Group all properties RDD")
-    val groupedRDD: RDD[(ItemID, ItemProps)] = groupAll(correlatorRDDs ++ propertiesRDDs)
-    //    logger.debug(s"Grouped RDD\n${groupedRDD.take(25).mkString("\n")}")
+    val groupedRDD: RDD[(ItemID, ItemProps)] = groupAll(correlatorDFRDDs ++ propertiesRDDs)
 
     val esRDD: RDD[Map[String, Any]] = groupedRDD.mapPartitions { iter =>
       iter map {

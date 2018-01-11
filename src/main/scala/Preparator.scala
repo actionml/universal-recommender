@@ -21,13 +21,15 @@ import grizzled.slf4j.Logger
 import org.apache.mahout.drivers.ItemSimilarityDriver._
 import org.apache.mahout.math.RandomAccessSparseVector
 import org.apache.mahout.math.drm.DistributedEngine
-import org.apache.mahout.sparkbindings.{ SparkDistributedContext, DrmRdd, drmWrap }
+import org.apache.mahout.sparkbindings.{ DrmRdd, SparkDistributedContext, drmWrap }
 import org.apache.predictionio.controller.PPreparator
-import org.apache.mahout.math.indexeddataset.{ DefaultIndexedDatasetWriteSchema, Schema, BiDictionary, IndexedDataset }
+import org.apache.mahout.math.indexeddataset.{ BiDictionary, DefaultIndexedDatasetWriteSchema, IndexedDataset, Schema }
 import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import com.actionml.helpers._
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 
 class Preparator
     extends PPreparator[TrainingData, PreparedData] {
@@ -41,9 +43,44 @@ class Preparator
    *  @param trainingData list of (actionName, actionRDD)
    *  @return list of (correlatorName, correlatorIndexedDataset)
    */
+
+  def filter_str(on: String, min: Int, max: Int): String = {
+    s"$on >= $min" + (if (max == 0) "" else s" and $on <= $max")
+  }
+
   def prepare(sc: SparkContext, trainingData: TrainingData): PreparedData = {
     // now that we have all actions in separate RDDs we must merge any user dictionaries and
     // make sure the same user ids map to the correct events
+
+    // Extract primary event DataFrame to filter users
+    val primaryEventName = trainingData.actions.head._1
+    val primaryEventDf = trainingData.actions.head._2
+
+    // Get users with minimum events
+    val usersDF = primaryEventDf.groupBy(UID)
+      .count()
+      .filter(s"count >= ${trainingData.minEventsPerUser.get}")
+
+    // Remove users that do not meet requirements from all event DataFrames by joining with
+    // user DataFrame
+    val filteredEventData: Seq[(ActionID, DataFrame)] = trainingData.actions.map({
+      case (eventName, rawEventDf) =>
+
+        // Select only users with primary events by joining with DataFrame
+        // of distinct users of primary event DataFrame
+        val filteredEventDf = rawEventDf.join(usersDF, Seq(UID)).select(UID, PID).distinct()
+
+        // TODO: Downsample user events here
+
+        (eventName, filteredEventDf)
+    })
+
+    val fieldsRDD: RDD[(ItemID, ItemProps)] = trainingData.fieldsRDD.map {
+      case (itemId, propMap) => itemId -> propMap.fields
+    }
+
+    return PreparedData(filteredEventData, fieldsRDD)
+    /*
     var userDictionary: Option[BiDictionary] = None
 
     val indexedDatasets = trainingData.actions.map {
@@ -84,12 +121,13 @@ class Preparator
       case (itemId, propMap) => itemId -> propMap.fields
     }
     PreparedData(indexedDatasets, fieldsRDD)
+    */
   }
 
 }
 
 case class PreparedData(
-  actions: Seq[(ActionID, IndexedDataset)],
+  actions: Seq[(ActionID, DataFrame)],
   fieldsRDD: RDD[(ItemID, ItemProps)]) extends Serializable
 
 /** This is a companion object used to build an [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]]

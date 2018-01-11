@@ -23,8 +23,6 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.controller.{ P2LAlgorithm, Params }
 import org.apache.predictionio.data.storage.{ DataMap, Event, NullModel, PropertyMap }
 import org.apache.predictionio.data.store.LEventStore
-import org.apache.mahout.math.cf.{ DownsamplableCrossOccurrenceDataset, SimilarityAnalysis }
-import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
@@ -33,6 +31,9 @@ import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
 import com.actionml.helpers._
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.Duration
@@ -307,34 +308,37 @@ class URAlgorithm(val ap: URAlgorithmParams)
     */
 
     logger.info("Actions read now creating correlators")
-    val cooccurrenceIDSs = if (ap.indicators.isEmpty) { // using one global set of algo params
-      SimilarityAnalysis.cooccurrencesIDSs(
-        data.actions.map(_._2).toArray,
-        randomSeed = ap.seed.getOrElse(System.currentTimeMillis()).toInt,
-        maxInterestingItemsPerThing = ap.maxCorrelatorsPerEventType
-          .getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType),
-        maxNumInteractions = ap.maxEventsPerEventType.getOrElse(DefaultURAlgoParams.MaxEventsPerEventType))
-        .map(_.asInstanceOf[IndexedDatasetSpark])
-    } else { // using params per matrix pair, these take the place of eventNames, maxCorrelatorsPerEventType,
-      // and maxEventsPerEventType!
-      val indicators = ap.indicators.get
-      val iDs = data.actions.map(_._2).toSeq
-      val datasets = iDs.zipWithIndex.map {
-        case (iD, i) =>
-          new DownsamplableCrossOccurrenceDataset(
-            iD,
-            indicators(i).maxItemsPerUser.getOrElse(DefaultURAlgoParams.MaxEventsPerEventType),
-            indicators(i).maxCorrelatorsPerItem.getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType),
-            indicators(i).minLLR)
-      }.toList
 
-      SimilarityAnalysis.crossOccurrenceDownsampled(
-        datasets,
-        ap.seed.getOrElse(System.currentTimeMillis()).toInt)
-        .map(_.asInstanceOf[IndexedDatasetSpark])
-    }
+    // Get primary events
+    val primaryEventDf = data.actions.head._2
+    val primaryEventName = data.actions.head._1
 
-    val cooccurrenceCorrelators = cooccurrenceIDSs.zip(data.actions.map(_._1)).map(_.swap) //add back the actionNames
+    // Get total user for LLR calculations
+    val totalUsers = primaryEventDf.select(UID).distinct().count()
+
+    logger.info(s"Total users: ${totalUsers}")
+    logger.info(s"Total items (primary event): ${primaryEventDf.select(PID).distinct().count()}")
+
+    // Calculate correlations for each event and select only those correlations
+    // that meet filter requirements.
+    val dfCorrelators: Seq[(ActionID, DataFrame)] = data.actions.zipWithIndex.map({
+      case ((eventName, eventDf), i) =>
+        {
+          val doCrossOccurrence = eventName != primaryEventName
+
+          val dfCorr = correlators(primaryEventDf, eventDf)
+
+          val dfLLRCorr: DataFrame = topCorrelators(
+            df = dfCorr,
+            totalUsers = totalUsers,
+            maxCorrelatorsPerItem = ap.indicators.get(i).maxCorrelatorsPerItem
+              .getOrElse(DefaultURAlgoParams.MaxCorrelatorsPerEventType),
+            minLLR = ap.indicators.get(i).minLLR.getOrElse(0.0),
+            crossOccur = doCrossOccurrence)
+
+          (eventName, dfLLRCorr)
+        }
+    })
 
     val propertiesRDD: RDD[(ItemID, ItemProps)] = if (calcPopular) {
       val ranksRdd = getRanksRDD(data.fieldsRDD)
@@ -350,10 +354,83 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     logger.info("Correlators created now putting into URModel")
     new URModel(
-      coocurrenceMatrices = cooccurrenceCorrelators,
+      coocurrenceDfs = dfCorrelators,
       propertiesRDDs = Seq(propertiesRDD),
       typeMappings = getMappings).save(dateNames, esIndex, esType)
     new NullModel
+  }
+
+  def topCorrelators(
+    df: DataFrame,
+    totalUsers: Long,
+    maxCorrelatorsPerItem: Int = 50,
+    minLLR: Double = 0.0f,
+    crossOccur: Boolean = false): DataFrame = {
+    /*
+    Filters DataFrame with all correlators by removing correlators that do not
+    meet the minimum LLR or rank
+     */
+
+    // Filter DataFrame by minLLR
+    val filter = if (crossOccur) col(LLR) >= minLLR else (col(LLR) >= minLLR) && (col(PID) !== col(RPID))
+
+    val dfLLR = df.withColumn(LLR, udfLLR(totalUsers)(col(CNT_BOTH), col(CNT_PID1), col(CNT_PID2)))
+      .filter(filter)
+
+    // Select top x correlators
+    val window = Window.partitionBy(col(PID)).orderBy(col(LLR).desc)
+    val dfLLRRank = dfLLR.select(col("*"), rank().over(window).as(RANK)).filter(col(RANK) <= maxCorrelatorsPerItem)
+
+    // Return list of correlators per PID
+    dfLLRRank.groupBy(PID).agg(collect_list(RPID).as(CORR))
+  }
+
+  def correlators(df1: DataFrame, df2: DataFrame, minCount: Int = 1) = {
+    /*
+    Calculates correlators between two event DataFrames df1 and df2
+
+    df1 and df2 schema: | UserId (String) | ProductID (String |
+
+    returns DataFrame with schema: | ProductID1 (String) | ProductID2 (String) | ...
+                                     CNT_BOTH (int) | CNT_PID1 (int) | CNT_PID2 (int) |
+
+    Optionally removes cooccurences that do not meet minimum count threshold
+
+    */
+
+    // Join both DataFrames on UserId column
+    val df2ColRenamed = df2.withColumnRenamed(PID, RPID)
+    val dfJoined = df1.join(df2ColRenamed, Seq(UID))
+
+    // Count distinct users co-occurence
+    val dfBoth = dfJoined.groupBy(PID, RPID)
+      .agg(countDistinct(UID).as(CNT_BOTH))
+      .filter(col(CNT_BOTH) >= minCount)
+
+    // Count users per PID for first event DataFrame
+    val df1ProdId = df1.groupBy(PID).agg(countDistinct(UID).as(CNT_PID1))
+
+    // Count uers per PID for second event DataFrame
+    val df2ProdId = df2ColRenamed.groupBy(RPID).agg(countDistinct(UID).as(CNT_PID2))
+
+    // Join all counts into single DataFrame
+    val dfAll = dfBoth.join(df1ProdId, Seq(PID))
+      .join(df2ProdId, Seq(RPID))
+
+    dfAll
+  }
+
+  def urLLR(nBoth: Long, nPid1: Long, nPid2: Long, nTotal: Long) = {
+    val k11 = nBoth
+    val k12 = nPid1 - k11
+    val k21 = nPid2 - k11
+    val k22 = nTotal - nPid1 - nPid2 + nBoth
+
+    LogLikelihood.logLikelihoodRatio(k11, k21, k12, k22)
+  }
+
+  def udfLLR(nTotal: Long) = {
+    udf((nBoth: Long, nPid1: Long, nPid2: Long) => urLLR(nBoth, nPid1, nPid2, nTotal))
   }
 
   /** This function creates a URModel from an existing index in Elasticsearch + new popularity ranking

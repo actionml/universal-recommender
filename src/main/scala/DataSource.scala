@@ -26,6 +26,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import com.actionml.helpers.{ ActionID, ItemID }
 import com.actionml.helpers._
+import org.apache.spark.sql.DataFrame
 
 /** Taken from engine.json these are passed in to the DataSource constructor
  *
@@ -75,8 +76,11 @@ class DataSource(val dsp: DataSourceParams)
       eventNames = Some(eventNames),
       targetEntityType = Some(Some("item")))(sc).repartition(sc.defaultParallelism)
 
+    val sqlContext = new org.apache.spark.sql.hive.HiveContext(sc)
+    import sqlContext.implicits._
+
     // now separate the events by event name
-    val eventRDDs: List[(ActionID, RDD[(UserID, ItemID)])] = eventNames.map { eventName =>
+    val eventRDDs: List[(ActionID, DataFrame)] = eventNames.map { eventName =>
       val singleEventRDD = eventsRDD.filter { event =>
         require(eventNames.contains(event.event), s"Unexpected event $event is read.") // is this really needed?
         require(event.entityId.nonEmpty && event.targetEntityId.get.nonEmpty, "Empty user or item ID")
@@ -85,9 +89,9 @@ class DataSource(val dsp: DataSourceParams)
         (event.entityId, event.targetEntityId.get)
       }
 
-      (eventName, singleEventRDD)
-    } filterNot { case (_, singleEventRDD) => singleEventRDD.isEmpty() }
-
+      // Convert to DataFrame with two columns: UserId / ProductId
+      (eventName, singleEventRDD.toDF(UID, PID))
+    } filterNot { case (_, singleEventDf) => singleEventDf.take(1).isEmpty }
     logger.info(s"Received events ${eventRDDs.map(_._1)}")
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
@@ -109,7 +113,8 @@ class DataSource(val dsp: DataSourceParams)
  *  @param minEventsPerUser users with less than this many events will not removed from training data
  */
 case class TrainingData(
-    actions: Seq[(ActionID, RDD[(UserID, ItemID)])],
+    //actions: Seq[(ActionID, RDD[(UserID, ItemID)])],
+    actions: Seq[(ActionID, DataFrame)],
     fieldsRDD: RDD[(ItemID, PropertyMap)],
     minEventsPerUser: Option[Int] = Some(1)) extends Serializable {
 

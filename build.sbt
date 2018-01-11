@@ -4,7 +4,7 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "universal-recommender"
 
-version := "0.6.0"
+version := "0.8.0-SNAPSHOT"
 
 organization := "com.actionml"
 
@@ -21,6 +21,7 @@ libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-data-elasticsearch1" % pioVersion % "provided",
   "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
   "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
+  "org.apache.spark" %% "spark-hive" % "1.6.0" % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
   // Mahout's Spark libs
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion,

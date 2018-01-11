@@ -8,7 +8,7 @@
       "name": "sample-handmade-data.txt",
       "appName": "handmade",
       "eventNames": ["purchase", "view", "category-pref"],
-      "minEventsPerUser": 3
+      "minEventsPerUser": 1
     }
   },
   "sparkConf": {
@@ -16,7 +16,6 @@
     "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
     "spark.kryo.referenceTracking": "false",
     "spark.kryoserializer.buffer": "300m",
-    "spark.sql.shuffle.partitions": 8,
     "es.index.auto.create": "true"
   },
   "algorithms": [
@@ -30,13 +29,17 @@
         "comment": "must have data for the first event or the model will not build, other events are optional",
         "indicators": [
           {
-            "name": "purchase"
+            "name": "purchase",
+            "maxCorrelatorsPerItem": 50,
+            "maxItemsPerUser": 999999
           },{
             "name": "view",
-            "maxCorrelatorsPerItem": 50
+            "maxCorrelatorsPerItem": 50,
+            "maxItemsPerUser": 999999
           },{
             "name": "category-pref",
-            "maxCorrelatorsPerItem": 50
+            "maxCorrelatorsPerItem": 50,
+            "maxItemsPerUser": 999999
           }
         ],
         "availableDateName": "available",

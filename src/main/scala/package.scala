@@ -35,6 +35,27 @@ package object helpers {
   // Item properties (fieldName, fieldValue)
   type ItemProps = Map[String, JValue]
 
+  val INDIV_ID = "INDIV_ID"
+  val UID = "UID"
+  val PID = "PID"
+  val TIME = "TIME"
+  val SESSION_ID = "SESSION_ID"
+  val COOKIE_ID = "COOKIE_ID"
+  val USER_ITEMS = "USER_ITEMS"
+  val ITEM_USERS = "ITEM_USERS"
+
+  val RPID = "RPID"
+  val CNT_BOTH = "CNT_BOTH"
+  val CNT_PID1 = "CNT_PID1"
+  val CNT_PID2 = "CNT_PID2"
+
+  val CORR = "Correlators"
+  val LLR = "LLR"
+  val RANK = "RANK"
+
+  //dataframes
+  val PURCHASE = "purchase"
+
   def drawActionML(implicit logger: Logger): Unit = {
     val actionML =
       """
