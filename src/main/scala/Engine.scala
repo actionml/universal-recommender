@@ -45,7 +45,7 @@ case class Query(
   // to what is in the algorithm params or false
   num: Option[Int] = None, // default: whatever is in algorithm params, which itself has a default--probably 20
   eventNames: Option[List[String]], // names used to ID all user actions
-  withRanks: Option[Boolean] = None) // Add to ItemScore rank fields values, default fasle
+  withRanks: Option[Boolean] = None) // Add to ItemScore rank fields values, default false
     extends Serializable
 
 /** Used to specify how Fields are represented in engine.json */
@@ -53,7 +53,7 @@ case class Field( // no optional values for fields, whne specified
   name: String, // name of metadata field
   values: Seq[String], // fields can have multiple values like tags of a single value as when using hierarchical
   // taxonomies
-  bias: Float) // any positive value is a boost, negative is a filter
+  bias: Float) // any positive value is a boost, negative is an inclusion filter, 0 is an exclusion filter
     extends Serializable
 
 /** Used to specify the date range for a query */
@@ -71,7 +71,8 @@ case class PredictedResult(
 case class ItemScore(
   item: ItemID, // item id
   score: Double, // used to rank, original score returned from teh search engine
-  ranks: Option[Map[String, Double]] = None) extends Serializable
+  ranks: Option[Map[String, Double]] = None)
+    extends Serializable
 
 object RecommendationEngine extends EngineFactory {
 

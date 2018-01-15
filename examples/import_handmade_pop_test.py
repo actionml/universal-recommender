@@ -19,7 +19,7 @@ def import_events(client, file, days_offset):
   random.seed(SEED)
   count = 0
   event_date = datetime.datetime.now(tz=local_tz) + datetime.timedelta(days=days_offset)
-  print "Importing data..."
+  print("Importing data...")
 
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
@@ -35,7 +35,7 @@ def import_events(client, file, days_offset):
         target_entity_id=data[2],
         event_time=event_date
       )
-      print "Event: " + data[1] + " user: " + data[0] + " item: " + data[2] + " date: " + str(event_date)
+      print("Event: " + data[1] + " user: " + data[0] + " item: " + data[2] + " date: " + str(event_date))
     elif (data[1] == "view"):  # assumes other event type is 'view'
       client.create_event(
         event=data[1],
@@ -45,10 +45,10 @@ def import_events(client, file, days_offset):
         target_entity_id=data[2],
         event_time=event_date
       )
-      print "Event: " + data[1] + " user: " + data[0] + " item: " + data[2] + " date: " + str(event_date)
+      print("Event: " + data[1] + " user: " + data[0] + " item: " + data[2] + " date: " + str(event_date))
     count += 1
   f.close()
-  print "%s events are imported." % count
+  print("%s events are imported." % count)
 
 
 if __name__ == '__main__':
@@ -61,7 +61,7 @@ if __name__ == '__main__':
   parser.add_argument('--file3', default="./data/sample-handmade-data3.txt")
 
   args = parser.parse_args()
-  print args
+  print(args)
 
   client = predictionio.EventClient(
     access_key=args.access_key,
