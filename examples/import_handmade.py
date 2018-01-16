@@ -26,7 +26,7 @@ def import_events(client, file):
   event_date = now_date - datetime.timedelta(days= 2.4)
   available_date = event_date + datetime.timedelta(days=-2)
   expire_date = event_date + datetime.timedelta(days=2)
-  print "Importing data..."
+  print("Importing data...")
 
   for line in f:
     data = line.rstrip('\r\n').split(RATE_ACTIONS_DELIMITER)
@@ -42,8 +42,8 @@ def import_events(client, file):
         target_entity_id=data[2],
         event_time = current_date
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
-            " current_date: " + current_date.isoformat()
+      print("Event: " + data[1] + " entity_id: " + data[0] + " target_entity_id: " + data[2] + \
+            " current_date: " + current_date.isoformat())
     elif (data[1] == "$set"):  # must be a set event
       properties = data[2].split(PROPERTIES_DELIMITER)
       prop_name = properties.pop(0)
@@ -55,13 +55,13 @@ def import_events(client, file):
         event_time=current_date,
         properties={prop_name: prop_value}
       )
-      print "Event: " + data[1] + " entity_id: " + data[0] + " properties/"+prop_name+": " + str(properties) + \
-          " current_date: " + current_date.isoformat()
+      print("Event: " + data[1] + " entity_id: " + data[0] + " properties/"+prop_name+": " + str(properties) + \
+          " current_date: " + current_date.isoformat())
     count += 1
     current_date += event_time_increment
 
   items = ['Iphone 6', 'Ipad-retina', 'Nexus', 'Surface', 'Iphone 4', 'Galaxy', 'Iphone 5']
-  print "All items: " + str(items)
+  print("All items: " + str(items))
   for item in items:
 
     client.create_event(
@@ -72,17 +72,17 @@ def import_events(client, file):
                   "available": available_date.isoformat(),
                   "date": event_date.isoformat()}
     )
-    print "Event: $set entity_id: " + item + \
+    print("Event: $set entity_id: " + item + \
             " properties/availableDate: " + available_date.isoformat() + \
             " properties/date: " + event_date.isoformat() + \
-            " properties/expireDate: " + expire_date.isoformat()
+            " properties/expireDate: " + expire_date.isoformat())
     expire_date += available_date_increment
     event_date += available_date_increment
     available_date += available_date_increment
     count += 1
 
   f.close()
-  print "%s events are imported." % count
+  print("%s events are imported." % count)
 
 
 if __name__ == '__main__':
@@ -93,7 +93,7 @@ if __name__ == '__main__':
   parser.add_argument('--file', default="./data/sample-handmade-data.txt")
 
   args = parser.parse_args()
-  print args
+  print(args)
 
   client = predictionio.EventClient(
     access_key=args.access_key,

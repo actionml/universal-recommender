@@ -29,6 +29,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
 import org.json4s.JValue
+import org.json4s.DefaultFormats
 import org.json4s.JsonAST._
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods._
@@ -179,6 +180,8 @@ case class URAlgorithmParams(
 class URAlgorithm(val ap: URAlgorithmParams)
     extends P2LAlgorithm[PreparedData, NullModel, Query, PredictedResult] {
 
+  implicit val formats = DefaultFormats
+
   @transient lazy implicit val logger: Logger = Logger[this.type]
 
   case class BoostableCorrelators(actionName: String, itemIDs: Seq[ItemID], boost: Option[Float] = None) {
@@ -227,8 +230,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
   lazy val modelEventNames = if (ap.indicators.isEmpty) {
     if (ap.eventNames.isEmpty) {
       throw new IllegalArgumentException("No eventNames or indicators in engine.json and one of these is required")
-    } else ap.eventNames.get
-  } else ap.indicators.get.map(_.name)
+    } else { ap.eventNames.get }
+  } else { ap.indicators.get.map(_.name) }
 
   val blacklistEvents = ap.blacklistEvents.getOrElse(Seq(modelEventNames.head)) // empty Seq[String] means no blacklist
   val returnSelf: Boolean = ap.returnSelf.getOrElse(DefaultURAlgoParams.ReturnSelf)
@@ -288,7 +291,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   def train(sc: SparkContext, data: PreparedData): NullModel = {
 
-    recsModel match {
+    val model = recsModel match {
       case RecsModels.All => calcAll(data)(sc)
       case RecsModels.CF  => calcAll(data, calcPopular = false)(sc)
       case RecsModels.BF  => calcPop(data)(sc)
@@ -299,6 +302,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
              |Bad algorithm param recsModel=[$unknownRecsModel] in engine definition params, possibly a bad json value.
              |Use one of the available parameter values ($recsModel).""".stripMargin)
     }
+    EsClient.close()
+    model
   }
 
   /** Calculates recs model as well as popularity model */
@@ -481,41 +486,46 @@ class URAlgorithm(val ap: URAlgorithmParams)
     queryEventNames = query.eventNames.getOrElse(modelEventNames) // eventNames in query take precedence
 
     val (queryStr, blacklist) = buildQuery(ap, query, rankingFieldNames)
-    val searchHitsOpt = EsClient.search(queryStr, esIndex, queryEventNames)
+    // old es1 query
+    // val searchHitsOpt = EsClient.search(queryStr, esIndex, queryEventNames)
+    val searchHitsOpt = EsClient.search(queryStr, esIndex)
 
     val withRanks = query.withRanks.getOrElse(false)
     val predictedResults = searchHitsOpt match {
       case Some(searchHits) =>
-        val recs = searchHits.getHits.map { hit =>
+        val hits = (searchHits \ "hits" \ "hits").extract[Seq[JValue]]
+        val recs = hits.map { hit =>
           if (withRanks) {
-            val source = hit.getSource
+            val source = hit \ "source"
             val ranks: Map[String, Double] = rankingsParams map { backfillParams =>
               val backfillType = backfillParams.`type`.getOrElse(DefaultURAlgoParams.BackfillType)
               val backfillFieldName = backfillParams.name.getOrElse(PopModel.nameByType(backfillType))
-              backfillFieldName -> source.get(backfillFieldName).asInstanceOf[Double]
+              backfillFieldName -> (source \ backfillFieldName).extract[Double]
             } toMap
 
-            ItemScore(hit.getId, hit.getScore.toDouble,
+            ItemScore((hit \ "_id").extract[String], (hit \ "_score").extract[Double],
               ranks = if (ranks.nonEmpty) Some(ranks) else None)
           } else {
-            ItemScore(hit.getId, hit.getScore.toDouble)
+            ItemScore((hit \ "_id").extract[String], (hit \ "_score").extract[Double])
           }
-        }
-        logger.info(s"Results: ${searchHits.getHits.length} retrieved of a possible ${searchHits.totalHits()}")
-        recs
+        }.toArray
+        logger.info(s"Results: ${hits.length} retrieved of a possible ${(searchHits \ "hits" \ "total").extract[Long]}")
+        PredictedResult(recs)
 
       case _ =>
         logger.info(s"No results for query ${parse(queryStr)}")
-        Array.empty[ItemScore]
+        PredictedResult(Array.empty[ItemScore])
     }
 
-    if (recsModel == RecsModels.CF) {
-      PredictedResult(predictedResults.filter(_.score != 0.0))
-    } else PredictedResult(predictedResults)
+    // todo: is this needed to remove ranked items from recs?
+    //if (recsModel == RecsModels.CF) {
+    //  PredictedResult(predictedResults.filter(_.score != 0.0))
+    //} else PredictedResult(predictedResults)
 
     // should have all blacklisted items excluded
     // todo: need to add dithering, mean, sigma, seed required, make a seed that only changes on some fixed time
     // period so the recs ordering stays fixed for that time period.
+    predictedResults
   }
 
   /** Calculate all fields and items needed for ranking.
@@ -555,18 +565,27 @@ class URAlgorithm(val ap: URAlgorithmParams)
     query: Query,
     backfillFieldNames: Seq[String] = Seq.empty): (String, Seq[Event]) = {
 
+    logger.info(s"Got query: \n${query}")
+
     try {
       // create a list of all query correlators that can have a bias (boost or filter) attached
       val (boostable, events) = getBiasedRecentUserActions(query)
+      logger.info(s"getBiasedRecentUserActions returned boostable: ${boostable} and events: ${events}")
 
       // since users have action history and items have correlators and both correspond to the same "actions" like
       // purchase or view, we'll pass both to the query if the user history or items correlators are empty
       // then metadata or backfill must be relied on to return results.
       val numRecs = query.num.getOrElse(limit)
+      logger.info(s"query.num.getOrElse returned numRecs: ${numRecs}")
+
       val should = buildQueryShould(query, boostable)
+      logger.info(s"buildQueryShould returned should: ${should}")
       val must = buildQueryMust(query, boostable)
+      logger.info(s"buildQueryMust returned must: ${must}")
       val mustNot = buildQueryMustNot(query, events)
+      logger.info(s"buildQueryMustNot returned mustNot: ${mustNot}")
       val sort = buildQuerySort()
+      logger.info(s"buildQuerySort returned sort: ${sort}")
 
       val json =
         ("size" -> numRecs) ~
@@ -578,12 +597,17 @@ class URAlgorithm(val ap: URAlgorithmParams)
               ("minimum_should_match" -> 1))) ~
               ("sort" -> sort)
 
+      logger.info(s"json is: ${json}")
       val compactJson = compact(render(json))
+      logger.info(s"compact json is: ${compactJson}")
 
-      logger.info(s"Query:\n$compactJson")
+      //logger.info(s"Query:\n$compactJson")
       (compactJson, events)
     } catch {
-      case e: IllegalArgumentException => ("", Seq.empty[Event])
+      case e: IllegalArgumentException => {
+        logger.warn("whoops, IllegalArgumentException for something in buildQuery.")
+        ("", Seq.empty[Event])
+      }
     }
   }
 
@@ -596,12 +620,14 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } else {
       Seq.empty
     }
+    logger.info(s"recentUserHistory is: ${recentUserHistory}")
 
     val similarItems: Seq[BoostableCorrelators] = if (itemBias >= 0f) {
       getBiasedSimilarItems(query)
     } else {
       Seq.empty
     }
+    logger.info(s"similarItems is: ${similarItems}")
 
     // this only makes sense when you train on (item-set-id, event-name, item-id) aka
     // shopping carts. We do not enforce this in the query nor throw an exception but a
@@ -615,14 +641,22 @@ class URAlgorithm(val ap: URAlgorithmParams)
     } else {
       Seq.empty
     }
+    logger.info(s"itemSet is: ${itemSet}")
 
     val boostedMetadata = getBoostedMetadata(query)
+    logger.info(s"boostedMetadata is: ${boostedMetadata}")
     val allBoostedCorrelators = recentUserHistory ++ similarItems ++ boostedMetadata ++ itemSet
+    logger.info(s"allBoostedCorrelators is: ${allBoostedCorrelators}")
 
-    val shouldFields: Seq[JValue] = allBoostedCorrelators.map {
+    val shouldFields: Seq[JValue] = allBoostedCorrelators.filter {
+      // only use non-zero boosts
+      case BoostableCorrelators(actionName, itemIDs, boost) =>
+        boost.getOrElse(1f) != 0f
+    }.map {
       case BoostableCorrelators(actionName, itemIDs, boost) =>
         render("terms" -> (actionName -> itemIDs) ~ ("boost" -> boost))
     }
+    logger.info(s"shouldFields is: ${shouldFields}")
 
     // todo: this should not be sent if there are no rankings, causes 0 scores to be returned as backfill even
     // with no other ranking. Currently the 0 score results are filtered out for no active ranking.
@@ -637,6 +671,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         |  }
         |}
         |""".stripMargin)
+    logger.info(s"shouldScore is: ${shouldScore}")
 
     shouldFields :+ shouldScore
   }
@@ -669,26 +704,21 @@ class URAlgorithm(val ap: URAlgorithmParams)
     mustFields ++ filteringDateRange
   }
 
-  /** Build not must query part */
+  /** Build mustNot part of the query */
   def buildQueryMustNot(query: Query, events: Seq[Event]): JValue = {
+    // this excludes any items from the query by id
+    val excludedItems = ("ids" -> ("values" -> getExcludedItems(events, query)) ~ ("boost" -> 0))
 
-    // first get the excluded items
-    val mustNotItems: JValue = render(
-      "ids" ->
-        ("values" -> getExcludedItems(events, query)) ~
-        ("boost" -> 0))
-
-    // then get the properties used in must_not clause
-    val exclusionFields = query.fields.getOrElse(Seq.empty).filter(_.bias == 0)
-    val exclusionProperties: Seq[JValue] = exclusionFields.map {
-      case Field(name, value, bias) =>
-        render(
-          "terms" ->
-            (name -> value) ~
-            ("boost" -> 0))
+    // exclude items with metadata boost = 0
+    val excludingMetadata = getExcludingMetadata(query)
+    logger.info(s"boosted metadata, should include boost = 0 for exclusions: ${excludingMetadata}")
+    val excludedByZeroBoost = excludingMetadata.map {
+      case ExclusionFields(metatdataName, values) =>
+        ("terms" -> (metatdataName -> values))
     }
+    logger.info(s"excluded by 0 boost: ${excludedByZeroBoost}")
 
-    exclusionProperties :+ mustNotItems
+    render(excludedItems ++ excludedByZeroBoost)
   }
 
   /** Build sort query part */
@@ -734,30 +764,23 @@ class URAlgorithm(val ap: URAlgorithmParams)
   /** Get similar items for an item, these are already in the action correlators in ES */
   def getBiasedSimilarItems(query: Query): Seq[BoostableCorrelators] = {
     if (query.item.nonEmpty) {
+      logger.info(s"using item ${query.item.get}")
       val m = EsClient.getSource(esIndex, esType, query.item.get)
+      logger.info(s"got source: ${m}")
 
-      if (m != null) {
+      if (m.nonEmpty) {
         val itemEventBias = query.itemBias.getOrElse(itemBias)
+        logger.info(s"getBiasedSimilarItems for item ${query.item.get}, bias value ${itemEventBias}")
         val itemEventsBoost = if (itemEventBias > 0 && itemEventBias != 1) Some(itemEventBias) else None
         modelEventNames.map { action =>
-          val items: Seq[String] = try {
-            if (m.containsKey(action) && m.get(action) != null) {
-              m.get(action).asInstanceOf[util.ArrayList[String]].asScala
-            } else {
-              Seq.empty[String]
-            }
-          } catch {
-            case cce: ClassCastException =>
-              logger.warn(s"Bad value in item [${query.item}] corresponding to key: [$action] that was not a " +
-                "Seq[String]. The event is ignored.")
-              Seq.empty[String]
-          }
+          val items: Seq[String] = m.get(action).getOrElse(Seq.empty[String])
           val rItems = if (items.size <= maxQueryEvents) items else items.slice(0, maxQueryEvents - 1)
           BoostableCorrelators(action, rItems, itemEventsBoost)
         }
       } else {
-        Seq.empty
-      } // no similar items
+        logger.info(s"getBiasedSimilarItems for item ${query.item.get}: item not found")
+        Seq.empty[BoostableCorrelators]
+      } // item not found in Elasticsearch
     } else {
       Seq.empty[BoostableCorrelators]
     } // no item specified
@@ -830,8 +853,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
       .distinct // de-dup and favor query fields
   }
 
-  /** get all metadata fields that are filters (not boosts) */
-  def getExcludingMetadatagetExcludingMetadata(query: Query): Seq[ExclusionFields] = {
+  /** get all metadata fields that are exclusion filters (not boosts) */
+  def getExcludingMetadata(query: Query): Seq[ExclusionFields] = {
     val paramsFilterFields = fields.filter(_.bias == 0f)
     val queryFilterFields = query.fields.getOrEmpty.filter(_.bias == 0f)
 
@@ -929,8 +952,11 @@ class URAlgorithm(val ap: URAlgorithmParams)
       fieldName -> ("float", false)
     }.toMap ++ // create mappings for correlators, where the Boolean says to not use norms
       modelEventNames.map { correlator =>
-        correlator -> ("string", true) // use norms with correlators to get closer to cosine similarity.
-      }.toMap
+        correlator -> ("keyword", true) // use norms with correlators to get closer to cosine similarity.
+      }.toMap ++
+      dateNames.map { dateName =>
+        dateName -> ("date", false) // map dates to be interpreted as dates
+      }
     logger.info(s"Index mappings for the Elasticsearch URModel: $mappings")
     mappings
   }

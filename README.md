@@ -15,13 +15,103 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 # Contributions
 
-Contributions are encouraged and appreciated. Create a PR against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We like to keep new features general so users will not be required to change the code of the UR to make use of the new feature. We will be happy to provide guidance or help via the github PR review mechanism.
+Contributions are encouraged and appreciated. Create a push request (PR) against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We like to keep new features general so users will not be required to change the code of the UR to make use of the new feature. We will be happy to provide guidance or help via the GitHub PR review mechanism.
 
 # The Universal Recommender Version Log
 
-## Roadmap
+## v0.7.0
 
-PIO-0.11.0 supports use of Elasticsearch 5.x, Spark 2.x, and Scala 2.11. The UR can be compiled for all these except ES 5.x by changing the `build.sbt` file. In a minor release we will provide alternative `build.sbt` files as examples of how to do this. ES 5 support is nearly ready in a PR and will be incorporated as soon as it is ready. ES 5 uses the REST API exclusively and so will support authentication and certain ES as a service hosts. It also has some significant performance improvements.
+This tag is for the UR integrated with PredictionIO 0.12.0 using Scala 2.11, Spark 2.x, and most importantly Elasticsearch 5.x. Primary differences from 0.6.0:
+
+ - Faster indexing, and queries due to the use of Elasticsearch 5.x
+ - Faster model building due to speedups in the ActionML fork of Mahout, this step will be removed in the UR 0.7.1 when Mahout is next released.
+ - Several upgrades like Scala 2.10 --> Scala 2.11
+ - Spark 2.x support
+ - Prediction 0.12.0 support
+ - Full use of the Elasticsearch REST interface, enabling ES authentication
+ - Fixed a bug in exclusion rules based on item properties
+
+ **WARNING**: Upgrading Elasticsearch or HBase will wipe existing data if any, so follow the special instructions below before installing any service upgrades.
+
+### Special Instructions (not reflected on ActionML.com yet)
+
+You must build PredictionIO with the default parameters so just run `./make-distribution` this will require you to install Scala 2.11. You can also run up to Spark 2.1.1 or greater, ES 5.5.2 or greater, Hadoop 2.6 or greater, you can get away with using older versions of services except ES must be 5.x. If you have issues getting pio to build and run send questions to the [PIO mailing list](http://predictionio.apache.org/support/). 
+
+**Backup your data**, moving from ES 1 to ES 5 will delete all data!!!! Actually even worse it is still in HBase but you can’t get at it so to upgrade do the following:
+
+ - `pio export` with pio < 0.12.0 =====**Before upgrade!**=====
+ - `pio data-delete` all your old apps =====**Before upgrade!**=====
+ - build and install pio 0.12.0 including all the services =====**The point of no return!**=====
+ - `pio app new …` and `pio import …` any needed datasets
+
+Once PIO is running test with `pio status` and `pio app list`. You will need to create an app in import your data to run the integration test to get some sample data installed in the “handmade” app.
+
+### Config for PIO 0.12.0 and the UR 0.7.0
+
+a sample of pio-env.sh that works with one type of setup is below, but you'll have to change paths to match yours. This example show the new way to configure for Elasticsearch 5.x, which uses a new port number:
+
+
+```
+#!/usr/bin/env bash
+
+# SPARK_HOME: Apache Spark is a hard dependency and must be configured.
+# using Spark 2.2.1 here
+SPARK_HOME=/usr/local/spark
+
+# ES_CONF_DIR: You must configure this if you have advanced configuration for
+# using ES 5.6.3
+ES_CONF_DIR=/usr/local/elasticsearch/config
+
+# HADOOP_CONF_DIR: You must configure this if you intend to run PredictionIO
+# using hadoop 2.8 here
+HADOOP_CONF_DIR=/usr/local/hadoop/etc/hadoop
+
+# HBASE_CONF_DIR: You must configure this if you intend to run PredictionIO
+# using HBase 1.2.x here or whatever the highest numbered stable release is
+HBASE_CONF_DIR=/usr/local/hbase/conf
+
+# Filesystem paths where PredictionIO uses as block storage.
+PIO_FS_BASEDIR=$HOME/.pio_store
+PIO_FS_ENGINESDIR=$PIO_FS_BASEDIR/engines
+PIO_FS_TMPDIR=$PIO_FS_BASEDIR/tmp
+
+# Storage Repositories
+PIO_STORAGE_REPOSITORIES_METADATA_NAME=pio_meta
+PIO_STORAGE_REPOSITORIES_METADATA_SOURCE=ELASTICSEARCH
+
+PIO_STORAGE_REPOSITORIES_MODELDATA_NAME=pio_
+PIO_STORAGE_REPOSITORIES_MODELDATA_SOURCE=LOCALFS
+
+PIO_STORAGE_REPOSITORIES_APPDATA_NAME=pio_appdata
+PIO_STORAGE_REPOSITORIES_APPDATA_SOURCE=ELASTICSEARCH
+
+PIO_STORAGE_REPOSITORIES_EVENTDATA_NAME=pio_eventdata
+PIO_STORAGE_REPOSITORIES_EVENTDATA_SOURCE=HBASE
+
+# ES config
+PIO_STORAGE_SOURCES_ELASTICSEARCH_TYPE=elasticsearch
+PIO_STORAGE_SOURCES_ELASTICSEARCH_HOSTS=localhost
+PIO_STORAGE_SOURCES_ELASTICSEARCH_PORTS=9200 # <===== notice 9200 now
+PIO_STORAGE_SOURCES_ELASTICSEARCH_CLUSTERNAME=elasticsearch_xyz # <===== should match what you have in you ES config file
+PIO_STORAGE_SOURCES_ELASTICSEARCH_HOME=/usr/local/elasticsearch
+
+PIO_STORAGE_SOURCES_LOCALFS_TYPE=localfs
+PIO_STORAGE_SOURCES_LOCALFS_HOSTS=$PIO_FS_BASEDIR/models
+
+PIO_STORAGE_SOURCES_HBASE_TYPE=hbase
+PIO_STORAGE_SOURCES_HBASE_HOME=/usr/local/hbase
+```
+
+### Build Mahout
+
+Mahout has speedups for the Universal Recommender's use that have not been released yet so you will have to build from source. To make this easy we have a fork hosted [here](https://github.com/actionml/mahout/tree/sparse-speedup-13.0), with special build instructions. Make sure you are on the "sparse-speedup" branch and follow instructions in the [README.md](https://github.com/actionml/mahout/blob/sparse-speedup-13.0/README.md)
+
+### Build the Universal Recommender
+
+ - download the UR from [here](https://github.com/actionml/universal-recommender.git) and checkout the `master` branch.
+ - replace the line: `resolvers += "Local Repository" at "file:///Users/pat/.custom-scala-m2/repo”` with your path to the local mahout build
+ - build the UR with `pio build` or run the integration test to get sample data put into PIO `./examples/integration-test`
+
 
 ## v0.6.0
 
