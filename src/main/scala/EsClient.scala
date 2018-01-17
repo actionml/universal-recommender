@@ -17,75 +17,113 @@
 
 package com.actionml
 
+import java.net.URLEncoder
 import java.util
 
 import grizzled.slf4j.Logger
-import org.apache.predictionio.data.storage._
-
-/*
-//import org.json4s.JsonAST.{JField, JString}
-import org.json4s._
-import org.json4s.native.JsonMethods._
-import org.json4s.JValue
-//import org.json4s.jackson.JsonMethods._
-//import org.json4s.JsonDSL._
-*/
-import org.json4s.JValue
-import org.json4s.JsonAST._
-import org.json4s.JsonDSL._
-import org.json4s.jackson.JsonMethods._
-
-//import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest
+import org.apache.http.util.EntityUtils
+import org.apache.predictionio.data.storage.{ DataMap, Storage, StorageClientConfig }
+import org.apache.predictionio.workflow.CleanupFunctions
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest
-import org.elasticsearch.action.admin.indices.create.CreateIndexRequest
-import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest
-import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest
-import org.elasticsearch.action.admin.indices.refresh.RefreshRequest
-import org.elasticsearch.common.settings.{ ImmutableSettings, Settings }
+import org.elasticsearch.client.RestClient
+import org.apache.http.HttpHost
+import org.apache.http.auth.{ AuthScope, UsernamePasswordCredentials }
+import org.apache.http.entity.ContentType
+import org.apache.http.entity.StringEntity
+import org.apache.http.impl.client.BasicCredentialsProvider
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder
+import org.apache.http.nio.entity.NStringEntity
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
+import org.elasticsearch.client.RestClient
+import org.elasticsearch.client.RestClientBuilder.HttpClientConfigCallback
 import org.elasticsearch.spark._
-import org.elasticsearch.search.SearchHits
+import org.json4s.JValue
+import org.json4s.DefaultFormats
+import org.json4s.JsonAST.JString
+// import org.json4s.native.Serialization.writePretty
 import com.actionml.helpers.{ ItemID, ItemProps }
+
+import scala.collection.immutable
+import scala.collection.parallel.mutable
+import scala.collection.JavaConverters._
 
 /** Elasticsearch notes:
  *  1) every query clause will affect scores unless it has a constant_score and boost: 0
  *  2) the Spark index writer is fast but must assemble all data for the index before the write occurs
- *  3) many operations must be followed by a refresh before the action takes effect--sortof like a transaction commit
- *  4) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
+ *  3) to use like a DB you must specify that the index of fields are `not_analyzed` so they won't be lowercased,
  *    stemmed, tokenized, etc. Then the values are literal and must match exactly what is in the query (no analyzer)
  *    Finally the correlator fields should be norms: true to enable norms, this make the score equal to the sum
  *    of dot products divided by the length of each vector. This is the definition of "cosine" similarity.
- *    Todo: norms may not be the best, should experiment to know for sure.
- *  5) the client, either transport client for < ES5 or the rest client for >= ES5 there should be a timeout set since
+ *  4) the client, either transport client for < ES5 or the rest client for >= ES5 there should have a timeout set since
  *    the default is very long, several seconds.
+ *
  */
 
-/** Defines methods to use on Elasticsearch.*/
+/** Defines methods to use on Elasticsearch 5 through the REST client.*/
 object EsClient {
   @transient lazy val logger: Logger = Logger[this.type]
 
-  /*  This returns 2 incompatible objects of TransportClient and RestClient
+  implicit val formats = DefaultFormats
 
-  private lazy val client = if (Storage.getConfig("ELASTICSEARCH5").nonEmpty)
-    new elasticsearch5.StorageClient(Storage.getConfig("ELASTICSEARCH5").get).client
-  else if (Storage.getConfig("ELASTICSEARCH").nonEmpty)
-    new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
-  else
+  private val configOpt = Storage.getConfig("ELASTICSEARCH")
+
+  private lazy val client: RestClient = configOpt.map { config =>
+    val usernamePassword = (
+      config.properties.get("USERNAME"),
+      config.properties.get("PASSWORD"))
+    val optionalBasicAuth: Option[(String, String)] = usernamePassword match {
+      case (None, None) => None
+      case (username, password) => Some(
+        (username.getOrElse(""), password.getOrElse("")))
+    }
+    CleanupFunctions.add {
+      EsClient.close
+    }
+    open(getHttpHosts(config), optionalBasicAuth)
+  } getOrElse {
     throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
       "proper configuration settings")
-  */
+  }
 
-  /** Gets the client for the right version of Elasticsearch. The ES timeout for the Transport client is
-   *  set in elasticsearch.yml with transport.tcp.connect_timeout: 200ms or something like that
-   */
-  private lazy val client = if (Storage.getConfig("ELASTICSEARCH").nonEmpty) {
-    new elasticsearch.StorageClient(Storage.getConfig("ELASTICSEARCH").get).client
-  } else {
-    throw new IllegalStateException("No Elasticsearch client configuration detected, check your pio-env.sh for" +
-      "proper configuration settings")
+  // Method lifted from ESUtils in PredictionIO
+  def getHttpHosts(config: StorageClientConfig): Seq[HttpHost] = {
+    val hosts = config.properties.get("HOSTS").
+      map(_.split(",").toSeq).getOrElse(Seq("localhost"))
+    val ports = config.properties.get("PORTS").
+      map(_.split(",").toSeq.map(_.toInt)).getOrElse(Seq(9200))
+    val schemes = config.properties.get("SCHEMES").
+      map(_.split(",").toSeq).getOrElse(Seq("http"))
+    (hosts, ports, schemes).zipped.map((h, p, s) => new HttpHost(h, p, s))
+  }
+
+  var _sharedRestClient: Option[RestClient] = None
+
+  def open(
+    hosts: Seq[HttpHost],
+    basicAuth: Option[(String, String)] = None): RestClient = {
+    val newClient = _sharedRestClient match {
+      case Some(c) => c
+      case None => {
+        var builder = RestClient.builder(hosts: _*)
+        builder = basicAuth match {
+          case Some((username, password)) => builder.setHttpClientConfigCallback(
+            new BasicAuthProvider(username, password))
+          case None => builder
+        }
+        builder.build()
+      }
+    }
+    _sharedRestClient = Some(newClient)
+    newClient
+  }
+
+  def close(): Unit = {
+    if (!_sharedRestClient.isEmpty) {
+      _sharedRestClient.get.close()
+      _sharedRestClient = None
+    }
   }
 
   /** Delete all data from an instance but do not commit it. Until the "refresh" is done on the index
@@ -96,30 +134,35 @@ object EsClient {
    *  @return true if all is well
    */
   def deleteIndex(indexName: String, refresh: Boolean = false): Boolean = {
-    //val debug = client.connectedNodes()
-    if (client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
-      val delete = client.admin().indices().delete(new DeleteIndexRequest(indexName)).actionGet()
-      if (!delete.isAcknowledged) {
-        logger.warn(s"Index $indexName wasn't deleted, but may have quietly failed.")
-      } else {
-        // now refresh to get it 'committed'
-        // todo: should do this after the new index is created so no index downtime
-        if (refresh) refreshIndex(indexName)
+    client.performRequest(
+      "HEAD",
+      s"/$indexName",
+      Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+        case 404 => false
+        case 200 =>
+          client.performRequest(
+            "DELETE",
+            s"/$indexName",
+            Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+              case 200 =>
+                if (refresh) refreshIndex(indexName)
+              case _ =>
+                logger.info(s"Index $indexName wasn't deleted, but may have quietly failed.")
+            }
+          true
+        case _ =>
+          throw new IllegalStateException()
+          false
       }
-      true
-    } else {
-      logger.warn(s"Elasticsearch index: $indexName wasn't deleted because it didn't exist. This may be an error.")
-      false
-    }
   }
 
   /** Creates a new empty index in Elasticsearch and initializes mappings for fields that will be used
    *
-   *  @param indexName elasticsearch name
-   *  @param indexType names the type of index, usually use the item name
-   *  @param fieldNames ES field names
+   *  @param indexName    elasticsearch name
+   *  @param indexType    names the type of index, usually use the item name
+   *  @param fieldNames   ES field names
    *  @param typeMappings indicates which ES fields are to be not_analyzed without norms
-   *  @param refresh should the index be refreshed so the create is committed
+   *  @param refresh      should the index be refreshed so the create is committed
    *  @return true if all is well
    */
   def createIndex(
@@ -128,65 +171,86 @@ object EsClient {
     fieldNames: List[String],
     typeMappings: Map[String, (String, Boolean)] = Map.empty,
     refresh: Boolean = false): Boolean = {
+    client.performRequest(
+      "HEAD",
+      s"/$indexName",
+      Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+        case 404 => { // should always be a unique index name so fail unless we get a 404
+          var mappings =
+            s"""
+              |{ "mappings": {
+              |    "$indexType": {
+              |      "properties": {
+            """.stripMargin.replace("\n", "")
 
-    if (!client.admin().indices().exists(new IndicesExistsRequest(indexName)).actionGet().isExists) {
-      var mappings = """
-        |{
-        |  "properties": {
-        """.stripMargin.replace("\n", "")
+          def mappingsField(`type`: String) = {
+            s"""
+              |    : {
+              |      "type": "${`type`}"
+              |    },
+            """.stripMargin.replace("\n", "")
+          }
 
-      def mappingsField(`type`: String, `normsEnabled`: Boolean) = {
-        s"""
-        |    : {
-        |      "type": "${`type`}",
-        |      "index": "not_analyzed",
-        |      "norms" : {
-        |        "enabled" : "${`normsEnabled`}"
-        |      }
-        |    },
-        """.stripMargin.replace("\n", "")
+          val mappingsTail =
+            // unused mapping forces the last element to have no comma, fuck JSON
+            s"""
+              |    "last": {
+              |      "type": "keyword"
+              |    }
+              |}}}}
+            """.stripMargin.replace("\n", "")
+
+          fieldNames.foreach { fieldName =>
+            if (typeMappings.contains(fieldName))
+              mappings +=
+                (s""""$fieldName"""" + mappingsField(typeMappings(
+                  fieldName)._1))
+            else // unspecified fields are treated as not_analyzed strings
+              mappings += (s""""$fieldName"""" + mappingsField(
+                "keyword"))
+          }
+
+          mappings += mappingsTail
+          // "id" string is not_analyzed and does not use norms
+          // val entity = new NStringEntity(mappings, ContentType.APPLICATION_JSON)
+          //logger.info(s"Create index with:\n$indexName\n$mappings\n")
+          val entity = new NStringEntity(
+            mappings,
+            ContentType.
+            APPLICATION_JSON)
+
+          client.
+            performRequest(
+              "PUT",
+              s"/$indexName",
+              Map.empty[String, String].asJava,
+              entity).getStatusLine.
+              getStatusCode match {
+                case 200 =>
+                  // now refresh to get it 'committed'
+                  // todo: should do this after the new index is created so no index downtime
+                  if (refresh) refreshIndex(indexName)
+                case _ =>
+                  logger.info(s"Index $indexName wasn't created, but may have quietly failed.")
+              }
+          true
+        }
+        case 200 =>
+          logger.warn(s"Elasticsearch index: $indexName wasn't created because it already exists. " +
+            s"This may be an error. Leaving the old index active.")
+          false
+        case _ =>
+          throw new IllegalStateException(s"/$indexName is invalid.")
+          false
       }
-
-      val mappingsTail = """
-        |    "id": {
-        |      "type": "string",
-        |      "index": "not_analyzed",
-        |      "norms" : {
-        |        "enabled" : false
-        |      }
-        |    }
-        |  }
-        |}
-      """.stripMargin.replace("\n", "")
-
-      fieldNames.foreach { fieldName =>
-        if (typeMappings.contains(fieldName))
-          mappings += (fieldName + mappingsField(typeMappings(fieldName)._1, typeMappings(fieldName)._2))
-        else // unspecified fields are treated as not_analyzed strings
-          mappings += (fieldName + (mappingsField("string", false)))
-      }
-      mappings += mappingsTail // "id" string is not_analyzed and does not use norms
-      logger.info(s"Mappings for the index: $mappings")
-
-      val cir = new CreateIndexRequest(indexName).mapping(indexType, mappings)
-      val create = client.admin().indices().create(cir).actionGet()
-      if (!create.isAcknowledged) {
-        logger.warn(s"Index $indexName wasn't created, but may have quietly failed.")
-      } else {
-        // now refresh to get it 'committed'
-        // todo: should do this after the new index is created so no index downtime
-        if (refresh) refreshIndex(indexName)
-      }
-      true
-    } else {
-      logger.warn(s"Elasticsearch index: $indexName wasn't created because it already exists. This may be an error.")
-      false
-    }
   }
 
   /** Commits any pending changes to the index */
   def refreshIndex(indexName: String): Unit = {
-    client.admin().indices().refresh(new RefreshRequest(indexName)).actionGet()
+    client.performRequest(
+      "POST",
+      s"/$indexName/_refresh",
+      Map.empty[String, String].asJava)
   }
 
   /** Create new index and hot-swap the new after it's indexed and ready to take over, then delete the old */
@@ -195,47 +259,106 @@ object EsClient {
     typeName: String,
     indexRDD: RDD[Map[String, Any]],
     fieldNames: List[String],
-    typeMappings: Map[String, (String, Boolean)] = Map.empty): Unit = {
+    typeMappings: Map[String, (String, Boolean)] = Map.empty,
+    numESWriteConnections: Option[Int] = None): Unit = {
     // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
-    val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
+    //val aliasMetadata = client.admin().indices().prepareGetAliases(alias).get().getAliases
     val newIndex = alias + "_" + DateTime.now().getMillis.toString
 
-    logger.trace(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
-    createIndex(newIndex, typeName, fieldNames, typeMappings)
+    logger.info(s"Create new index: $newIndex, $typeName, $fieldNames, $typeMappings")
+    // todo: this should have a typeMappings that is Map[String, (String, Boolean)] with the Boolean saying to use norms
+    // taken out for now since there is no client.admin in the REST client. Have to construct REST call directly
+    createIndex(newIndex, typeName, fieldNames, typeMappings, true)
+
+    // throttle writing to the max bulk-write connections, which is one per ES core.
+    // todo: can we find this from the cluster itself?
+    val repartitionedIndexRDD = if (numESWriteConnections.nonEmpty && indexRDD.context.defaultParallelism >
+      numESWriteConnections.get) {
+      logger.info(s"defaultParallelism: ${indexRDD.context.defaultParallelism}")
+      logger.info(s"Coalesce to: ${numESWriteConnections.get} to reduce number of ES connections for saveToEs")
+      indexRDD.coalesce(numESWriteConnections.get)
+    } else {
+      logger.info(s"Number of ES connections for saveToEs: ${indexRDD.context.defaultParallelism}")
+      indexRDD
+    }
 
     val newIndexURI = "/" + newIndex + "/" + typeName
-    indexRDD.saveToEs(newIndexURI, Map("es.mapping.id" -> "id"))
-    //refreshIndex(newIndex) //appears to not be needed
+    // TODO check if {"es.mapping.id": "id"} works on ESHadoop Interface of ESv5
+    // Repartition to fit into Elasticsearch concurrency limits.
 
-    if (!aliasMetadata.isEmpty
-      && aliasMetadata.get(alias) != null
-      && aliasMetadata.get(alias).get(0) != null) { // was alias so remove the old one
-      //append the DateTime to the alias to create an index name
-      val oldIndex = aliasMetadata.get(alias).get(0).getIndexRouting
-      client.admin().indices().prepareAliases()
-        .removeAlias(oldIndex, alias)
-        .addAlias(newIndex, alias)
-        .execute().actionGet()
-      deleteIndex(oldIndex) // now can safely delete the old one since it's not used
-    } else { // todo: could be more than one index with 'alias' so
-      // no alias so add one
-      //to clean up any indexes that exist with the alias name
-      val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
-      if (indices.contains(alias)) {
-        //refreshIndex(alias)
-        deleteIndex(alias) // index named like the new alias so delete it
+    val usernamePasswordOpt = configOpt flatMap { config =>
+      val usernamePassword = (
+        config.properties.get("USERNAME"),
+        config.properties.get("PASSWORD"))
+      usernamePassword match {
+        case (None, None) => None
+        case (username, password) => Some(
+          (username.getOrElse(""), password.getOrElse("")))
       }
-      // slight downtime, but only for one case of upgrading the UR engine from v0.1.x to v0.2.0+
-      client.admin().indices().prepareAliases()
-        .addAlias(newIndex, alias)
-        .execute().actionGet()
-    }
-    // clean out any old indexes that were the product of a failed train?
-    val indices = util.Arrays.asList(client.admin().indices().prepareGetIndex().get().indices()).get(0)
-    indices.map { index =>
-      if (index.contains(alias) && index != newIndex) deleteIndex(index) //clean out any old orphaned indexes
     }
 
+    val esConfig = Map("es.mapping.id" -> "id") ++
+      usernamePasswordOpt.map(usernamePassword =>
+        Map(
+          "es.net.http.auth.user" -> usernamePassword._1,
+          "es.net.http.auth.pass" -> usernamePassword._2))
+      .getOrElse(Map.empty[String, String]) ++
+      configOpt.flatMap(config =>
+        config.properties.get("SCHEMES").map(schemes =>
+          if ("https" == schemes) {
+            Map("es.net.ssl" -> "true")
+          } else {
+            Map("es.net.ssl" -> "false")
+          })).getOrElse(Map.empty[String, String])
+    repartitionedIndexRDD.saveToEs(newIndexURI, esConfig)
+
+    // get index for alias, change a char, create new one with new id and index it, swap alias and delete old one
+
+    val (oldIndexSet, deleteOldIndexQuery) = client.performRequest(
+      // Does the alias exist?
+      "HEAD",
+      s"/_alias/$alias",
+      Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+        case 200 => {
+          val response = client.performRequest(
+            "GET",
+            s"/_alias/$alias",
+            Map.empty[String, String].asJava)
+          val responseJValue = parse(EntityUtils.toString(response.getEntity))
+          val oldIndexSet = responseJValue.extract[Map[String, JValue]].keys
+          val oldIndexName = oldIndexSet.head
+          client.performRequest(
+            // Does the old index exist?
+            "HEAD",
+            s"/$oldIndexName",
+            Map.empty[String, String].asJava).getStatusLine.getStatusCode match {
+              case 200 => {
+                val deleteOldIndexQuery = s""",{ "remove_index": { "index": "${oldIndexName}"}}"""
+                (oldIndexSet, deleteOldIndexQuery)
+              }
+              case _ => (Set(), "")
+            }
+        }
+        case _ => (Set(), "")
+      }
+
+    val aliasQuery =
+      s"""
+        |{
+        |    "actions" : [
+        |        { "add":  { "index": "${newIndex}", "alias": "${alias}" } }
+        |        ${deleteOldIndexQuery}
+        |    ]
+        |}
+      """.stripMargin.replace("\n", "")
+
+    val entity = new NStringEntity(aliasQuery, ContentType.APPLICATION_JSON)
+    client.performRequest(
+      "POST",
+      "/_aliases",
+      Map.empty[String, String].asJava,
+      entity)
+    oldIndexSet.foreach(deleteIndex(_))
   }
 
   /** Performs a search using the JSON query String
@@ -244,41 +367,21 @@ object EsClient {
    *  @param indexName the index to search
    *  @return a [PredictedResults] collection
    */
-  def search(query: String, indexName: String, correlators: Seq[String]): Option[SearchHits] = {
-
-    val sr = client.prepareSearch(indexName).setSource(query).get()
-    if (!sr.isTimedOut) {
-      Some(sr.getHits)
-    } else { // ask for raked items like popular
-      val rr = client.prepareSearch(indexName).setSource(rankedResults(query, correlators)).get()
-      if (!rr.isTimedOut) {
-        logger.warn("Elasticsearch timed out during a query so returning ranked items, not user, item, or" +
-          s" itemSet based. Query is now: ${rankedResults(query, correlators)}")
-        Some(rr.getHits)
-      } else {
+  def search(query: String, indexName: String): Option[JValue] = {
+    logger.info(s"Query:\n${query}")
+    val response = client.performRequest(
+      "POST",
+      s"/$indexName/_search",
+      Map.empty[String, String].asJava,
+      new StringEntity(query, ContentType.APPLICATION_JSON))
+    response.getStatusLine.getStatusCode match {
+      case 200 =>
+        logger.info(s"Got source from query: ${query}")
+        Some(parse(EntityUtils.toString(response.getEntity)))
+      case _ =>
+        logger.info(s"Query: ${query}\nproduced status code: ${response.getStatusLine.getStatusCode}")
         None
-      }
     }
-  }
-
-  /** sorry, a little hacky, remove item, user, and/or itemset from query so all the bizrules
-   *  are unchanged but the query will run fast returning ranked results like popular.
-   *  Todo: a better way it to pass in a fallback query
-   */
-  def rankedResults(query: String, correlators: Seq[String]): String = {
-    var newQuery = query
-    for (correlator <- correlators) {
-      // way hacky, should use the removal or replacement functions but can't quite see how to do it
-      // Todo: Warning this will have problems if the correlator name can be interpretted as a regex
-      newQuery = newQuery.replace(correlator, "__null__") // replaces no matter where in the string, seems dangerous
-      /* removeField example that leaves an invalid query
-      newQuery = compact(render(parse(newQuery).removeField { // filter one at a time, there must be a better way
-        case JField(`correlator`, _) => true
-        case _                       => false
-      }))
-      */
-    }
-    newQuery
   }
 
   /** Gets the "source" field of an Elasticsearch document
@@ -288,43 +391,71 @@ object EsClient {
    *  @param doc for UR the item id
    *  @return source [java.util.Map] of field names to any valid field values or null if empty
    */
-  def getSource(indexName: String, typeName: String, doc: String): util.Map[String, AnyRef] = {
-    client.prepareGet(indexName, typeName, doc)
-      .execute()
-      .actionGet().getSource
+  def getSource(indexName: String, typeName: String, doc: String): Map[String, List[String]] = {
+    val url = s"/$indexName/$typeName/${encodeURIFragment(doc)}"
+    var rjv: Option[JValue] = Some(JString(""))
+    logger.info(s"using URL: $url")
+    try { // ES throws and exception when a doc is not found!!!! Why, oh why--the madness...
+      logger.info("performing request")
+      val response = client.performRequest(
+        "GET",
+        url,
+        Map.empty[String, String].asJava)
+      logger.info(s"got response: $response")
+
+      rjv = response.getStatusLine.getStatusCode match {
+        case 200 =>
+          val entity = EntityUtils.toString(response.getEntity)
+          logger.info(s"got status code: 200\nentity: ${entity}")
+          if (entity.isEmpty) {
+            None
+          } else {
+            logger.info(s"About to parse: $entity")
+            Some(parse(entity))
+          }
+        case 404 =>
+          logger.info(s"got status code: 404")
+          Some(parse("""{"notFound": "true"}"""))
+        case _ =>
+          logger.info(s"got status code: ${response.getStatusLine.getStatusCode}\nentity: ${EntityUtils.toString(response.getEntity)}")
+          None
+      }
+    } catch {
+      case e: org.elasticsearch.client.ResponseException => {
+        logger.info("got no data for the item")
+        rjv = None
+      }
+      case _ =>
+        logger.info("got unknown exception and so no data for the item")
+        rjv = None
+    }
+
+    if (rjv.nonEmpty) {
+      //val responseJValue = parse(EntityUtils.toString(response.getEntity))
+      val result = (rjv.get \ "_source").values.asInstanceOf[Map[String, List[String]]]
+      logger.info(s"getSource for ${url} result: ${result}")
+      result
+    } else {
+      logger.info(s"Non-existent item $doc, but that's ok, return backfill recs")
+      Map.empty
+    }
   }
 
-  /*
-  public Set<String> getIndicesFromAliasName(String aliasName) {
-
-    IndicesAdminClient iac = client.admin().indices();
-    ImmutableOpenMap<String, List<AliasMetaData>> map = iac.getAliases(new GetAliasesRequest(aliasName))
-            .actionGet().getAliases();
-
-    final Set<String> allIndices = new HashSet<>();
-    map.keysIt().forEachRemaining(allIndices::add);
-    return allIndices;
-}
-   */
   def getIndexName(alias: String): Option[String] = {
-
-    val allIndicesMap = client.admin().indices().getAliases(new GetAliasesRequest(alias)).actionGet().getAliases
-
-    if (allIndicesMap.size() == 1) { // must be a 1-1 mapping of alias <-> index
-      var indexName: String = ""
-      val itr = allIndicesMap.keysIt()
-      while (itr.hasNext)
-        indexName = itr.next()
-      Some(indexName) // the one index the alias points to
+    val response = client.performRequest(
+      "GET",
+      s"/_alias/$alias",
+      Map.empty[String, String].asJava)
+    val responseJValue = parse(EntityUtils.toString(response.getEntity))
+    val allIndicesMap = responseJValue.extract[Map[String, JValue]]
+    if (allIndicesMap.size == 1) {
+      allIndicesMap.headOption.map(_._1)
     } else {
       // delete all the indices that are pointed to by the alias, they can't be used
       logger.warn("There is no 1-1 mapping of index to alias so deleting the old indexes that are referenced by the " +
-        s"alias: $alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
+        "alias. This may have been caused by a crashed or stopped `pio train` operation so try running it again.")
       if (!allIndicesMap.isEmpty) {
-        val i = allIndicesMap.keys().toArray.asInstanceOf[Array[String]]
-        for (indexName <- i) {
-          deleteIndex(indexName, refresh = true)
-        }
+        allIndicesMap.keys.foreach(indexName => deleteIndex(indexName, refresh = true))
       }
       None // if more than one abort, need to clean up bad aliases
     }
@@ -336,5 +467,41 @@ object EsClient {
     getIndexName(alias)
       .map(index => sc.esJsonRDD(alias + "/" + typeName) map { case (itemId, json) => itemId -> DataMap(json).fields })
       .getOrElse(sc.emptyRDD)
+  }
+
+  import java.io.UnsupportedEncodingException
+
+  def encodeURIFragment(s: String): String = {
+    var result: String = ""
+    try
+      result = URLEncoder.encode(s, "UTF-8")
+        .replaceAll("\\+", "%20")
+        .replaceAll("\\%21", "!")
+        .replaceAll("\\%27", "'")
+        .replaceAll("\\%28", "(")
+        .replaceAll("\\%29", ")")
+        .replaceAll("\\%7E", "%7E")
+    catch {
+      case e: UnsupportedEncodingException =>
+        result = s
+    }
+    result
+  }
+
+}
+
+class BasicAuthProvider(
+  val username: String,
+  val password: String)
+    extends HttpClientConfigCallback {
+
+  val credentialsProvider = new BasicCredentialsProvider()
+  credentialsProvider.setCredentials(
+    AuthScope.ANY,
+    new UsernamePasswordCredentials(username, password))
+
+  override def customizeHttpClient(
+    httpClientBuilder: HttpAsyncClientBuilder): HttpAsyncClientBuilder = {
+    httpClientBuilder.setDefaultCredentialsProvider(credentialsProvider)
   }
 }
