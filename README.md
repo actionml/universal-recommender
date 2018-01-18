@@ -25,8 +25,8 @@ Contributions are encouraged and appreciated. Create a push request (PR) against
 This tag is for the UR integrated with PredictionIO 0.12.0 using Scala 2.11, Spark 2.x, and most importantly Elasticsearch 5.x. Primary differences from 0.6.0:
 
  - Faster indexing, and queries due to the use of Elasticsearch 5.x
- - Faster model building due to speedups in the ActionML fork of Mahout, this step will be removed in the UR 0.7.1 when Mahout is next released.
- - Several upgrades like Scala 2.10 --> Scala 2.11
+ - Faster model building due to speedups in the ActionML fork of Mahout, which require the user to build Mahout locally. This step will be removed in the UR 0.7.1 when Mahout is next released.
+ - Several upgrades such as Scala 2.10 --> Scala 2.11
  - Spark 2.x support
  - Prediction 0.12.0 support
  - Full use of the Elasticsearch REST interface, enabling ES authentication
