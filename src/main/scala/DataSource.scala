@@ -24,7 +24,7 @@ import grizzled.slf4j.Logger
 import org.apache.predictionio.core.{ EventWindow, SelfCleaningDataSource }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import com.actionml.helpers.{ ActionID, ItemID }
+import com.actionml.helpers.{ ActionID }
 import com.actionml.helpers._
 import org.apache.spark.sql.DataFrame
 
@@ -95,7 +95,7 @@ class DataSource(val dsp: DataSourceParams)
     logger.info(s"Received events ${eventRDDs.map(_._1)}")
 
     // aggregating all $set/$unsets for metadata fields, which are attached to items
-    val fieldsRDD: RDD[(ItemID, PropertyMap)] = PEventStore.aggregateProperties(
+    val fieldsRDD: RDD[(String, PropertyMap)] = PEventStore.aggregateProperties(
       appName = dsp.appName,
       entityType = "item")(sc).repartition(sc.defaultParallelism)
     //    logger.debug(s"FieldsRDD\n${fieldsRDD.take(25).mkString("\n")}")
@@ -113,9 +113,9 @@ class DataSource(val dsp: DataSourceParams)
  *  @param minEventsPerUser users with less than this many events will not removed from training data
  */
 case class TrainingData(
-    //actions: Seq[(ActionID, RDD[(UserID, ItemID)])],
+    //actions: Seq[(ActionID, RDD[(UserID, String)])],
     actions: Seq[(ActionID, DataFrame)],
-    fieldsRDD: RDD[(ItemID, PropertyMap)],
+    fieldsRDD: RDD[(String, PropertyMap)],
     minEventsPerUser: Option[Int] = Some(1)) extends Serializable {
 
   override def toString: String = {

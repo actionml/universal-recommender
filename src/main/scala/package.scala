@@ -31,9 +31,9 @@ package object helpers {
 
   type UserID = String
   type ActionID = String
-  type ItemID = String
+  //type ItemID = String
   // Item properties (fieldName, fieldValue)
-  type ItemProps = Map[String, JValue]
+  //type ItemProps = Map[String, JValue]
 
   val INDIV_ID = "INDIV_ID"
   val UID = "UID"
@@ -101,7 +101,7 @@ package object helpers {
   }
 
   implicit class IndexedDatasetConversions(val indexedDataset: IndexedDatasetSpark) {
-    def toStringMapRDD(actionName: ActionID): RDD[(ItemID, ItemProps)] = {
+    def toStringMapRDD(actionName: ActionID): RDD[(String, Map[String, JValue])] = {
       @transient lazy val logger = Logger[this.type]
 
       //val matrix = indexedDataset.matrix.checkpoint()
@@ -114,7 +114,7 @@ package object helpers {
 
       // may want to mapPartition and create bulk updates as a slight optimization
       // creates an RDD of (itemID, Map[correlatorName, list-of-correlator-values])
-      indexedDataset.matrix.rdd.map[(ItemID, ItemProps)] {
+      indexedDataset.matrix.rdd.map[(String, Map[String, JValue])] {
         case (rowNum, itemVector) =>
 
           // turn non-zeros into list for sorting

@@ -20,7 +20,7 @@ val pioVersion = "0.12.0-incubating"
 
 val elasticsearchVersion = "5.5.2"
 
-val sparkVersion = "1.6.0"
+val sparkVersion = "2.1.2"
 
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % pioVersion % "provided",
@@ -28,9 +28,9 @@ libraryDependencies ++= Seq(
   "org.elasticsearch"       %% "elasticsearch-spark-20" % elasticsearchVersion % "provided"
     exclude("org.apache.spark", "*"),
   "org.elasticsearch"        % "elasticsearch-hadoop-mr"  % elasticsearchVersion % "provided",
-  "org.apache.spark" %% "spark-core" % "1.4.0" % "provided",
-  "org.apache.spark" %% "spark-mllib" % "1.4.0" % "provided",
-  "org.apache.spark" %% "spark-hive" % "1.6.0" % "provided",
+  "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-mllib" % sparkVersion % "provided",
+  "org.apache.spark" %% "spark-hive" % sparkVersion % "provided",
   "org.xerial.snappy" % "snappy-java" % "1.1.1.7",
   // Mahout's Spark libs
   "org.apache.mahout" %% "mahout-math-scala" % mahoutVersion,
@@ -44,8 +44,12 @@ libraryDependencies ++= Seq(
   //  exclude("org.apache.zookeeper", "zookeeper"),
   // other external libs
   "com.thoughtworks.xstream" % "xstream" % "1.4.4"
-    exclude("xmlpull", "xmlpull"),
-  "org.json4s" %% "json4s-native" % "3.2.10")
+    exclude("xmlpull", "xmlpull")
+  //"org.json4s" %% "json4s-native" % "3.2.10")
+  // for Spark 2.2.0: "org.json4s" %% "json4s-native" % "3.2.11" % "provided")
+  // for greater than what Spark provides:
+  //"org.json4s" %% "json4s-native" % "3.5.3"
+  )
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
 /*

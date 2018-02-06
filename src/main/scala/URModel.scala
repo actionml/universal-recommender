@@ -24,19 +24,20 @@ import org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.DateTime
-import org.json4s.JsonAST.JArray
 import org.json4s._
-import com.actionml.helpers.{ IndexedDatasetConversions, ItemID, ItemProps }
 import org.apache.spark.sql.DataFrame
 
 /** Universal Recommender models to save in ES */
+//noinspection ScalaStyle
 class URModel(
-    coocurrenceDfs: Seq[(ItemID, DataFrame)] = Seq.empty,
-    propertiesRDDs: Seq[RDD[(ItemID, ItemProps)]] = Seq.empty,
+    coocurrenceDfs: Seq[(String, DataFrame)] = Seq.empty,
+    propertiesRDDs: Seq[RDD[(String, Map[String, JValue])]] = Seq.empty,
     typeMappings: Map[String, (String, Boolean)] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
     nullModel: Boolean = false)(implicit sc: SparkContext) {
 
   @transient lazy val logger: Logger = Logger[this.type]
+
+  //implicit val formats: org.json4s.DefaultFormats = DefaultFormats
 
   /** Save all fields to be indexed by Elasticsearch and queried for recs
    *  This will is something like a table with row IDs = item IDs and separate fields for all
@@ -55,21 +56,39 @@ class URModel(
     // convert cooccurrence matrices into correlators as RDD[(itemID, (actionName, Seq[itemID])]
     // do they need to be in Elasticsearch format
     logger.info("Converting cooccurrence matrices into correlators")
-    val correlatorDFRDDs: Seq[RDD[(ItemID, ItemProps)]] = coocurrenceDfs.map { //Seq(("purchase",df),("atb",df))
+    //import org.json4s.DefaultFormats
+    //implicit val formats: org.json4s.DefaultFormats = DefaultFormats
+    val correlatorDFRDDs: Seq[RDD[(String, Map[String, JValue])]] = coocurrenceDfs.map { //Seq(("purchase",df),("atb",df))
       case (actionName, df) =>
-        val itemProps = df.map[(ItemID, ItemProps)](row => {
+        /*
+        val itemProps = df.map[(String, Map[String, JValue])](row => {
           var itemId = row.get(0).toString //
           var correlators = row.getSeq[String](1).toList //corrs [22805,22806]
           (itemId, Map(actionName -> JArray(correlators map { t => JsonAST.JString(t) })))
         })
+        logger.info(s"Creating an RDD for $actionName")
+*/
+        implicit val formats: org.json4s.DefaultFormats = DefaultFormats
+        val itemProps = df.rdd.map[(String, Map[String, JValue])](row => {
+          //import org.json4s.DefaultFormats
+          //implicit val formats: org.json4s.DefaultFormats = DefaultFormats
+          val itemId = row.getString(0) //
+          val correlators = row.getSeq[String](1).toList //corrs [22805,22806]
+          (itemId, Map(actionName -> JArray(correlators.map { t =>
+            JsonAST.JString(t)
+          })))
+        })
+        logger.info(s"Finished creating RDDs")
         itemProps
     }
 
-    val groupedRDD: RDD[(ItemID, ItemProps)] = groupAll(correlatorDFRDDs ++ propertiesRDDs)
+    val groupedRDD: RDD[(String, Map[String, JValue])] = groupAll(correlatorDFRDDs ++ propertiesRDDs)
+    logger.info("Done with groupAll, creating ES RDDs")
 
     val esRDD: RDD[Map[String, Any]] = groupedRDD.mapPartitions { iter =>
-      iter map {
+      iter.map {
         case (itemId, itemProps) =>
+          // implicit val formats = DefaultFormats
           val propsMap = itemProps.map {
             case (propName, propValue) =>
               propName -> URModel.extractJvalue(dateNames, propName, propValue)
@@ -77,26 +96,27 @@ class URModel(
           propsMap + ("id" -> itemId)
       }
     }
-
+    logger.info(s"Finished creating ES RDDs, beginning hotSwap")
     // todo: this could be replaced with an optional list of properties in the params json because now it
     // goes through every element to find it's property name
     val esFields: List[String] = esRDD.flatMap(_.keySet).distinct().collect.toList
     logger.info(s"ES fields[${esFields.size}]: $esFields")
-
     EsClient.hotSwap(esIndex, esType, esRDD, esFields, typeMappings, numESWriteConnections)
     true
   }
 
   // Something in the second def of this function hangs on some data, reverting so this ***disables ranking***
-  def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
+  def groupAll(fields: Seq[RDD[(String, Map[String, JValue])]]): RDD[(String, Map[String, JValue])] = {
     //def groupAll( fields: Seq[RDD[(String, (Map[String, Any]))]]): RDD[(String, (Map[String, Any]))] = {
     //if (fields.size > 1 && !fields.head.isEmpty() && !fields(1).isEmpty()) {
+    logger.info(s"Executing groupAll")
     if (fields.size > 1) {
-      fields.head.cogroup[ItemProps](groupAll(fields.drop(1))).map {
+      fields.head.cogroup[Map[String, JValue]](groupAll(fields.drop(1))).map {
         case (key, pairMapSeqs) =>
           // to be safe merge all maps but should only be one per rdd element
-          val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Any].asInstanceOf[ItemProps])(_ ++ _)
-          val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Any].asInstanceOf[ItemProps])(_ ++ _)
+          logger.info(s"Inside recursive groupAll, folding away")
+          val rdd1Maps = pairMapSeqs._1.foldLeft(Map.empty[String, Any].asInstanceOf[Map[String, JValue]])(_ ++ _)
+          val rdd2Maps = pairMapSeqs._2.foldLeft(Map.empty[String, Any].asInstanceOf[Map[String, JValue]])(_ ++ _)
           val fullMap = rdd1Maps ++ rdd2Maps
           (key, fullMap)
       }
@@ -105,8 +125,8 @@ class URModel(
     }
   }
 
-  /*  def groupAll(fields: Seq[RDD[(ItemID, ItemProps)]]): RDD[(ItemID, ItemProps)] = {
-    fields.fold(sc.emptyRDD[(ItemID, ItemProps)])(_ ++ _).reduceByKey(_ ++ _)
+  /*  def groupAll(fields: Seq[RDD[(String, Map[String, JValue])]]): RDD[(String, Map[String, JValue])] = {
+    fields.fold(sc.emptyRDD[(String, Map[String, JValue])])(_ ++ _).reduceByKey(_ ++ _)
   }
 */
 }

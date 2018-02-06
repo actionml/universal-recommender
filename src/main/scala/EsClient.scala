@@ -43,7 +43,6 @@ import org.json4s.JValue
 import org.json4s.DefaultFormats
 import org.json4s.JsonAST.JString
 // import org.json4s.native.Serialization.writePretty
-import com.actionml.helpers.{ ItemID, ItemProps }
 
 import scala.collection.immutable
 import scala.collection.parallel.mutable
@@ -324,7 +323,7 @@ object EsClient {
             "GET",
             s"/_alias/$alias",
             Map.empty[String, String].asJava)
-          val responseJValue = parse(EntityUtils.toString(response.getEntity))
+          val responseJValue = parse(EntityUtils.toString(response.getEntity), true)
           val oldIndexSet = responseJValue.extract[Map[String, JValue]].keys
           val oldIndexName = oldIndexSet.head
           client.performRequest(
@@ -377,7 +376,7 @@ object EsClient {
     response.getStatusLine.getStatusCode match {
       case 200 =>
         logger.info(s"Got source from query: ${query}")
-        Some(parse(EntityUtils.toString(response.getEntity)))
+        Some(parse(EntityUtils.toString(response.getEntity), true))
       case _ =>
         logger.info(s"Query: ${query}\nproduced status code: ${response.getStatusLine.getStatusCode}")
         None
@@ -411,11 +410,11 @@ object EsClient {
             None
           } else {
             logger.info(s"About to parse: $entity")
-            Some(parse(entity))
+            Some(parse(entity, true))
           }
         case 404 =>
           logger.info(s"got status code: 404")
-          Some(parse("""{"notFound": "true"}"""))
+          Some(parse("""{"notFound": "true"}""", true))
         case _ =>
           logger.info(s"got status code: ${response.getStatusLine.getStatusCode}\nentity: ${EntityUtils.toString(response.getEntity)}")
           None
@@ -446,7 +445,7 @@ object EsClient {
       "GET",
       s"/_alias/$alias",
       Map.empty[String, String].asJava)
-    val responseJValue = parse(EntityUtils.toString(response.getEntity))
+    val responseJValue = parse(EntityUtils.toString(response.getEntity), true)
     val allIndicesMap = responseJValue.extract[Map[String, JValue]]
     if (allIndicesMap.size == 1) {
       allIndicesMap.headOption.map(_._1)
@@ -463,7 +462,7 @@ object EsClient {
 
   def getRDD(
     alias: String,
-    typeName: String)(implicit sc: SparkContext): RDD[(ItemID, ItemProps)] = {
+    typeName: String)(implicit sc: SparkContext): RDD[(String, Map[String, JValue])] = {
     getIndexName(alias)
       .map(index => sc.esJsonRDD(alias + "/" + typeName) map { case (itemId, json) => itemId -> DataMap(json).fields })
       .getOrElse(sc.emptyRDD)

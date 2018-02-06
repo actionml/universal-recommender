@@ -30,11 +30,16 @@ import org.apache.spark.rdd.RDD
 import com.actionml.helpers._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
+import org.json4s.JValue
 
 class Preparator
     extends PPreparator[TrainingData, PreparedData] {
 
   @transient lazy implicit val logger: Logger = Logger[this.type]
+
+  def filter_str(on: String, min: Int, max: Int): String = {
+    s"$on >= $min" + (if (max == 0) "" else s" and $on <= $max")
+  }
 
   /** Create [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]] rdd backed
    *  "distributed row matrices" from the input string keyed rdds.
@@ -43,11 +48,6 @@ class Preparator
    *  @param trainingData list of (actionName, actionRDD)
    *  @return list of (correlatorName, correlatorIndexedDataset)
    */
-
-  def filter_str(on: String, min: Int, max: Int): String = {
-    s"$on >= $min" + (if (max == 0) "" else s" and $on <= $max")
-  }
-
   def prepare(sc: SparkContext, trainingData: TrainingData): PreparedData = {
     // now that we have all actions in separate RDDs we must merge any user dictionaries and
     // make sure the same user ids map to the correct events
@@ -75,7 +75,7 @@ class Preparator
         (eventName, filteredEventDf)
     })
 
-    val fieldsRDD: RDD[(ItemID, ItemProps)] = trainingData.fieldsRDD.map {
+    val fieldsRDD: RDD[(String, Map[String, JValue])] = trainingData.fieldsRDD.map {
       case (itemId, propMap) => itemId -> propMap.fields
     }
 
@@ -117,7 +117,7 @@ class Preparator
 
     }
 
-    val fieldsRDD: RDD[(ItemID, ItemProps)] = trainingData.fieldsRDD.map {
+    val fieldsRDD: RDD[(String, Map[String, JValue])] = trainingData.fieldsRDD.map {
       case (itemId, propMap) => itemId -> propMap.fields
     }
     PreparedData(indexedDatasets, fieldsRDD)
@@ -128,7 +128,7 @@ class Preparator
 
 case class PreparedData(
   actions: Seq[(ActionID, DataFrame)],
-  fieldsRDD: RDD[(ItemID, ItemProps)]) extends Serializable
+  fieldsRDD: RDD[(String, Map[String, JValue])]) extends Serializable
 
 /** This is a companion object used to build an [[org.apache.mahout.sparkbindings.indexeddataset.IndexedDatasetSpark]]
  *  The most important odditiy is that it enforces that all rows (users) have minEventsPerUser or more events. The

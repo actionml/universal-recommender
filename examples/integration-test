@@ -60,10 +60,11 @@ echo $ACCESS_KEY
 python examples/import_handmade.py --access_key $ACCESS_KEY --file data/sample-handmade-data.txt
 
 echo ""
-echo "Building and delpoying model"
+echo "Building the UR"
 pio build
+echo "Training on the test data"
 pio train  -- --driver-memory 4g --executor-memory 4g
-echo "Model will remain deployed after this test"
+echo "Deploying the UR for predictions, the deployed engine will be killed at the end of this test"
 nohup pio deploy > deploy.out &
 echo "Waiting 30 seconds for the server to start"
 sleep 30
@@ -87,7 +88,7 @@ echo "Note: differences in ordering of results with the same score is allowed."
 diff data/integration-test-expected.txt test.out
 
 deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
-echo "Killing the deployed test PredictionServer"
+echo "Killing the deployed test UR server"
 kill "$deploy_pid"
 
 

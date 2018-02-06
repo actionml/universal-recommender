@@ -185,12 +185,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   @transient lazy implicit val logger: Logger = Logger[this.type]
 
-  case class BoostableCorrelators(actionName: String, itemIDs: Seq[ItemID], boost: Option[Float] = None) {
+  case class BoostableCorrelators(actionName: String, itemIDs: Seq[String], boost: Option[Float] = None) {
     def toFilterCorrelators: FilterCorrelators = {
       FilterCorrelators(actionName, itemIDs)
     }
   }
-  case class FilterCorrelators(actionName: String, itemIDs: Seq[ItemID])
+  case class FilterCorrelators(actionName: String, itemIDs: Seq[String])
   case class ExclusionFields(propertyName: String, values: Seq[String])
 
   val appName: String = ap.appName
@@ -352,7 +352,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         }
     })
 
-    val propertiesRDD: RDD[(ItemID, ItemProps)] = if (calcPopular) {
+    val propertiesRDD: RDD[(String, Map[String, JValue])] = if (calcPopular) {
       val ranksRdd = getRanksRDD(data.fieldsRDD)
       data.fieldsRDD.fullOuterJoin(ranksRdd).map {
         case (item, (Some(fieldsPropMap), Some(rankPropMap))) => item -> (fieldsPropMap ++ rankPropMap)
@@ -452,12 +452,12 @@ class URAlgorithm(val ap: URAlgorithmParams)
   def calcPop(data: PreparedData)(implicit sc: SparkContext): NullModel = {
 
     // Aggregating all $set/$unsets properties, which are attached to items
-    val fieldsRDD: RDD[(ItemID, ItemProps)] = data.fieldsRDD
+    val fieldsRDD: RDD[(String, Map[String, JValue])] = data.fieldsRDD
     // Calc new ranking properties for all items
-    val ranksRdd: RDD[(ItemID, ItemProps)] = getRanksRDD(fieldsRDD)
+    val ranksRdd: RDD[(String, Map[String, JValue])] = getRanksRDD(fieldsRDD)
     // Current items RDD from ES
-    val currentMetadataRDD: RDD[(ItemID, ItemProps)] = EsClient.getRDD(esIndex, esType)
-    val propertiesRDD: RDD[(ItemID, ItemProps)] = currentMetadataRDD.fullOuterJoin(ranksRdd) map {
+    val currentMetadataRDD: RDD[(String, Map[String, JValue])] = EsClient.getRDD(esIndex, esType)
+    val propertiesRDD: RDD[(String, Map[String, JValue])] = currentMetadataRDD.fullOuterJoin(ranksRdd) map {
       case (itemId, maps) =>
         maps match {
           case (Some(metaProp), Some(rankProp)) => itemId -> (metaProp ++ rankProp)
@@ -590,7 +590,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         PredictedResult(recs)
 
       case _ =>
-        logger.info(s"No results for query ${parse(queryStr)}")
+        logger.info(s"No results for query ${parse(queryStr, true)}")
         PredictedResult(Array.empty[ItemScore])
     }
 
@@ -611,9 +611,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
    *  @param sc the current Spark context
    *  @return
    */
-  def getRanksRDD(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext): RDD[(ItemID, ItemProps)] = {
+  def getRanksRDD(fieldsRDD: RDD[(String, Map[String, JValue])])(implicit sc: SparkContext): RDD[(String, Map[String, JValue])] = {
     val popModel = PopModel(fieldsRDD)
-    val rankRDDs: Seq[(String, RDD[(ItemID, Double)])] = rankingsParams map { rankingParams =>
+    val rankRDDs: Seq[(String, RDD[(String, Double)])] = rankingsParams map { rankingParams =>
       val rankingType = rankingParams.`type`.getOrElse(DefaultURAlgoParams.BackfillType)
       val rankingFieldName = rankingParams.name.getOrElse(PopModel.nameByType(rankingType))
       val durationAsString = rankingParams.duration.getOrElse(DefaultURAlgoParams.BackfillDuration)
@@ -625,7 +625,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     }
 
     //    logger.debug(s"RankRDDs[${rankRDDs.size}]\n${rankRDDs.map(_._1).mkString(", ")}\n${rankRDDs.map(_._2.take(25).mkString("\n")).mkString("\n\n")}")
-    rankRDDs.foldLeft[RDD[(ItemID, ItemProps)]](sc.emptyRDD) {
+    rankRDDs.foldLeft[RDD[(String, Map[String, JValue])]](sc.emptyRDD) {
       case (leftRdd, (fieldName, rightRdd)) =>
         leftRdd.fullOuterJoin(rightRdd).map {
           case (itemId, (Some(propMap), Some(rank))) => itemId -> (propMap + (fieldName -> JDouble(rank)))
@@ -747,7 +747,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         |    "boost": 0
         |  }
         |}
-        |""".stripMargin)
+        |""".stripMargin, true)
     logger.info(s"shouldScore is: ${shouldScore}")
 
     shouldFields :+ shouldScore
@@ -800,9 +800,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
   /** Build sort query part */
   def buildQuerySort(): Seq[JValue] = if (recsModel == RecsModels.All || recsModel == RecsModels.BF) {
-    val sortByScore: Seq[JValue] = Seq(parse("""{"_score": {"order": "desc"}}"""))
+    val sortByScore: Seq[JValue] = Seq(parse("""{"_score": {"order": "desc"}}""", true))
     val sortByRanks: Seq[JValue] = rankingFieldNames map { fieldName =>
-      parse(s"""{ "$fieldName": { "unmapped_type": "double", "order": "desc" } }""")
+      parse(s"""{ "$fieldName": { "unmapped_type": "double", "order": "desc" } }""", true)
     }
     sortByScore ++ sortByRanks
   } else {
@@ -984,7 +984,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
       if (!before.isEmpty) range += rangeBefore
       range += rangeEnd
 
-      Seq(parse(range))
+      Seq(parse(range, true))
     } else if (ap.availableDateName.nonEmpty && ap.expireDateName.nonEmpty) { // use the query date or system date
       val availableDate = ap.availableDateName.get // never None
       val expireDate = ap.expireDateName.get
@@ -1017,7 +1017,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
         |}
         """.stripMargin
 
-      Seq(parse(available), parse(expire))
+      Seq(parse(available, true), parse(expire, true))
     } else {
       Seq.empty
     }

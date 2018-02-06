@@ -24,7 +24,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.joda.time.format.ISODateTimeFormat
 import org.joda.time.{ DateTime, Interval }
-import com.actionml.helpers.{ ItemID, ItemProps }
+import org.json4s.JValue
 
 import scala.language.postfixOps
 import scala.util.Random
@@ -50,7 +50,7 @@ object RankingType {
   override def toString: String = s"$Popular, $Trending, $Hot, $UserDefined, $Random"
 }
 
-class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
+class PopModel(fieldsRDD: RDD[(String, Map[String, JValue])])(implicit sc: SparkContext) {
 
   @transient lazy val logger: Logger = Logger[this.type]
 
@@ -59,7 +59,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
     eventNames: Seq[String],
     appName: String,
     duration: Int = 0,
-    offsetDate: Option[String] = None): RDD[(ItemID, Double)] = {
+    offsetDate: Option[String] = None): RDD[(String, Double)] = {
 
     // todo: make end manditory and fill it with "now" upstream if not specified, will simplify logic here
     // end should always be 'now' except in unusual conditions like for testing
@@ -98,7 +98,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
   /** Create random rank for all items */
   def calcRandom(
     appName: String,
-    interval: Interval): RDD[(ItemID, Double)] = {
+    interval: Interval): RDD[(String, Double)] = {
 
     val events = eventsRDD(appName = appName, interval = interval)
     val actionsRDD = events.map(_.targetEntityId).filter(_.isDefined).map(_.get).distinct()
@@ -113,7 +113,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
   def calcPopular(
     appName: String,
     eventNames: Seq[String],
-    interval: Interval): RDD[(ItemID, Double)] = {
+    interval: Interval): RDD[(String, Double)] = {
     val events = eventsRDD(appName, eventNames, interval)
     events.map { e => (e.targetEntityId, e.event) }
       .groupByKey()
@@ -128,7 +128,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
   def calcTrending(
     appName: String,
     eventNames: Seq[String],
-    interval: Interval): RDD[(ItemID, Double)] = {
+    interval: Interval): RDD[(String, Double)] = {
 
     logger.info(s"Current Interval: $interval, ${interval.toDurationMillis}")
     val halfInterval = interval.toDurationMillis / 2
@@ -153,7 +153,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
   def calcHot(
     appName: String,
     eventNames: Seq[String] = List.empty,
-    interval: Interval): RDD[(ItemID, Double)] = {
+    interval: Interval): RDD[(String, Double)] = {
 
     logger.info(s"Current Interval: $interval, ${interval.toDurationMillis}")
     val olderInterval = new Interval(interval.getStart, interval.getStart.plus(interval.toDurationMillis / 3))
@@ -198,7 +198,7 @@ class PopModel(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext) {
 
 object PopModel {
 
-  def apply(fieldsRDD: RDD[(ItemID, ItemProps)])(implicit sc: SparkContext): PopModel = {
+  def apply(fieldsRDD: RDD[(String, Map[String, JValue])])(implicit sc: SparkContext): PopModel = {
     new PopModel(fieldsRDD)
   }
 
