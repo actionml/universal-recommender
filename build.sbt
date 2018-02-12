@@ -4,7 +4,7 @@ import com.typesafe.sbt.SbtScalariform.ScalariformKeys
 
 name := "universal-recommender"
 
-version := "0.7.0-SNAPSHOT"
+version := "0.7.0"
 
 organization := "com.actionml"
 
@@ -12,7 +12,7 @@ scalaVersion := "2.11.11"
 
 scalaVersion in ThisBuild := "2.11.11"
 
-val mahoutVersion = "0.13.1-SNAPSHOT"
+val mahoutVersion = "0.13.0"
 
 val pioVersion = "0.12.0-incubating"
 
@@ -45,7 +45,7 @@ libraryDependencies ++= Seq(
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
 
-//resolvers += "Local Repository" at "file:///Users/pat/.custom-scala-m2/repo"
+resolvers += "Local Repository" at "file:///<path-to>/.custom-scala-m2/repo"
 
 resolvers += Resolver.mavenLocal
 
