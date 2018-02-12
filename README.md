@@ -20,8 +20,8 @@ Contributions are encouraged and appreciated. Create a push request (PR) against
 
 # The Universal Recommender Version Log
 
-## v0.7.0 
-## This README Has Special Build Instructions!
+## Git Tag: 0.7.0 
+**This README Has Special Build Instructions!**
 
 This tag is for the UR integrated with PredictionIO 0.12.0 using Scala 2.11, Spark 2.1.x, and most importantly Elasticsearch 5.x. Primary differences from 0.6.0:
 
@@ -110,7 +110,7 @@ Mahout has speedups for the Universal Recommender's use that have not been relea
 
 ### Build the Universal Recommender
 
- - download the UR from [here](https://github.com/actionml/universal-recommender.git) be sure move to the `v0.7.0` tag.
+ - download the UR from [here](https://github.com/actionml/universal-recommender.git) be sure move to the `0.7.0` tag.
  - replace the line: `resolvers += "Local Repository" at "file:///Users/pat/.custom-scala-m2/repo”` with your path to the local mahout build. **the UR will not build unless this line is changed, this is expected**
  - build the UR with `pio build` or run the integration test to get sample data put into PIO `./examples/integration-test`
 
