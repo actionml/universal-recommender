@@ -20,23 +20,24 @@ Contributions are encouraged and appreciated. Create a push request (PR) against
 
 # The Universal Recommender Version Log
 
-## v0.7.0
+## Git Tag: 0.7.0 
+**This README Has Special Build Instructions!**
 
-This tag is for the UR integrated with PredictionIO 0.12.0 using Scala 2.11, Spark 2.x, and most importantly Elasticsearch 5.x. Primary differences from 0.6.0:
+This tag is for the UR integrated with PredictionIO 0.12.0 using Scala 2.11, Spark 2.1.x, and most importantly Elasticsearch 5.x. Primary differences from 0.6.0:
 
  - Faster indexing, and queries due to the use of Elasticsearch 5.x
- - Faster model building due to speedups in the ActionML fork of Mahout, this step will be removed in the UR 0.7.1 when Mahout is next released.
- - Several upgrades like Scala 2.10 --> Scala 2.11
- - Spark 2.x support
+ - Faster model building due to speedups in the ActionML fork of Mahout, which requires the user to build Mahout locally. This step will be removed in a later version of the UR.
+ - Several upgrades such as Scala 2.10 --> Scala 2.11, Python 2.7 --> Python 3
+ - Spark 2.1.x support, PIO has a minor incompatibility with Spark 2.2.x 
  - Prediction 0.12.0 support
- - Full use of the Elasticsearch REST interface, enabling ES authentication
+ - Requires Elasticsearch 5.x. using the ES REST APIs exclusively now, enabling ES authentication use optionally. ES 5.x also improves indexing and query performance over previous versions.
  - Fixed a bug in exclusion rules based on item properties
 
  **WARNING**: Upgrading Elasticsearch or HBase will wipe existing data if any, so follow the special instructions below before installing any service upgrades.
 
 ### Special Instructions (not reflected on ActionML.com yet)
 
-You must build PredictionIO with the default parameters so just run `./make-distribution` this will require you to install Scala 2.11. You can also run up to Spark 2.1.1 or greater, ES 5.5.2 or greater, Hadoop 2.6 or greater, you can get away with using older versions of services except ES must be 5.x. If you have issues getting pio to build and run send questions to the [PIO mailing list](http://predictionio.apache.org/support/). 
+You must build PredictionIO with the default parameters so just run `./make-distribution` this will require you to install Scala 2.11 and Python 3 (as the default Scala and Python). You can also run up to Spark 2.1.x (but not 2.2.x), ES 5.5.2 or greater (but 6.x has not been tested), Hadoop 2.6 or greater, you can get away with using older versions of services except ES must be 5.x. If you have issues getting pio to build and run send questions to the [PIO mailing list](http://predictionio.apache.org/support/). 
 
 **Backup your data**, moving from ES 1 to ES 5 will delete all data!!!! Actually even worse it is still in HBase but you can’t get at it so to upgrade do the following:
 
@@ -45,7 +46,7 @@ You must build PredictionIO with the default parameters so just run `./make-dist
  - build and install pio 0.12.0 including all the services =====**The point of no return!**=====
  - `pio app new …` and `pio import …` any needed datasets
 
-Once PIO is running test with `pio status` and `pio app list`. You will need to create an app in import your data to run the integration test to get some sample data installed in the “handmade” app.
+Once PIO is running test with `pio status` and `pio app list`. To test your setup and UR integration, run `./examples/integration-test` from the URs home.
 
 ### Config for PIO 0.12.0 and the UR 0.7.0
 
@@ -103,14 +104,14 @@ PIO_STORAGE_SOURCES_HBASE_TYPE=hbase
 PIO_STORAGE_SOURCES_HBASE_HOME=/usr/local/hbase
 ```
 
-### Build Mahout
+### Build Mahout After PredictionIO!
 
 Mahout has speedups for the Universal Recommender's use that have not been released yet so you will have to build from source. To make this easy we have a fork hosted [here](https://github.com/actionml/mahout/tree/sparse-speedup-13.0), with special build instructions. Make sure you are on the "sparse-speedup" branch and follow instructions in the [README.md](https://github.com/actionml/mahout/blob/sparse-speedup-13.0/README.md)
 
 ### Build the Universal Recommender
 
- - download the UR from [here](https://github.com/actionml/universal-recommender.git) and checkout the `master` branch.
- - replace the line: `resolvers += "Local Repository" at "file:///Users/pat/.custom-scala-m2/repo”` with your path to the local mahout build
+ - download the UR from [here](https://github.com/actionml/universal-recommender.git) be sure move to the `0.7.0` tag.
+ - replace the line: `resolvers += "Local Repository" at "file:///Users/pat/.custom-scala-m2/repo”` with your path to the local mahout build. **the UR will not build unless this line is changed, this is expected**
  - build the UR with `pio build` or run the integration test to get sample data put into PIO `./examples/integration-test`
 
 
