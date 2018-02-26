@@ -181,7 +181,7 @@ case class URAlgorithmParams(
 class URAlgorithm(val ap: URAlgorithmParams)
     extends P2LAlgorithm[PreparedData, NullModel, Query, PredictedResult] {
 
-  implicit val formats = DefaultFormats
+  //implicit val formats = DefaultFormats
 
   @transient lazy implicit val logger: Logger = Logger[this.type]
 
@@ -570,6 +570,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
     val withRanks = query.withRanks.getOrElse(false)
     val predictedResults = searchHitsOpt match {
       case Some(searchHits) =>
+        implicit val json4sFormats = org.json4s.DefaultFormats
         val hits = (searchHits \ "hits" \ "hits").extract[Seq[JValue]]
         val recs = hits.map { hit =>
           if (withRanks) {

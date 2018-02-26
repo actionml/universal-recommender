@@ -33,7 +33,7 @@ class URModel(
     coocurrenceDfs: Seq[(String, DataFrame)] = Seq.empty,
     propertiesRDDs: Seq[RDD[(String, Map[String, JValue])]] = Seq.empty,
     typeMappings: Map[String, (String, Boolean)] = Map.empty, // maps fieldname that need type mapping in Elasticsearch
-    nullModel: Boolean = false)(implicit sc: SparkContext) {
+    nullModel: Boolean = false)(implicit sc: SparkContext) extends Serializable {
 
   @transient lazy val logger: Logger = Logger[this.type]
 
@@ -68,7 +68,7 @@ class URModel(
         })
         logger.info(s"Creating an RDD for $actionName")
 */
-        implicit val formats: org.json4s.DefaultFormats = DefaultFormats
+        //implicit val formats: org.json4s.DefaultFormats = DefaultFormats
         val itemProps = df.rdd.map[(String, Map[String, JValue])](row => {
           //import org.json4s.DefaultFormats
           //implicit val formats: org.json4s.DefaultFormats = DefaultFormats
