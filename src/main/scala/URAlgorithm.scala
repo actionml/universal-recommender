@@ -56,6 +56,7 @@ object DefaultURAlgoParams {
   val NumResults = 20
   val MaxCorrelatorsPerEventType = 50
   val MaxQueryEvents = 100 // default number of user history events to use in recs query
+  val MinEventsPerUser = 1
 
   val ExpireDateName = "expireDate" // default name for the expire date property of an item
   val AvailableDateName = "availableDate" //defualt name for and item's available after date
@@ -384,7 +385,7 @@ class URAlgorithm(val ap: URAlgorithmParams)
      */
 
     // Filter DataFrame by minLLR
-    val filter = if (crossOccur) col(LLR) >= minLLR else (col(LLR) >= minLLR) && (col(PID) !== col(RPID))
+    val filter = if (crossOccur) col(LLR) >= minLLR else (col(LLR) >= minLLR) && (col(PID) =!= col(RPID))
 
     val dfLLR = df.withColumn(LLR, udfLLR(totalUsers)(col(CNT_BOTH), col(CNT_PID1), col(CNT_PID2)))
       .filter(filter)

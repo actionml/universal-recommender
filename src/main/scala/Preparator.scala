@@ -59,7 +59,7 @@ class Preparator
     // Get users with minimum events
     val usersDF = primaryEventDf.groupBy(UID)
       .count()
-      .filter(s"count >= ${trainingData.minEventsPerUser.get}")
+      .filter(s"count >= ${trainingData.minEventsPerUser.getOrElse(DefaultURAlgoParams.MinEventsPerUser)}")
 
     // Remove users that do not meet requirements from all event DataFrames by joining with
     // user DataFrame
