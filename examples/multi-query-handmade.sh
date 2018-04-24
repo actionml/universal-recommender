@@ -191,8 +191,11 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
   BEFORE=`date --date="tomorrow" --iso-8601=seconds`
   AFTER=`date --date="1 day ago" --iso-8601=seconds`
 else
-  BEFORE=`date -v +1d +"%Y-%m-%dT%H:%M:%SZ"`
-  AFTER=`date -v -1d +"%Y-%m-%dT%H:%M:%SZ"`
+  # changed as per PR https://github.com/actionml/universal-recommender/pull/49
+  # BEFORE=`date -v +1d +"%Y-%m-%dT%H:%M:%SZ"`
+  # AFTER=`date -v -1d +"%Y-%m-%dT%H:%M:%SZ"`
+  BEFORE=`date -v +1d -u +%FT%TZ`
+  AFTER=`date -v -1d -u +%FT%TZ`
 fi
 #echo "before: $BEFORE after: $AFTER"
 echo "Recommendations for user: u1"

@@ -45,7 +45,9 @@ libraryDependencies ++= Seq(
   .map(_.exclude("org.apache.lucene","lucene-core")).map(_.exclude("org.apache.lucene","lucene-analyzers-common"))
 
 
-resolvers += "Local Repository" at "file:///<path-to>/.custom-scala-m2/repo"
+//resolvers += "Local Repository" at "file:///<path-to>/.custom-scala-m2/repo"
+
+resolvers += "Temp Scala 2.11 build of Mahout" at "https://github.com/actionml/mahout_2.11/raw/mvn-repo/"
 
 resolvers += Resolver.mavenLocal
 
