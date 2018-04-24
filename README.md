@@ -20,6 +20,13 @@ Contributions are encouraged and appreciated. Create a push request (PR) against
 
 # The Universal Recommender Version Log
 
+## Git Tag: 0.7.1
+
+This tag take precedence over 0.7.0, which should not be used. Changes:
+
+ - Removes the need to build Mahout from the ActionML's fork and so is much easier to install.
+ - Fixes a bug in the integration test which made it fail for macOS High Sierra in East Asian time zones.
+
 ## Git Tag: 0.7.0 
 **This README Has Special Build Instructions!**
 
