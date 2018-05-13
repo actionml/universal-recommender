@@ -120,3 +120,17 @@ Recommendations for user: u-3, Tablets and Samsung excluded, Estados Unidos Mexi
 Recommendations for user: u-3, Tablets and Samsung boosted, Estados Unidos Mexicanos excluded, phones included
 
 {"itemScores":[{"item":"Galaxy","score":1.4384104}]}
+
+============ Pagination test ============
+
+Recommendations for user: u5, 5 recs
+
+{"itemScores":[{"item":"Iphone 4","score":0.18232156},{"item":"Ipad-retina","score":0.18232156},{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0},{"item":"Surface","score":0.0}]}
+
+Recommendations for user: u5, paginated from 0 num 2
+
+{"itemScores":[{"item":"Iphone 4","score":0.18232156},{"item":"Ipad-retina","score":0.18232156}]}
+
+Recommendations for user: u5, paginated from 2 num 2
+
+{"itemScores":[{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0}]}
