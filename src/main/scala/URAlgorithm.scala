@@ -567,6 +567,9 @@ class URAlgorithm(val ap: URAlgorithmParams)
 
     logger.info(s"Got query: \n${query}")
 
+    val startPos = query.from.getOrElse(0)
+    logger.info(s"from: ${startPos}")
+
     try {
       // create a list of all query correlators that can have a bias (boost or filter) attached
       val (boostable, events) = getBiasedRecentUserActions(query)
@@ -575,7 +578,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
       // since users have action history and items have correlators and both correspond to the same "actions" like
       // purchase or view, we'll pass both to the query if the user history or items correlators are empty
       // then metadata or backfill must be relied on to return results.
-      val numRecs = query.num.getOrElse(limit)
+      val numRecs = if (query.num.isDefined) query.num.get else limit // num in query orerrides num in config
+      logger.info(s"UR query num = ${query.num}")
       logger.info(s"query.num.getOrElse returned numRecs: ${numRecs}")
 
       val should = buildQueryShould(query, boostable)
@@ -588,7 +592,8 @@ class URAlgorithm(val ap: URAlgorithmParams)
       logger.info(s"buildQuerySort returned sort: ${sort}")
 
       val json =
-        ("size" -> numRecs) ~
+        ("from" -> startPos) ~
+          ("size" -> numRecs) ~
           ("query" ->
             ("bool" ->
               ("should" -> should) ~

@@ -20,6 +20,12 @@ Contributions are encouraged and appreciated. Create a push request (PR) against
 
 # The Universal Recommender Version Log
 
+## Git Tag: 0.7.2
+
+Adds:
+
+ - Pagination support in query using `"from": 0, "num": 2` will return 2 recs from the first available, `"from": 2, "num": 2` will return 2 starting at the 3rd since `"from"` is 0 based.
+
 ## Git Tag: 0.7.1
 
 This tag take precedence over 0.7.0, which should not be used. Changes:
