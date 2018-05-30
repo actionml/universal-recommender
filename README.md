@@ -20,7 +20,7 @@ Contributions are encouraged and appreciated. Create a push request (PR) against
 
 # The Universal Recommender Version Log
 
-## Git Tag: 0.7.3
+## Git Tag: v0.7.3
 
 Adds:
 
