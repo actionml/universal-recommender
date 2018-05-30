@@ -57,7 +57,7 @@ echo "Importing data for integration test"
 ACCESS_KEY=`pio app show handmade | grep Key | cut -f 7 -d ' '`
 echo -n "Access key: "
 echo $ACCESS_KEY
-python examples/import_handmade.py --access_key $ACCESS_KEY --file data/sample-handmade-data.txt
+python3 examples/import_handmade.py --access_key $ACCESS_KEY --file data/sample-handmade-data.txt
 
 echo ""
 echo "Building and delpoying model"
@@ -82,9 +82,10 @@ echo "Restoring engine.json if is was saved"
 mv user-engine.json engine.json || true 
 
 echo ""
-echo "Differences between expected and actual results, none is a passing test."
-echo "Note: differences in ordering of results with the same score is allowed."
+echo "================ Differences between expected and actual results, none is a passing test ================"
 diff data/integration-test-expected.txt test.out
+echo "========================================================================================================="
+
 
 deploy_pid=`jps -lm | grep "onsole deploy" | cut -f 1 -d ' '`
 echo "Killing the deployed test PredictionServer"

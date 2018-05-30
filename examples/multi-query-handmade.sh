@@ -5,7 +5,7 @@ echo "Queries to illustrate many use cases on a small standard dataset and for a
 echo ""
 echo "WARNING: for this to produce the correct result you must:"
 echo "  1. Import data with"
-echo "     $ python examples/import_handmade.py --access_key <your-app-accesskey>"
+echo "     $ python3 examples/import_handmade.py --access_key <your-app-accesskey>"
 echo "  2. Copy handmade-engine.json to engine.json."
 echo "  3. Run 'pio build', 'pio train', and 'pio deploy'"
 echo "  4. The queries must be run the same day as the import was done because date filters are part of the test."
@@ -339,6 +339,44 @@ curl -H "Content-Type: application/json" -d '
         "values": ["Estados Unidos Mexicanos"],
         "bias": 0
     }]
+}' http://localhost:8000/queries.json
+echo ""
+
+
+echo ""
+echo "============ Pagination test ============"
+echo ""
+
+
+echo "Recommendations for user: u5, 5 recs"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u5"
+    "from": 0,
+    "num": 5
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u5, paginated from 0 num 2"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u5"
+    "from": 0,
+    "num": 2
+}' http://localhost:8000/queries.json
+echo ""
+
+echo ""
+echo "Recommendations for user: u5, paginated from 2 num 2"
+echo ""
+curl -H "Content-Type: application/json" -d '
+{
+    "user": "u5"
+    "from": 2,
+    "num": 2
 }' http://localhost:8000/queries.json
 echo ""
 

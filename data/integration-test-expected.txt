@@ -3,7 +3,7 @@ Queries to illustrate many use cases on a small standard dataset and for an auto
 
 WARNING: for this to produce the correct result you must:
   1. Import data with
-     $ python examples/import_handmade.py --access_key <your-app-accesskey>
+     $ python3 examples/import_handmade.py --access_key <your-app-accesskey>
   2. Copy handmade-engine.json to engine.json.
   3. Run 'pio build', 'pio train', and 'pio deploy'
   4. The queries must be run the same day as the import was done because date filters are part of the test.
@@ -120,3 +120,17 @@ Recommendations for user: u-3, Tablets and Samsung excluded, Estados Unidos Mexi
 Recommendations for user: u-3, Tablets and Samsung boosted, Estados Unidos Mexicanos excluded, phones included
 
 {"itemScores":[{"item":"Galaxy","score":1.4384104}]}
+
+============ Pagination test ============
+
+Recommendations for user: u5, 5 recs
+
+{"itemScores":[{"item":"Iphone 4","score":0.18232156},{"item":"Ipad-retina","score":0.18232156},{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0},{"item":"Surface","score":0.0}]}
+
+Recommendations for user: u5, paginated from 0 num 2
+
+{"itemScores":[{"item":"Iphone 4","score":0.18232156},{"item":"Ipad-retina","score":0.18232156}]}
+
+Recommendations for user: u5, paginated from 2 num 2
+
+{"itemScores":[{"item":"Galaxy","score":0.0},{"item":"Nexus","score":0.0}]}

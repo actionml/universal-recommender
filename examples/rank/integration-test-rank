@@ -70,7 +70,7 @@ pio app data-delete ${APP_NAME} -f
 echo -e "${GREEN}${LINE}"
 echo -e "Importing data for integration test"
 echo -e "${LINE}${NC}"
-python examples/rank/import_rank.py --access_key ${APP_ACCESS_KEY} --file './data/sample-rank-data.txt'
+python3 examples/rank/import_rank.py --access_key ${APP_ACCESS_KEY} --file './data/sample-rank-data.txt'
 
 echo -e "${GREEN}${LINE}"
 echo -e "Building and delpoying model"

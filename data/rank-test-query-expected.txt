@@ -3,7 +3,7 @@ Queries to illustrate many use cases on a small standard dataset and for an auto
 
 WARNING: for this to produce the correct result you must:
   1. Import data with
-     $ python examples/import_rank.py --access_key <your-app-accesskey>
+     $ python3 examples/import_rank.py --access_key <your-app-accesskey>
   2. Copy rank-engine.json to engine.json.
   3. Run 'pio build', 'pio train', and 'pio deploy'
   4. The queries must be run the same day as the import was done because date filters are part of the test.
