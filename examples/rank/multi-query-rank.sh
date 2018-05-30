@@ -5,7 +5,7 @@ echo "Queries to illustrate many use cases on a small standard dataset and for a
 echo ""
 echo "WARNING: for this to produce the correct result you must:"
 echo "  1. Import data with"
-echo "     $ python examples/import_rank.py --access_key <your-app-accesskey>"
+echo "     $ python3 examples/import_rank.py --access_key <your-app-accesskey>"
 echo "  2. Copy rank-engine.json to engine.json."
 echo "  3. Run 'pio build', 'pio train', and 'pio deploy'"
 echo "  4. The queries must be run the same day as the import was done because date filters are part of the test."
