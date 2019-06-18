@@ -6,7 +6,7 @@ Most recommenders can only use conversion events, like buy or rate. Using all we
 
 # Requirements&mdash;The Universal Recommender Has Moved!
 
-The UR 0.8.0+ requires the [Harness Machine Learning Server](https://github.com/actionml/harness). 0.7.3 and before run in PredictionIO 0.12.1. This repo is now build into Harness as a [pre-packaged Engine](https://github.com/actionml/harness/tree/develop/rest-server/engines/src/main/scala/com/actionml/engines/ur). See [Upgrading PIO to Harness](https://github.com/actionml/harness/blob/develop/docs/upgrading_from_pio_to_harness.md)
+The UR 0.8.0+ requires the [Harness Machine Learning Server](https://github.com/actionml/harness). 0.7.3 and before run in PredictionIO 0.12.1. This repo is now build into Harness as a [pre-packaged Engine](https://github.com/actionml/harness/tree/develop/rest-server/engines/src/main/scala/com/actionml/engines/ur). See [Upgrading from PIO to Harness](https://github.com/actionml/harness/blob/develop/docs/upgrading_from_pio_to_harness.md)
 
 # Documentation
 
@@ -26,7 +26,7 @@ Contributions are encouraged and appreciated. Create a push request (PR) against
 
 ## UR v0.8.0+ The UR Has Moved!
 
-The Universal Recommender has moved. Future versions will be included as a built-in Engine for the new [Harness Machine Learning Server](https://github.com/actionml/harness). the UR v0.8.0+ is data compatible with previous versions that are integrated with PredictionIO. This means you can export from UR+PIO and import into UR+Harness. See [Upgrading PIO to Harness](https://github.com/actionml/harness/blob/develop/docs/upgrading_from_pio_to_harness.md)
+The Universal Recommender has moved. Future versions will be included as a built-in Engine for the new [Harness Machine Learning Server](https://github.com/actionml/harness). the UR v0.8.0+ is data compatible with previous versions that are integrated with PredictionIO. This means you can export from UR+PIO and import into UR+Harness. See [Upgrading from PIO to Harness](https://github.com/actionml/harness/blob/develop/docs/upgrading_from_pio_to_harness.md)
 
 Adds:
 
