@@ -4,9 +4,9 @@ The Universal Recommender (UR) is a new type of collaborative filtering recommen
 
 Most recommenders can only use conversion events, like buy or rate. Using all we know about a user and their context allows us to much better predict their preferences.
 
-# Requirements
+# Requirements&mdash;The Universal Recommender Has Moved!
 
-The UR 0.8.0+ requires the Harness Machine Learning Server. 0.7.3 and before runs in PredictionIO 0.12.1. This repo is now build into Harness as a [pre-packaged Engine](https://github.com/actionml/harness/tree/develop/rest-server/engines/src/main/scala/com/actionml/engines/ur).
+The UR 0.8.0+ requires the [Harness Machine Learning Server](https://github.com/actionml/harness). 0.7.3 and before run in PredictionIO 0.12.1. This repo is now build into Harness as a [pre-packaged Engine](https://github.com/actionml/harness/tree/develop/rest-server/engines/src/main/scala/com/actionml/engines/ur).
 
 # Documentation
 
