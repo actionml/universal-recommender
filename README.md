@@ -4,6 +4,10 @@ The Universal Recommender (UR) is a new type of collaborative filtering recommen
 
 Most recommenders can only use conversion events, like buy or rate. Using all we know about a user and their context allows us to much better predict their preferences.
 
+# Requirements
+
+The UR 0.8.0+ requires the Harness Machine Learning Server. 0.7.3 and before runs in PredictionIO 0.12.1. This repo is now build into Harness as a [pre-packaged Engine](https://github.com/actionml/harness/tree/develop/rest-server/engines/src/main/scala/com/actionml/engines/ur).
+
 # Documentation
 
  - [The Universal Recommender](http://actionml.com/docs/ur)
@@ -18,7 +22,19 @@ All docs for the Universal Recommender are [here](http://actionml.com/docs/ur) a
 
 Contributions are encouraged and appreciated. Create a push request (PR) against the [`develop`](https://github.com/actionml/universal-recommender/tree/develop) branch of the git repo. We like to keep new features general so users will not be required to change the code of the UR to make use of the new feature. We will be happy to provide guidance or help via the GitHub PR review mechanism.
 
-# The Universal Recommender Version Log
+# Version Log
+
+## UR v0.8.0+ The UR Has Moved!
+
+The Universal Recommender has moved. Future versions will be included as a built-in Engine for the new [Harness Machine Learning Server](https://github.com/actionml/harness). the UR v0.8.0+ is data compatible with previous versions that are integrated with PredictionIO. This means you can export from UR+PIO and import into UR+Harness. See [Upgrading PIO to Harness](https://github.com/actionml/harness/blob/develop/docs/upgrading_from_pio_to_harness.md)
+
+Adds:
+
+ - Realtime changes to item properties with $set.
+ - Ease of having more than one predictive model (Harness feature)
+ - TTL based trim of old events. After a user defined period, events may be dropped from the collection without running a separate process (Harness feature)
+ - Containerized deployment
+ - many other features are inherited from 
 
 ## Git Tag: v0.7.3
 
@@ -55,7 +71,7 @@ This tag is for the UR integrated with PredictionIO 0.12.0 using Scala 2.11, Spa
 
  **WARNING**: Upgrading Elasticsearch or HBase will wipe existing data if any, so follow the special instructions below before installing any service upgrades.
 
-### Special Instructions (not reflected on ActionML.com yet)
+### Upgrade from UR v0.6.0 Instructions
 
 You must build PredictionIO with the default parameters so just run `./make-distribution` this will require you to install Scala 2.11 and Python 3 (as the default Scala and Python). You can also run up to Spark 2.1.x (but not 2.2.x), ES 5.5.2 or greater (but 6.x has not been tested), Hadoop 2.6 or greater, you can get away with using older versions of services except ES must be 5.x. If you have issues getting pio to build and run send questions to the [PIO mailing list](http://predictionio.apache.org/support/). 
 
